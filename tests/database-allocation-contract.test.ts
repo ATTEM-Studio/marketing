@@ -36,6 +36,14 @@ test("fails closed for nullable metrics and allocation JSON", () => {
   expect(migration).toContain("v_allocation_total is null");
 });
 
+test("rejects target revenue outside the positive finite contract", () => {
+  expect(migration).toContain("p_target_revenue is null");
+  expect(migration).toContain(
+    "p_target_revenue::text in ('NaN', 'Infinity', '-Infinity')",
+  );
+  expect(migration).toContain("p_target_revenue <= 0");
+});
+
 test("makes the secured RPC the only assessment and goal write path", () => {
   expect(migration).toContain(
     "revoke insert, update, delete on public.assessments, public.goals from anon, authenticated;",

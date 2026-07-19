@@ -1,6 +1,6 @@
 begin;
 
-select plan(79);
+select plan(85);
 
 select has_table('public', 'profiles');
 select has_table('public', 'invite_codes');
@@ -126,6 +126,36 @@ select throws_ok(
   $$insert into public.goals (user_id, store_id, assessment_id, target_revenue, allocation, period_start, period_end) values ('44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '66666666-6666-6666-6666-666666666666', 40000000, '{}'::jsonb, current_date, current_date)$$,
   '42501', null,
   'an active authenticated user cannot insert a goal directly'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, null::numeric, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects SQL NULL target revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, -1, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects negative target revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 0, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects zero target revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 'NaN'::numeric, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects NaN target revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 'Infinity'::numeric, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects positive infinity target revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, '-Infinity'::numeric, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects negative infinity target revenue'
 );
 select throws_ok(
   $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, null::jsonb, '{}'::jsonb, 40000000, '{}'::jsonb, current_date, current_date)$$,

@@ -41,6 +41,12 @@ begin
     raise exception 'store_not_found' using errcode = 'P0001';
   end if;
 
+  if p_target_revenue is null
+    or p_target_revenue::text in ('NaN', 'Infinity', '-Infinity')
+    or p_target_revenue <= 0 then
+    raise exception 'invalid_goal_allocation' using errcode = 'P0001';
+  end if;
+
   if jsonb_typeof(p_input_data) is distinct from 'object'
     or jsonb_typeof(p_calculated_metrics) is distinct from 'object'
     or jsonb_typeof(p_diagnosis) is distinct from 'object'
