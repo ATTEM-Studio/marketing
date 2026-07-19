@@ -29,8 +29,40 @@ export interface DiagnosisInput {
 }
 
 type Step = 1 | 2 | 3;
+type QuestionId =
+  | "averageMonthlyRevenue"
+  | "targetMonthlyRevenue"
+  | "averageOrderValue"
+  | "operatingDays"
+  | "monthlyCustomerCountStatus"
+  | "primaryConcern"
+  | "capacity"
+  | "returningDataStatus"
+  | "hasConsentDb"
+  | "canChangeMenu"
+  | "adsRunning";
 type RenderOptions = {
   onSubmit(input: DiagnosisInput): Promise<void> | void;
+};
+
+const questions: readonly { id: QuestionId; step: Step }[] = [
+  { id: "averageMonthlyRevenue", step: 1 },
+  { id: "targetMonthlyRevenue", step: 1 },
+  { id: "averageOrderValue", step: 1 },
+  { id: "operatingDays", step: 1 },
+  { id: "monthlyCustomerCountStatus", step: 2 },
+  { id: "primaryConcern", step: 2 },
+  { id: "capacity", step: 3 },
+  { id: "returningDataStatus", step: 3 },
+  { id: "hasConsentDb", step: 3 },
+  { id: "canChangeMenu", step: 3 },
+  { id: "adsRunning", step: 3 },
+];
+
+const chapterTitles: Record<Step, string> = {
+  1: "매출 목표",
+  2: "현재 고객 상황",
+  3: "실행 조건",
 };
 
 const numberValue = (form: HTMLFormElement, name: string): number => {
@@ -221,15 +253,49 @@ function detailsFields(name: string, label: string): string {
   return `<div class="detail-row"><strong>${label}</strong>${numberField(`${name}Previous`, "이전 기간", false)}${numberField(`${name}Current`, "현재 기간", false)}</div>`;
 }
 
-function showStep(root: HTMLElement, step: Step): void {
+function showQuestion(root: HTMLElement, index: number): void {
+  const current = questions[index];
+  if (!current) return;
   root.querySelectorAll<HTMLElement>("[data-step]").forEach((panel) => {
-    panel.hidden = Number(panel.dataset.step) !== step;
+    panel.hidden = Number(panel.dataset.step) !== current.step;
   });
-  const label = root.querySelector<HTMLElement>("[data-step-label]");
+  root.querySelectorAll<HTMLElement>("[data-question]").forEach((panel) => {
+    panel.hidden = panel.dataset.question !== current.id;
+  });
+  const chapterQuestions = questions.filter(
+    (item) => item.step === current.step,
+  );
+  const questionNumber =
+    chapterQuestions.findIndex((item) => item.id === current.id) + 1;
+  const questionLabel = root.querySelector<HTMLElement>(
+    "[data-question-label]",
+  );
+  const chapterTitle = root.querySelector<HTMLElement>("[data-chapter-title]");
+  const stepLabel = root.querySelector<HTMLElement>("[data-step-label]");
   const progress = root.querySelector<HTMLElement>("[data-progress]");
-  if (label) label.textContent = `${step} / 3`;
-  if (progress) progress.style.width = `${Math.round((step / 3) * 100)}%`;
-  root.querySelector<HTMLElement>(`[data-step='${step}'] input`)?.focus();
+  const previousButton = root.querySelector<HTMLButtonElement>(
+    "[data-prev-question]",
+  );
+  const nextButton = root.querySelector<HTMLButtonElement>(
+    "[data-next-question]",
+  );
+  const submitButton = root.querySelector<HTMLButtonElement>(
+    "[data-submit-diagnosis]",
+  );
+  if (questionLabel) {
+    questionLabel.textContent = `질문 ${questionNumber} / ${chapterQuestions.length}`;
+  }
+  if (chapterTitle) chapterTitle.textContent = chapterTitles[current.step];
+  if (stepLabel) stepLabel.textContent = `${current.step} / 3`;
+  if (progress) {
+    progress.style.width = `${Math.round((current.step / 3) * 100)}%`;
+  }
+  if (previousButton) previousButton.hidden = index === 0;
+  if (nextButton) nextButton.hidden = index === questions.length - 1;
+  if (submitButton) submitButton.hidden = index !== questions.length - 1;
+  root
+    .querySelector<HTMLElement>(`[data-question='${current.id}'] h2`)
+    ?.focus();
 }
 
 function setError(form: HTMLFormElement, name: string, message: string): void {
@@ -269,6 +335,58 @@ function clearErrors(form: HTMLFormElement): void {
     .forEach((group) => {
       group.removeAttribute("aria-invalid");
     });
+}
+
+function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
+  clearErrors(form);
+  if (
+    [
+      "averageMonthlyRevenue",
+      "targetMonthlyRevenue",
+      "averageOrderValue",
+      "operatingDays",
+    ].includes(id)
+  ) {
+    const input = form.elements.namedItem(id);
+    if (!(input instanceof HTMLInputElement) || input.value.trim() === "") {
+      setError(form, id, "값을 입력해주세요.");
+      if (input instanceof HTMLInputElement) input.focus();
+      return false;
+    }
+    if (hasInvalidNumber(form, id)) {
+      setError(form, id, "숫자만 입력해주세요.");
+      input.focus();
+      return false;
+    }
+  }
+  if (
+    [
+      "monthlyCustomerCountStatus",
+      "primaryConcern",
+      "capacity",
+      "returningDataStatus",
+      "hasConsentDb",
+      "canChangeMenu",
+      "adsRunning",
+    ].includes(id) &&
+    !radioValue(form, id)
+  ) {
+    setError(form, id, "하나를 선택해주세요.");
+    form.querySelector<HTMLInputElement>(`[name='${id}']`)?.focus();
+    return false;
+  }
+  return true;
+}
+
+function updateCoachingFeedback(form: HTMLFormElement): void {
+  const feedback = form.querySelector<HTMLElement>("[data-coaching-feedback]");
+  if (!feedback) return;
+  const current = numberValue(form, "averageMonthlyRevenue");
+  const target = numberValue(form, "targetMonthlyRevenue");
+  feedback.textContent =
+    current > 0 && target > current
+      ? `목표까지 월 ${new Intl.NumberFormat("ko-KR").format(target - current)}원이 더 필요해요.`
+      : "";
 }
 
 function syncAdvertisingFields(
@@ -417,7 +535,7 @@ export function renderDiagnosis(
     <header class="work-header">
       <a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>
       <div class="progress-area">
-        <div class="progress-copy"><span>매장 진단</span><strong data-step-label>1 / 3</strong></div>
+        <div class="progress-copy"><span data-chapter-title>매출 목표</span><strong data-step-label>1 / 3</strong><span data-question-label>질문 1 / 4</span></div>
         <div class="progress-track" aria-hidden="true"><span data-progress style="width: 33%"></span></div>
       </div>
     </header>
@@ -425,88 +543,156 @@ export function renderDiagnosis(
       <p class="eyebrow">내 가게 숫자 점검</p>
       <h1>아는 수치부터 차례로 확인해 볼게요.</h1>
       <p class="page-description">모르는 값은 편하게 모른다고 선택해 주세요. 확인되지 않은 값은 추정해 단정하지 않습니다.</p>
-      <form data-diagnosis-form novalidate>
+      <form class="diagnosis-stage" data-diagnosis-form novalidate>
         <fieldset class="step-panel" data-step="1"><legend><span>1단계</span> 매출 목표</legend>
           <p class="step-description">현재 위치와 목표를 입력하면 필요한 고객 수의 기준을 계산합니다.</p>
-          <div class="question-grid">
+          <section class="question-card" data-question="averageMonthlyRevenue">
+            <p class="question-number">질문 1</p>
+            <h2 tabindex="-1">최근 한 달 평균 매출은 어느 정도인가요?</h2>
+            <p class="question-help">정확하지 않아도 괜찮아요. 가장 가까운 금액을 적어주세요.</p>
             ${numberField("averageMonthlyRevenue", "최근 월평균 매출")}
+          </section>
+          <section class="question-card" data-question="targetMonthlyRevenue" hidden>
+            <p class="question-number">질문 2</p>
+            <h2 tabindex="-1">목표로 하는 한 달 매출은 얼마인가요?</h2>
+            <p class="question-help">지금 달성하고 싶은 현실적인 목표 금액을 적어주세요.</p>
             ${numberField("targetMonthlyRevenue", "목표 월매출")}
+          </section>
+          <section class="question-card" data-question="averageOrderValue" hidden>
+            <p class="question-number">질문 3</p>
+            <h2 tabindex="-1">평균 객단가는 얼마인가요?</h2>
+            <p class="question-help">고객 한 명이 한 번 방문해 결제하는 평균 금액을 적어주세요.</p>
             ${numberField("averageOrderValue", "평균 객단가")}
+          </section>
+          <section class="question-card" data-question="operatingDays" hidden>
+            <p class="question-number">질문 4</p>
+            <h2 tabindex="-1">한 달에 며칠 영업하나요?</h2>
+            <p class="question-help">평균적인 한 달을 기준으로 영업일을 적어주세요.</p>
             ${numberField("operatingDays", "월 영업일")}
-          </div>
-          ${allocationFields()}
-          <div class="form-actions form-actions-end"><button type="button" data-next-step>고객 상황 확인하기</button></div>
+            ${allocationFields()}
+          </section>
         </fieldset>
         <fieldset class="step-panel" data-step="2" hidden><legend><span>2단계</span> 현재 고객 상황</legend>
           <p class="step-description">알고 있는 고객 수와 지금 가장 궁금한 지점을 선택해 주세요.</p>
-          ${choiceGroup(
-            "monthlyCustomerCountStatus",
-            "월 고객 수를 알고 있나요?",
-            [
-              ["known", "알고 있어요"],
-              ["unknown", "모르겠어요"],
-            ],
-          )}
-          ${numberField("monthlyCustomerCount", "월 고객 수", false)}
-          ${choiceGroup("primaryConcern", "지금 가장 궁금한 점은 무엇인가요?", [
-            ["customers", "새 고객"],
-            ["ads", "광고"],
-            ["averageOrderValue", "객단가"],
-            ["returning", "재방문"],
-            ["unknown", "모르겠어요"],
-          ])}
-          <div class="form-actions"><button type="button" class="secondary-action" data-prev-step>이전</button><button type="button" data-next-step>실행 조건 확인하기</button></div>
+          <section class="question-card" data-question="monthlyCustomerCountStatus" hidden>
+            <p class="question-number">질문 1</p>
+            <h2 tabindex="-1">월 고객 수를 알고 있나요?</h2>
+            <p class="question-help">모른다면 모른다고 선택해도 기본 진단을 계속할 수 있어요.</p>
+            ${choiceGroup(
+              "monthlyCustomerCountStatus",
+              "월 고객 수를 알고 있나요?",
+              [
+                ["known", "알고 있어요"],
+                ["unknown", "모르겠어요"],
+              ],
+            )}
+            ${numberField("monthlyCustomerCount", "월 고객 수", false)}
+          </section>
+          <section class="question-card" data-question="primaryConcern" hidden>
+            <p class="question-number">질문 2</p>
+            <h2 tabindex="-1">지금 가장 궁금한 점은 무엇인가요?</h2>
+            <p class="question-help">가장 먼저 확인하고 싶은 한 가지를 골라주세요.</p>
+            ${choiceGroup(
+              "primaryConcern",
+              "지금 가장 궁금한 점은 무엇인가요?",
+              [
+                ["customers", "새 고객"],
+                ["ads", "광고"],
+                ["averageOrderValue", "객단가"],
+                ["returning", "재방문"],
+                ["unknown", "모르겠어요"],
+              ],
+            )}
+          </section>
         </fieldset>
         <fieldset class="step-panel" data-step="3" hidden><legend><span>3단계</span> 실행 조건</legend>
           <p class="step-description">지금 실제로 바꿀 수 있는 범위를 확인해 실행 가능한 행동을 고릅니다.</p>
-          ${choiceGroup("capacity", "추가 고객을 받을 여력이 있나요?", [
-            ["yes", "있어요"],
-            ["sometimes", "시간대에 따라 달라요"],
-            ["no", "지금은 어려워요"],
-          ])}
-          ${choiceGroup("returningDataStatus", "재방문 데이터 상태", [
-            ["known", "연결된 방문 이력으로 확인했어요"],
-            ["sampled", "일부만 확인했어요"],
-            ["unknown", "잘 모르겠어요 — 신규 고객 기준으로 계산할게요"],
-          ])}
-          ${choiceGroup(
-            "hasConsentDb",
-            "광고성 안내에 동의한 고객 목록이 있나요?",
-            [
-              ["true", "있어요"],
-              ["false", "없어요"],
-            ],
-          )}
-          ${choiceGroup("canChangeMenu", "메뉴나 가격 구성을 바꿀 수 있나요?", [
-            ["true", "가능해요"],
-            ["false", "지금은 어려워요"],
-          ])}
-          ${choiceGroup("adsRunning", "현재 광고를 하고 있나요?", [
-            ["true", "하고 있어요"],
-            ["false", "하지 않아요"],
-          ])}
-          ${choiceGroup(
-            "hasConnectedVisitHistory",
-            "연결된 방문 이력이 있나요?",
-            [
-              ["true", "있어요"],
-              ["false", "없어요"],
-            ],
-          )}
-          ${advertisingFields()}
-          <details><summary>비교할 수치가 있으면 더 입력하기 (선택)</summary>
-            ${detailsFields("exposure", "노출")}${detailsFields("click", "클릭")}${detailsFields("visit", "방문")}${detailsFields("averageOrderValueMetric", "객단가")}${detailsFields("returning", "재방문")}
-          </details>
-          <div class="form-actions"><button type="button" class="secondary-action" data-prev-step>이전</button><button type="submit" data-submit-diagnosis>내 가게 결과 보기</button></div>
-          <p data-save-status class="form-status" role="status" aria-live="polite"></p>
+          <section class="question-card" data-question="capacity" hidden>
+            <p class="question-number">질문 1</p>
+            <h2 tabindex="-1">추가 고객을 받을 여력이 있나요?</h2>
+            <p class="question-help">가장 붐비는 시간대를 기준으로 골라주세요.</p>
+            ${choiceGroup("capacity", "추가 고객을 받을 여력이 있나요?", [
+              ["yes", "있어요"],
+              ["sometimes", "시간대에 따라 달라요"],
+              ["no", "지금은 어려워요"],
+            ])}
+          </section>
+          <section class="question-card" data-question="returningDataStatus" hidden>
+            <p class="question-number">질문 2</p>
+            <h2 tabindex="-1">재방문 데이터를 어느 정도 알고 있나요?</h2>
+            <p class="question-help">확인된 범위만 선택하면 돼요.</p>
+            ${choiceGroup("returningDataStatus", "재방문 데이터 상태", [
+              ["known", "연결된 방문 이력으로 확인했어요"],
+              ["sampled", "일부만 확인했어요"],
+              ["unknown", "잘 모르겠어요 — 신규 고객 기준으로 계산할게요"],
+            ])}
+            ${choiceGroup(
+              "hasConnectedVisitHistory",
+              "연결된 방문 이력이 있나요?",
+              [
+                ["true", "있어요"],
+                ["false", "없어요"],
+              ],
+            )}
+          </section>
+          <section class="question-card" data-question="hasConsentDb" hidden>
+            <p class="question-number">질문 3</p>
+            <h2 tabindex="-1">광고성 안내에 동의한 고객 목록이 있나요?</h2>
+            <p class="question-help">문자나 알림을 보낼 수 있는 동의 고객 목록을 기준으로 답해주세요.</p>
+            ${choiceGroup(
+              "hasConsentDb",
+              "광고성 안내에 동의한 고객 목록이 있나요?",
+              [
+                ["true", "있어요"],
+                ["false", "없어요"],
+              ],
+            )}
+          </section>
+          <section class="question-card" data-question="canChangeMenu" hidden>
+            <p class="question-number">질문 4</p>
+            <h2 tabindex="-1">메뉴나 가격 구성을 바꿀 수 있나요?</h2>
+            <p class="question-help">지금 바로 시험할 수 있는 범위를 기준으로 골라주세요.</p>
+            ${choiceGroup(
+              "canChangeMenu",
+              "메뉴나 가격 구성을 바꿀 수 있나요?",
+              [
+                ["true", "가능해요"],
+                ["false", "지금은 어려워요"],
+              ],
+            )}
+          </section>
+          <section class="question-card" data-question="adsRunning" hidden>
+            <p class="question-number">질문 5</p>
+            <h2 tabindex="-1">현재 광고를 하고 있나요?</h2>
+            <p class="question-help">현재 비용을 지출해 운영 중인 광고를 기준으로 답해주세요.</p>
+            ${choiceGroup("adsRunning", "현재 광고를 하고 있나요?", [
+              ["true", "하고 있어요"],
+              ["false", "하지 않아요"],
+            ])}
+            ${advertisingFields()}
+            <details><summary>비교할 수치가 있으면 더 입력하기 (선택)</summary>
+              ${detailsFields("exposure", "노출")}${detailsFields("click", "클릭")}${detailsFields("visit", "방문")}${detailsFields("averageOrderValueMetric", "객단가")}${detailsFields("returning", "재방문")}
+            </details>
+          </section>
         </fieldset>
+        <aside class="coaching-feedback" data-coaching-feedback aria-live="polite"></aside>
+        <div class="question-actions">
+          <button type="button" class="secondary-action" data-prev-question hidden>이전</button>
+          <button type="button" data-next-question>다음</button>
+          <button type="submit" data-submit-diagnosis hidden>내 가게 결과 보기</button>
+        </div>
+        <p data-save-status class="form-status" role="status" aria-live="polite"></p>
       </form>
     </main>`;
 
   const form = root.querySelector<HTMLFormElement>("[data-diagnosis-form]");
   if (!form) return;
   syncAdvertisingFields(form);
-  let step: Step = 1;
+  let questionIndex = 0;
+  showQuestion(root, questionIndex);
+  form.addEventListener("input", () => {
+    updateCoachingFeedback(form);
+  });
   form.addEventListener("change", (event) => {
     const target = event.target;
     if (target instanceof HTMLInputElement && target.name === "adsRunning") {
@@ -523,18 +709,33 @@ export function renderDiagnosis(
   form.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLButtonElement)) return;
-    if (target.hasAttribute("data-next-step") && validateStep(form, step)) {
-      step = (step + 1) as Step;
-      showStep(root, step);
+    if (target.hasAttribute("data-next-question")) {
+      const current = questions[questionIndex];
+      const next = questions[questionIndex + 1];
+      if (!current || !validateQuestion(form, current.id)) return;
+      if (
+        (!next || next.step !== current.step) &&
+        !validateStep(form, current.step)
+      ) {
+        return;
+      }
+      questionIndex += 1;
+      showQuestion(root, questionIndex);
     }
-    if (target.hasAttribute("data-prev-step")) {
-      step = (step - 1) as Step;
-      showStep(root, step);
+    if (target.hasAttribute("data-prev-question") && questionIndex > 0) {
+      questionIndex -= 1;
+      showQuestion(root, questionIndex);
     }
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!validateStep(form, 3)) return;
+    if (
+      !validateStep(form, 1) ||
+      !validateStep(form, 2) ||
+      !validateStep(form, 3)
+    ) {
+      return;
+    }
     await options.onSubmit(readDiagnosisForm(form));
   });
 }

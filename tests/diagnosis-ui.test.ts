@@ -8,6 +8,11 @@ const click = (selector: string) => {
   if (!button) throw new Error(`missing button ${selector}`);
   button.click();
 };
+const advanceQuestions = (count: number) => {
+  for (let index = 0; index < count; index += 1) {
+    click("[data-next-question]");
+  }
+};
 const setValue = (name: string, value: string) => {
   const input = document.querySelector<HTMLInputElement>(`[name='${name}']`);
   if (!input) throw new Error(`missing input ${name}`);
@@ -31,19 +36,67 @@ const openStepThree = async (primaryConcern = "unknown") => {
   setValue("targetMonthlyRevenue", "40,000,000");
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
-  click("[data-next-step]");
+  advanceQuestions(4);
   choose("monthlyCustomerCountStatus", "unknown");
   choose("primaryConcern", primaryConcern);
-  click("[data-next-step]");
+  advanceQuestions(2);
   choose("capacity", "yes");
   choose("returningDataStatus", "unknown");
   choose("hasConsentDb", "false");
   choose("canChangeMenu", "true");
+  advanceQuestions(4);
   return root;
 };
 
 beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>';
+});
+
+test("shows only the current chapter and current question", async () => {
+  const root = document.querySelector<HTMLElement>("#app")!;
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+
+  expect(root.querySelectorAll("[data-step]:not([hidden])")).toHaveLength(1);
+  expect(root.querySelectorAll("[data-question]:not([hidden])")).toHaveLength(
+    1,
+  );
+  expect(root.querySelector("[data-chapter-title]")?.textContent).toBe(
+    "매출 목표",
+  );
+  expect(root.querySelector("[data-question-label]")?.textContent).toBe(
+    "질문 1 / 4",
+  );
+});
+
+test("keeps a revenue answer when moving backward", async () => {
+  const root = document.querySelector<HTMLElement>("#app")!;
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  click("[data-next-question]");
+  click("[data-prev-question]");
+
+  expect(
+    document.querySelector<HTMLInputElement>("[name='averageMonthlyRevenue']")
+      ?.value,
+  ).toBe("30,000,000");
+  expect(root.querySelectorAll("[data-question]:not([hidden])")).toHaveLength(
+    1,
+  );
+});
+
+test("summarizes the gap immediately after the target revenue answer", async () => {
+  const root = document.querySelector<HTMLElement>("#app")!;
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  click("[data-next-question]");
+  setValue("targetMonthlyRevenue", "40,000,000");
+
+  expect(root.querySelector("[data-coaching-feedback]")?.textContent).toContain(
+    "목표까지 월 10,000,000원이 더 필요해요",
+  );
 });
 
 test("shows a readable three-step progress indicator", async () => {
@@ -61,7 +114,7 @@ test("shows a readable three-step progress indicator", async () => {
   setValue("targetMonthlyRevenue", "40,000,000");
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
-  click("[data-next-step]");
+  advanceQuestions(4);
 
   expect(root.querySelector("[data-step-label]")?.textContent).toBe("2 / 3");
   expect(root.querySelector<HTMLElement>("[data-progress]")?.style.width).toBe(
@@ -92,14 +145,15 @@ test("completes the three-step all-new-customer ceiling flow", async () => {
   setValue("targetMonthlyRevenue", "40,000,000");
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
-  click("[data-next-step]");
+  advanceQuestions(4);
   choose("monthlyCustomerCountStatus", "unknown");
   choose("primaryConcern", "unknown");
-  click("[data-next-step]");
+  advanceQuestions(2);
   choose("capacity", "yes");
   choose("returningDataStatus", "unknown");
   choose("hasConsentDb", "false");
   choose("canChangeMenu", "true");
+  advanceQuestions(4);
   choose("adsRunning", "false");
   click("[data-submit-diagnosis]");
   await Promise.resolve();
@@ -119,7 +173,7 @@ test("shows a linked error and moves focus when required revenue is missing", as
   if (!root) throw new Error("missing test root");
   await createApp(root, createDemoService()).start();
   click("[data-start-diagnosis]");
-  click("[data-next-step]");
+  click("[data-next-question]");
 
   const input = document.querySelector<HTMLInputElement>(
     "[name='targetMonthlyRevenue']",
@@ -143,7 +197,7 @@ test.each(["abc", "Infinity", "1e309"])(
     setValue("targetMonthlyRevenue", "40,000,000");
     setValue("averageOrderValue", "25,000");
     setValue("operatingDays", "20");
-    click("[data-next-step]");
+    click("[data-next-question]");
 
     expect(
       document
@@ -162,16 +216,17 @@ test("does not use unconnected repeat data for a repeat recommendation", async (
   setValue("targetMonthlyRevenue", "40,000,000");
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
-  click("[data-next-step]");
+  advanceQuestions(4);
   choose("monthlyCustomerCountStatus", "unknown");
   choose("primaryConcern", "returning");
-  click("[data-next-step]");
+  advanceQuestions(2);
   choose("capacity", "yes");
   choose("returningDataStatus", "known");
   choose("hasConsentDb", "true");
   choose("canChangeMenu", "true");
   choose("adsRunning", "false");
   choose("hasConnectedVisitHistory", "false");
+  advanceQuestions(4);
   click("[data-submit-diagnosis]");
   await Promise.resolve();
   await Promise.resolve();
@@ -190,8 +245,8 @@ test("links a radio-group error to every invalid choice", async () => {
   setValue("targetMonthlyRevenue", "40,000,000");
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
-  click("[data-next-step]");
-  click("[data-next-step]");
+  advanceQuestions(4);
+  click("[data-next-question]");
 
   const group = document.querySelector<HTMLElement>(
     "[data-choice-group='monthlyCustomerCountStatus']",
@@ -217,11 +272,11 @@ test.each(["0", "-1"])(
     setValue("targetMonthlyRevenue", "40,000,000");
     setValue("averageOrderValue", "25,000");
     setValue("operatingDays", "20");
-    click("[data-next-step]");
+    advanceQuestions(4);
     choose("monthlyCustomerCountStatus", "known");
     setValue("monthlyCustomerCount", customerCount);
     choose("primaryConcern", "unknown");
-    click("[data-next-step]");
+    advanceQuestions(2);
 
     const input = document.querySelector<HTMLInputElement>(
       "[name='monthlyCustomerCount']",
@@ -254,7 +309,7 @@ test("requires an exact direct revenue allocation before the next step", async (
   if (!allocation) return;
   allocation.value = "9,999,999";
   allocation.dispatchEvent(new Event("input", { bubbles: true }));
-  click("[data-next-step]");
+  advanceQuestions(4);
 
   expect(allocation.getAttribute("aria-invalid")).toBe("true");
   expect(document.querySelector<HTMLElement>("[data-step='1']")?.hidden).toBe(
@@ -280,7 +335,7 @@ test.each(
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
   setValue(field, value);
-  click("[data-next-step]");
+  advanceQuestions(4);
 
   const input = document.querySelector<HTMLInputElement>(`[name='${field}']`);
   expect(input?.getAttribute("aria-invalid")).toBe("true");
@@ -419,14 +474,15 @@ test("shows advertising estimates only after all actual advertising values are e
   setValue("targetMonthlyRevenue", "40,000,000");
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
-  click("[data-next-step]");
+  advanceQuestions(4);
   choose("monthlyCustomerCountStatus", "unknown");
   choose("primaryConcern", "ads");
-  click("[data-next-step]");
+  advanceQuestions(2);
   choose("capacity", "yes");
   choose("returningDataStatus", "unknown");
   choose("hasConsentDb", "false");
   choose("canChangeMenu", "true");
+  advanceQuestions(4);
   choose("adsRunning", "true");
   setValue("visitConversionRate", "20");
   setValue("costPerClick", "500");
