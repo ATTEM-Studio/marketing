@@ -15,6 +15,7 @@ import {
 import { checkInDueDate, renderResult } from "./ui/result";
 import { renderDashboard } from "./ui/dashboard";
 import { renderOnboarding } from "./ui/onboarding";
+import type { OnboardingView } from "./ui/onboarding";
 import { renderLandingShell } from "./ui/shell";
 
 function consumeAuthCallback(): void {
@@ -37,8 +38,8 @@ export function createApp(
     renderLandingShell(
       root,
       {
-        onRegister: () => showOnboarding(false),
-        onLogin: () => showOnboarding(false),
+        onRegister: () => showOnboarding(false, "register"),
+        onLogin: () => showOnboarding(false, "login"),
         onDemo: () => showDiagnosis(),
       },
       { mode: options.isLive ? "live" : "demo" },
@@ -165,7 +166,10 @@ export function createApp(
     });
   };
 
-  const showOnboarding = (authCallback = false) => {
+  const showOnboarding = (
+    authCallback = false,
+    initialView: OnboardingView = "register",
+  ) => {
     renderOnboarding(root, service, {
       authCallback,
       onAuthenticated(finalized) {
@@ -176,7 +180,7 @@ export function createApp(
         }
         showOnboarding(false);
       },
-    });
+    }, initialView);
   };
 
   return {

@@ -10,6 +10,8 @@ export interface OnboardingCallbacks {
   authCallback?: boolean;
 }
 
+export type OnboardingView = "register" | "login";
+
 const INVITE_ERROR =
   "코드를 확인할 수 없습니다. 입력 내용을 다시 확인해 주세요.";
 const REGISTER_ERROR =
@@ -47,10 +49,9 @@ function clearErrors(root: HTMLElement): void {
 }
 
 function registrationInput(form: HTMLFormElement): BuyerRegistration {
-  const email = value(form, "email");
-  const input: BuyerRegistration = {
+  return {
     name: value(form, "name"),
-    email,
+    email: value(form, "email"),
     region: value(form, "region"),
     businessName: value(form, "businessName"),
     inviteCode: value(form, "inviteCode"),
@@ -62,7 +63,6 @@ function registrationInput(form: HTMLFormElement): BuyerRegistration {
         ?.checked,
     ),
   };
-  return input;
 }
 
 function firstRegistrationError(
@@ -75,9 +75,69 @@ function firstRegistrationError(
   if (!input.region) return ["region", "지역을 입력해 주세요."];
   if (!input.businessName) return ["businessName", "업체명을 입력해 주세요."];
   if (!input.inviteCode) return ["inviteCode", "초대 코드를 입력해 주세요."];
-  if (!input.serviceConsent)
+  if (!input.serviceConsent) {
     return ["serviceConsent", "서비스 이용 동의가 필요합니다."];
+  }
   return null;
+}
+
+function workHeader(status: string): string {
+  return `<header class="work-header"><a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a><span class="status-chip">${status}</span></header>`;
+}
+
+function registrationScreenMarkup(): string {
+  return `
+    ${workHeader("구매자 인증")}
+    <main class="onboarding-shell" aria-labelledby="onboarding-title">
+      <div class="onboarding-layout">
+        <section class="onboarding-intro">
+          <p class="eyebrow">전자책 구매자 전용</p>
+          <h1 id="onboarding-title">내 가게에 맞는 방향을 찾아볼까요?</h1>
+          <p>가입과 매장 맞춤 안내를 위해 기본 정보만 받습니다. 입력한 정보는 다른 목적으로 사용하지 않습니다.</p>
+          <ol class="mini-journey"><li>구매자 확인</li><li>매장 수치 입력</li><li>오늘의 행동 확인</li></ol>
+        </section>
+        <section class="form-card" aria-label="신규 가입">
+          <div class="form-card-heading"><div><p class="step-kicker">처음 이용하시나요?</p><h2>구매자 인증하기</h2></div><button type="button" class="text-button" data-show-login>기존 사용자 로그인</button></div>
+          <form data-registration-form novalidate>
+            <div class="question-grid registration-grid">
+              <div class="field"><label for="name">이름 <span class="required-label">필수</span></label><input id="name" name="name" required aria-describedby="name-error" autocomplete="name" placeholder="홍길동"><p id="name-error" class="field-error"></p></div>
+              <div class="field"><label for="email">이메일 <span class="required-label">필수</span></label><input id="email" name="email" type="email" required aria-describedby="email-error" autocomplete="email" placeholder="name@example.com"><p id="email-error" class="field-error"></p></div>
+              <div class="field"><label for="region">지역 <span class="required-label">필수</span></label><input id="region" name="region" required aria-describedby="region-error" autocomplete="address-level1" placeholder="서울 마포구"><p id="region-error" class="field-error"></p></div>
+              <div class="field"><label for="businessName">업체명 <span class="required-label">필수</span></label><input id="businessName" name="businessName" required aria-describedby="businessName-error" autocomplete="organization" placeholder="우리 가게 이름"><p id="businessName-error" class="field-error"></p></div>
+              <div class="field field-wide"><label for="inviteCode">초대 코드 <span class="required-label">필수</span></label><input id="inviteCode" name="inviteCode" required aria-describedby="inviteCode-error" autocomplete="one-time-code" placeholder="전자책에서 안내받은 코드"><p id="inviteCode-error" class="field-error"></p></div>
+            </div>
+            <div class="consent-group">
+              <div class="field consent-field"><label class="choice"><input name="serviceConsent" type="checkbox" aria-describedby="serviceConsent-error"> <span>서비스 이용과 개인정보 처리에 동의합니다. <strong>필수</strong></span></label><p id="serviceConsent-error" class="field-error"></p></div>
+              <label class="choice"><input name="marketingConsent" type="checkbox"> <span>새 소식과 마케팅 안내를 받겠습니다. <small>선택</small></span></label>
+            </div>
+            <button type="submit" class="primary-action" data-register-submit disabled>이메일 확인 링크 받기</button>
+          </form>
+          <p class="form-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </main>`;
+}
+
+function loginScreenMarkup(): string {
+  return `
+    ${workHeader("기존 사용자")}
+    <main class="onboarding-shell" aria-labelledby="login-title">
+      <div class="onboarding-layout">
+        <section class="onboarding-intro">
+          <p class="eyebrow">다시 오셨군요</p>
+          <h1 id="login-title">지난 진단과 실행 기록을 이어보세요.</h1>
+          <p>가입할 때 사용한 이메일로 안전한 로그인 링크를 보내드립니다.</p>
+        </section>
+        <section class="form-card" aria-label="기존 사용자 로그인">
+          <div class="form-card-heading"><div><p class="step-kicker">비밀번호 없이</p><h2>이메일로 로그인</h2></div><button type="button" class="text-button" data-show-register>처음 이용하기</button></div>
+          <form data-login-form novalidate>
+            <div class="field"><label for="loginEmail">가입한 이메일</label><input id="loginEmail" name="loginEmail" type="email" required aria-describedby="loginEmail-error" autocomplete="email" placeholder="name@example.com"><p id="loginEmail-error" class="field-error"></p></div>
+            <button type="submit" class="primary-action" data-login-submit>로그인 링크 받기</button>
+          </form>
+          <p class="login-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </main>`;
 }
 
 function renderConfirmation(
@@ -86,14 +146,16 @@ function renderConfirmation(
   callbacks: OnboardingCallbacks,
 ): void {
   root.innerHTML = `
-    <main class="onboarding-shell" aria-labelledby="confirmation-title">
-      <p class="eyebrow">이메일 확인</p>
-      <h1 id="confirmation-title">이메일 확인을 마쳤나요?</h1>
-      <p>메일의 로그인 링크를 연 뒤, 아래 버튼을 눌러 가입을 완료해 주세요.</p>
-      <button type="button" data-confirm-registration>확인하고 시작하기</button>
-      <p class="form-status" role="status" aria-live="polite"></p>
-    </main>
-  `;
+    ${workHeader("이메일 확인")}
+    <main class="onboarding-shell confirmation-shell" aria-labelledby="confirmation-title">
+      <section class="form-card confirmation-card">
+        <p class="eyebrow">마지막 단계</p>
+        <h1 id="confirmation-title">이메일 확인을 마쳤나요?</h1>
+        <p>메일에서 로그인 링크를 연 뒤 아래 버튼을 눌러 가입을 완료해 주세요.</p>
+        <button type="button" class="primary-action" data-confirm-registration>확인하고 진단 시작하기</button>
+        <p class="form-status" role="status" aria-live="polite"></p>
+      </section>
+    </main>`;
   const button = root.querySelector<HTMLButtonElement>(
     "[data-confirm-registration]",
   );
@@ -113,102 +175,54 @@ function renderConfirmation(
   });
 }
 
-export function renderOnboarding(
-  root: HTMLElement,
-  service: AppService,
-  callbacks: OnboardingCallbacks,
-): void {
-  if (callbacks.authCallback) {
-    renderConfirmation(root, service, callbacks);
-    return;
-  }
+function bindRegistration(root: HTMLElement, service: AppService): void {
+  const form = root.querySelector<HTMLFormElement>("[data-registration-form]");
+  const button = root.querySelector<HTMLButtonElement>("[data-register-submit]");
+  const status = root.querySelector<HTMLElement>(".form-status");
+  const consent = root.querySelector<HTMLInputElement>("[name='serviceConsent']");
 
-  root.innerHTML = `
-    <main class="onboarding-shell" aria-labelledby="onboarding-title">
-      <p class="eyebrow">구매자 전용</p>
-      <h1 id="onboarding-title">이메일로 안전하게 시작하세요</h1>
-      <p>입력한 정보는 가입과 매장 맞춤 안내를 위해 사용합니다.</p>
-      <form data-registration-form novalidate>
-        <fieldset>
-          <legend>처음 이용하시나요?</legend>
-          <div class="field"><label for="name">이름</label><input id="name" name="name" required aria-describedby="name-error" autocomplete="name"><p id="name-error" class="field-error"></p></div>
-          <div class="field"><label for="email">이메일</label><input id="email" name="email" type="email" required aria-describedby="email-error" autocomplete="email"><p id="email-error" class="field-error"></p></div>
-          <div class="field"><label for="region">지역</label><input id="region" name="region" required aria-describedby="region-error" autocomplete="address-level1"><p id="region-error" class="field-error"></p></div>
-          <div class="field"><label for="businessName">업체명</label><input id="businessName" name="businessName" required aria-describedby="businessName-error" autocomplete="organization"><p id="businessName-error" class="field-error"></p></div>
-          <div class="field"><label for="inviteCode">초대 코드</label><input id="inviteCode" name="inviteCode" required aria-describedby="inviteCode-error" autocomplete="one-time-code"><p id="inviteCode-error" class="field-error"></p></div>
-          <div class="field consent-field"><label class="choice"><input name="serviceConsent" type="checkbox" aria-describedby="serviceConsent-error"> 서비스 이용에 동의합니다. (필수)</label><p id="serviceConsent-error" class="field-error"></p></div>
-          <label class="choice"><input name="marketingConsent" type="checkbox"> 새 소식과 마케팅 안내를 받겠습니다. (선택)</label>
-          <button type="submit" data-register-submit disabled>이메일 확인 링크 보내기</button>
-        </fieldset>
-      </form>
-      <p class="form-status" role="status" aria-live="polite"></p>
-      <form data-login-form novalidate>
-        <fieldset>
-          <legend>이미 가입하셨나요?</legend>
-          <div class="field"><label for="loginEmail">가입한 이메일</label><input id="loginEmail" name="loginEmail" type="email" required aria-describedby="loginEmail-error" autocomplete="email"><p id="loginEmail-error" class="field-error"></p></div>
-          <button type="submit" data-login-submit>로그인 링크 보내기</button>
-        </fieldset>
-      </form>
-      <p class="login-status" role="status" aria-live="polite"></p>
-    </main>
-  `;
-
-  const registrationForm = root.querySelector<HTMLFormElement>(
-    "[data-registration-form]",
-  );
-  const registrationButton = root.querySelector<HTMLButtonElement>(
-    "[data-register-submit]",
-  );
-  const registrationStatus = root.querySelector<HTMLElement>(".form-status");
-  const serviceConsent = root.querySelector<HTMLInputElement>(
-    "[name='serviceConsent']",
-  );
-  const loginForm = root.querySelector<HTMLFormElement>("[data-login-form]");
-  const loginButton = root.querySelector<HTMLButtonElement>(
-    "[data-login-submit]",
-  );
-  const loginStatus = root.querySelector<HTMLElement>(".login-status");
-
-  serviceConsent?.addEventListener("change", () => {
-    if (registrationButton)
-      registrationButton.disabled = !serviceConsent.checked;
+  consent?.addEventListener("change", () => {
+    if (button) button.disabled = !consent.checked;
   });
 
-  registrationForm?.addEventListener("submit", async (event) => {
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!registrationForm || !registrationButton) return;
+    if (!form || !button) return;
     clearErrors(root);
-    const input = registrationInput(registrationForm);
+    const input = registrationInput(form);
     const error = firstRegistrationError(input);
     if (error) {
       showFieldError(root, error[0], error[1]);
       return;
     }
-    registrationButton.disabled = true;
-    if (registrationStatus)
-      registrationStatus.textContent = "이메일 확인 링크를 보내고 있습니다.";
+    button.disabled = true;
+    if (status) status.textContent = "이메일 확인 링크를 보내고 있습니다.";
     try {
       await service.registerBuyer(input);
-      if (registrationStatus) {
-        registrationStatus.textContent =
+      if (status) {
+        status.textContent =
           "이메일을 확인해 주세요. 메일의 링크를 연 뒤 가입을 완료할 수 있습니다.";
       }
-      registrationForm.reset();
+      form.reset();
     } catch {
       showFieldError(root, "inviteCode", INVITE_ERROR);
-      if (registrationStatus) registrationStatus.textContent = REGISTER_ERROR;
+      if (status) status.textContent = REGISTER_ERROR;
     } finally {
-      registrationButton.disabled = !(serviceConsent?.checked ?? false);
+      button.disabled = !(consent?.checked ?? false);
     }
   });
+}
 
-  loginForm?.addEventListener("submit", async (event) => {
+function bindLogin(root: HTMLElement, service: AppService): void {
+  const form = root.querySelector<HTMLFormElement>("[data-login-form]");
+  const button = root.querySelector<HTMLButtonElement>("[data-login-submit]");
+  const status = root.querySelector<HTMLElement>(".login-status");
+
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!loginForm || !loginButton) return;
-    const email = value(loginForm, "loginEmail");
-    const emailField = root.querySelector<HTMLInputElement>(
-      "[name='loginEmail']",
-    );
+    if (!form || !button) return;
+    const email = value(form, "loginEmail");
+    const emailField = root.querySelector<HTMLInputElement>("[name='loginEmail']");
     const emailError = root.querySelector<HTMLElement>("#loginEmail-error");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       if (emailError) emailError.textContent = "이메일 주소를 확인해 주세요.";
@@ -218,20 +232,48 @@ export function renderOnboarding(
     }
     if (emailError) emailError.textContent = "";
     emailField?.removeAttribute("aria-invalid");
-    loginButton.disabled = true;
-    if (loginStatus) loginStatus.textContent = "로그인 링크를 보내고 있습니다.";
+    button.disabled = true;
+    if (status) status.textContent = "로그인 링크를 보내고 있습니다.";
     try {
       await service.sendLoginLink(email);
-      if (loginStatus)
-        loginStatus.textContent =
-          "등록된 주소라면 링크를 보냅니다. 이메일을 확인해 주세요.";
-      loginForm.reset();
     } catch {
-      if (loginStatus)
-        loginStatus.textContent =
-          "등록된 주소라면 링크를 보냅니다. 이메일을 확인해 주세요.";
+      // Keep the acknowledgement generic to prevent account enumeration.
     } finally {
-      loginButton.disabled = false;
+      if (status) {
+        status.textContent =
+          "등록된 주소라면 링크를 보냅니다. 이메일을 확인해 주세요.";
+      }
+      form.reset();
+      button.disabled = false;
     }
   });
+}
+
+export function renderOnboarding(
+  root: HTMLElement,
+  service: AppService,
+  callbacks: OnboardingCallbacks,
+  initialView: OnboardingView = "register",
+): void {
+  if (callbacks.authCallback) {
+    renderConfirmation(root, service, callbacks);
+    return;
+  }
+
+  const renderView = (view: OnboardingView) => {
+    root.innerHTML =
+      view === "register"
+        ? registrationScreenMarkup()
+        : loginScreenMarkup();
+    root
+      .querySelector<HTMLButtonElement>("[data-show-register]")
+      ?.addEventListener("click", () => renderView("register"));
+    root
+      .querySelector<HTMLButtonElement>("[data-show-login]")
+      ?.addEventListener("click", () => renderView("login"));
+    if (view === "register") bindRegistration(root, service);
+    else bindLogin(root, service);
+  };
+
+  renderView(initialView);
 }

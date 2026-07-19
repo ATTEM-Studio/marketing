@@ -38,6 +38,27 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>';
 });
 
+test("opens only the requested onboarding form and lets the buyer switch", () => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  renderOnboarding(root, service(), { onAuthenticated: vi.fn() }, "login");
+
+  expect(root.querySelector("[data-login-form]")).not.toBeNull();
+  expect(root.querySelector("[data-registration-form]")).toBeNull();
+  root.querySelector<HTMLButtonElement>("[data-show-register]")?.click();
+  expect(root.querySelector("[data-registration-form]")).not.toBeNull();
+  expect(root.querySelector("[data-login-form]")).toBeNull();
+});
+
+test("labels every registration field as required or optional", () => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  renderOnboarding(root, service(), { onAuthenticated: vi.fn() }, "register");
+
+  expect(root.querySelectorAll(".required-label")).toHaveLength(5);
+  expect(root.textContent).toContain("선택");
+});
+
 test("keeps marketing consent optional", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
@@ -97,7 +118,7 @@ test("sends an existing buyer login link", async () => {
   const fake = service();
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
-  renderOnboarding(root, fake, { onAuthenticated: vi.fn() });
+  renderOnboarding(root, fake, { onAuthenticated: vi.fn() }, "login");
   set("loginEmail", "buyer@example.com");
   document.querySelector<HTMLFormElement>("[data-login-form]")?.requestSubmit();
   await Promise.resolve();
@@ -116,7 +137,7 @@ test.each(["not-registered", "auth-rejected"])(
     });
     const root = document.querySelector<HTMLElement>("#app");
     if (!root) throw new Error("missing root");
-    renderOnboarding(root, fake, { onAuthenticated: vi.fn() });
+    renderOnboarding(root, fake, { onAuthenticated: vi.fn() }, "login");
     set("loginEmail", "buyer@example.com");
     document
       .querySelector<HTMLFormElement>("[data-login-form]")
