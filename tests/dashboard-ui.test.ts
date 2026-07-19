@@ -1,4 +1,5 @@
 import { expect, test, vi } from "vitest";
+import { createApp } from "../src/app";
 import { checkInDueDate, renderResult } from "../src/ui/result";
 import type { ActionPlanRecord, AppService } from "../src/services/contracts";
 import { renderDashboard } from "../src/ui/dashboard";
@@ -211,4 +212,207 @@ test("keeps live sign-out available when dashboard data cannot load", async () =
   await Promise.resolve();
 
   expect(signOut).toHaveBeenCalledTimes(1);
+});
+
+test("shows the business summary, nearest plan, and completed history", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const plans: ActionPlanRecord[] = [
+    {
+      id: "late",
+      assessmentId: "assessment-1",
+      actionKey: "local-discovery",
+      metric: "전화 수",
+      checkInDueAt: "2026-07-30",
+      status: "planned",
+      beforeValue: null,
+      afterValue: null,
+      note: null,
+    },
+    {
+      id: "early",
+      assessmentId: "assessment-1",
+      actionKey: "local-discovery",
+      metric: "길찾기 수",
+      checkInDueAt: "2026-07-26",
+      status: "planned",
+      beforeValue: null,
+      afterValue: null,
+      note: null,
+    },
+    {
+      id: "done",
+      assessmentId: "assessment-1",
+      actionKey: "local-discovery",
+      metric: "예약 수",
+      checkInDueAt: "2026-07-20",
+      status: "completed",
+      beforeValue: "2회",
+      afterValue: "5회",
+      note: "사진을 바꿨어요",
+    },
+  ];
+  const fake = {
+    getLatestAssessment: vi.fn(async () => ({
+      id: "assessment-1",
+      inputs: { revenue: { targetMonthlyRevenue: 40_000_000 } },
+      metrics: { maxNewCustomers: 400 },
+      diagnosis: {},
+      createdAt: "2026-07-19T00:00:00.000Z",
+    })),
+    listActionPlans: vi.fn(async () => plans),
+    signOut: vi.fn(),
+  } as unknown as AppService;
+
+  await renderDashboard(
+    root,
+    {
+      mode: "demo",
+      profile: {
+        id: "demo",
+        name: "샘플 사장님",
+        email: "demo@example.invalid",
+        region: "서울",
+        businessName: "샘플 식당",
+      },
+    },
+    fake,
+    vi.fn(),
+  );
+
+  expect(root.textContent).toContain("샘플 식당");
+  expect(root.textContent).toContain("40,000,000원");
+  expect(root.textContent).toContain("최대 400명");
+  expect(root.querySelector(".current-action")?.textContent).toContain(
+    "길찾기 수",
+  );
+  expect(root.querySelector(".upcoming-actions")?.textContent).toContain(
+    "전화 수",
+  );
+  expect(root.textContent).toContain("실행 전 2회 · 실행 후 5회");
+  expect(root.textContent).toContain("사진을 바꿨어요");
+});
+
+test("uses gentle empty states and blocks an incomplete check-in", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const empty = {
+    getLatestAssessment: vi.fn(async () => null),
+    listActionPlans: vi.fn(async () => []),
+    signOut: vi.fn(),
+  } as unknown as AppService;
+  await renderDashboard(root, { mode: "demo", profile: null }, empty, vi.fn());
+  expect(root.textContent).toContain("아직 진단한 내용이 없어요");
+  expect(root.textContent).toContain("오늘 할 행동을 정해 볼까요");
+  expect(root.textContent).toContain("아직 기록이 없습니다");
+
+  const planned: ActionPlanRecord = {
+    id: "plan-1",
+    assessmentId: "assessment-1",
+    actionKey: "local-discovery",
+    metric: "길찾기 수",
+    checkInDueAt: "2026-07-26",
+    status: "planned",
+    beforeValue: null,
+    afterValue: null,
+    note: null,
+  };
+  const save = vi.fn();
+  const withPlan = {
+    getLatestAssessment: vi.fn(async () => null),
+    listActionPlans: vi.fn(async () => [planned]),
+    completeActionPlan: save,
+    signOut: vi.fn(),
+  } as unknown as AppService;
+  await renderDashboard(
+    root,
+    { mode: "demo", profile: null },
+    withPlan,
+    vi.fn(),
+  );
+  root.querySelector<HTMLButtonElement>("[data-complete-plan]")?.click();
+  root.querySelector<HTMLFormElement>("[data-checkin-form]")?.requestSubmit();
+
+  expect(save).not.toHaveBeenCalled();
+  expect(
+    root.querySelector("[name='beforeValue']")?.getAttribute("aria-invalid"),
+  ).toBe("true");
+});
+
+test("saves the result action through AppService with its assessment date", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const saveActionPlan = vi.fn(async () => ({
+    id: "plan-1",
+    assessmentId: "assessment-1",
+    actionKey: "local-discovery" as const,
+    metric: "길찾기 수",
+    checkInDueAt: "2026-07-26",
+    status: "planned" as const,
+    beforeValue: null,
+    afterValue: null,
+    note: null,
+  }));
+  const fake: AppService = {
+    getSession: vi.fn(async () => ({ mode: "demo" as const, profile: null })),
+    registerBuyer: vi.fn(async () => undefined),
+    sendLoginLink: vi.fn(async () => undefined),
+    finalizeRegistration: vi.fn(async () => ({
+      mode: "demo" as const,
+      profile: null,
+    })),
+    signOut: vi.fn(async () => undefined),
+    saveAssessment: vi.fn(async (snapshot) => ({
+      ...snapshot,
+      id: "assessment-1",
+      createdAt: "2026-07-19T00:00:00.000Z",
+    })),
+    getLatestAssessment: vi.fn(async () => null),
+    saveActionPlan,
+    listActionPlans: vi.fn(async () => []),
+    completeActionPlan: vi.fn(async () => {
+      throw new Error("unused");
+    }),
+  };
+  await createApp(root, fake).start();
+  root.querySelector<HTMLButtonElement>("[data-start-diagnosis]")?.click();
+  const set = (name: string, value: string) => {
+    const input = root.querySelector<HTMLInputElement>(`[name='${name}']`);
+    if (!input) throw new Error(`missing ${name}`);
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  const choose = (name: string, value: string) =>
+    root
+      .querySelector<HTMLInputElement>(`[name='${name}'][value='${value}']`)
+      ?.click();
+  set("averageMonthlyRevenue", "30000000");
+  set("targetMonthlyRevenue", "40000000");
+  set("averageOrderValue", "25000");
+  set("operatingDays", "20");
+  root.querySelector<HTMLButtonElement>("[data-next-step]")?.click();
+  choose("monthlyCustomerCountStatus", "unknown");
+  choose("primaryConcern", "unknown");
+  root.querySelector<HTMLButtonElement>("[data-next-step]")?.click();
+  choose("capacity", "yes");
+  choose("returningDataStatus", "unknown");
+  choose("hasConsentDb", "false");
+  choose("canChangeMenu", "true");
+  choose("adsRunning", "false");
+  root.querySelector<HTMLButtonElement>("[data-submit-diagnosis]")?.click();
+  await Promise.resolve();
+  await Promise.resolve();
+  root.querySelector<HTMLButtonElement>("[data-save-action]")?.click();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(saveActionPlan).toHaveBeenCalledWith({
+    assessmentId: "assessment-1",
+    actionKey: "local-discovery",
+    metric: "7일간 전화·길찾기·예약 수",
+    checkInDueAt: "2026-07-26",
+  });
 });
