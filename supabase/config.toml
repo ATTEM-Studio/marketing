@@ -18,6 +18,7 @@ port = 54323
 
 [auth]
 enabled = true
+enable_anonymous_sign_ins = true
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173/?auth=callback"]
 jwt_expiry = 3600
@@ -33,7 +34,7 @@ policy = "per_worker"
 inspector_port = 8083
 
 [functions.redeem-invite]
-verify_jwt = false
+verify_jwt = true
 
 [functions.finalize-registration]
 verify_jwt = true

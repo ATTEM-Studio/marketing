@@ -14,6 +14,10 @@ const http = readFileSync(
   resolve(process.cwd(), "supabase/functions/_shared/http.ts"),
   "utf8",
 );
+const config = readFileSync(
+  resolve(process.cwd(), "supabase/config.toml"),
+  "utf8",
+);
 
 describe("invite edge security contract", () => {
   test("fails closed when the deployment-guaranteed client IP header is absent", () => {
@@ -48,5 +52,22 @@ describe("invite edge security contract", () => {
     expect(redeemInvite).toContain("await sha256(inviteCode)");
     expect(redeemInvite).toContain("await sha256(`${pepper}${inviteCode}`)");
     expect(redeemInvite).toContain("for (const codeHash of candidateHashes)");
+  });
+
+  test("requires an authenticated anonymous user before activating access", () => {
+    expect(redeemInvite).toContain('request.headers.get("authorization")');
+    expect(redeemInvite).toContain("auth.getUser(token)");
+    expect(redeemInvite).toContain("user.is_anonymous !== true");
+    expect(redeemInvite).toContain('"activate_anonymous_reader"');
+  });
+
+  test("activates immediately without sending an email OTP", () => {
+    expect(redeemInvite).not.toContain("signInWithOtp");
+    expect(redeemInvite).toContain("return json(200, { active: true })");
+  });
+
+  test("enables anonymous auth and requires a valid JWT at the edge", () => {
+    expect(config).toContain("enable_anonymous_sign_ins = true");
+    expect(config).toMatch(/\[functions\.redeem-invite\]\s+verify_jwt = true/);
   });
 });

@@ -41,8 +41,7 @@ Deno.serve(async (request) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const pepper = Deno.env.get("INVITE_HASH_PEPPER");
-  const siteUrl = Deno.env.get("SITE_URL");
-  if (!url || !anonKey || !serviceRoleKey || !pepper || !siteUrl) {
+  if (!url || !anonKey || !serviceRoleKey || !pepper) {
     return json(500, { error: "registration_unavailable" });
   }
 
@@ -50,6 +49,18 @@ Deno.serve(async (request) => {
   const adminClient = createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) return json(401, { error: "anonymous_session_required" });
+
+  const {
+    data: { user },
+    error: userError,
+  } = await authClient.auth.getUser(token);
+  if (userError || !user || user.is_anonymous !== true) {
+    return json(401, { error: "anonymous_session_required" });
+  }
+
   const ip = clientIp(request);
   if (!ip) return json(400, { error: "client_ip_required" });
   const ipHash = await sha256(`${pepper}:${ip}`);
@@ -91,36 +102,25 @@ Deno.serve(async (request) => {
     await sha256(inviteCode),
     await sha256(`${pepper}${inviteCode}`),
   ];
-  let reservationAccepted = false;
+  let activationAccepted = false;
   for (const codeHash of candidateHashes) {
-    const { data, error } = await adminClient.rpc(
-      "reserve_buyer_registration",
-      {
-        p_code_hash: codeHash,
-        p_email: email,
-        p_name: name,
-        p_region: region,
-        p_business_name: businessName,
-        p_required_consent: true,
-        p_marketing_consent: body.marketingConsent,
-      },
-    );
+    const { data, error } = await adminClient.rpc("activate_anonymous_reader", {
+      p_user_id: user.id,
+      p_code_hash: codeHash,
+      p_email: email,
+      p_name: name,
+      p_region: region,
+      p_business_name: businessName,
+      p_required_consent: true,
+      p_marketing_consent: body.marketingConsent,
+    });
     if (error) return json(500, { error: "registration_unavailable" });
     if (data) {
-      reservationAccepted = true;
+      activationAccepted = true;
       break;
     }
   }
-  if (!reservationAccepted) return invalidInvite();
+  if (!activationAccepted) return invalidInvite();
 
-  const { error: otpError } = await authClient.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${siteUrl}/?auth=callback`,
-      shouldCreateUser: true,
-    },
-  });
-  if (otpError) return json(500, { error: "registration_unavailable" });
-
-  return json(202, { accepted: true });
+  return json(200, { active: true });
 });
