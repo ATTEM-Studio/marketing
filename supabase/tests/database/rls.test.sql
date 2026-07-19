@@ -1,6 +1,6 @@
 begin;
 
-select plan(85);
+select plan(94);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
@@ -22,6 +22,15 @@ select ok((select relrowsecurity from pg_class where oid = 'public.invite_codes'
 select ok(not has_table_privilege('anon', 'public.pending_registrations', 'select'), 'anon cannot read pending PII');
 select ok(not has_table_privilege('authenticated', 'public.pending_registrations', 'select'), 'authenticated cannot read pending PII');
 select ok(not has_table_privilege('authenticated', 'public.invite_codes', 'select'), 'authenticated cannot read invite hashes');
+select ok(has_table_privilege('authenticated', 'public.profiles', 'select'), 'authenticated can read their profile through RLS');
+select ok(has_table_privilege('authenticated', 'public.consent_events', 'select'), 'authenticated can read their consent through RLS');
+select ok(has_table_privilege('authenticated', 'public.stores', 'select'), 'authenticated can read their store through RLS');
+select ok(has_table_privilege('authenticated', 'public.assessments', 'select'), 'authenticated can read their assessments through RLS');
+select ok(has_table_privilege('authenticated', 'public.goals', 'select'), 'authenticated can read their goals through RLS');
+select ok(has_table_privilege('authenticated', 'public.action_plans', 'select'), 'authenticated can read their action plans through RLS');
+select ok(has_table_privilege('authenticated', 'public.check_ins', 'select'), 'authenticated can read their check-ins through RLS');
+select ok(has_table_privilege('authenticated', 'public.action_plans', 'insert'), 'authenticated can create a scheduled action plan through RLS');
+select ok(not has_table_privilege('anon', 'public.profiles', 'select'), 'anon cannot read profiles');
 select ok(not has_table_privilege('authenticated', 'public.stores', 'insert'), 'clients cannot create stores directly');
 select ok(not has_table_privilege('authenticated', 'public.consent_events', 'insert'), 'clients cannot create consent events directly');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'update'), 'clients cannot alter email or access status');
