@@ -1,4 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
+import { AuthSessionMissingError } from "@supabase/supabase-js";
 
 type MockClient = {
   auth: Record<
@@ -115,7 +116,10 @@ beforeEach(() => {
 test("creates an anonymous session, activates the invite, and returns the live profile", async () => {
   mocked.client.auth.getUser = vi
     .fn()
-    .mockResolvedValueOnce({ data: { user: null }, error: null })
+    .mockResolvedValueOnce({
+      data: { user: null },
+      error: new AuthSessionMissingError(),
+    })
     .mockResolvedValue({
       data: { user: { id: "user-1", is_anonymous: true } },
       error: null,

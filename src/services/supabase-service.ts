@@ -7,6 +7,7 @@ import type {
   BuyerProfile,
   BuyerRegistration,
 } from "./contracts";
+import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import {
   createSupabaseClient,
   type BuyerSupabaseClient,
@@ -179,7 +180,9 @@ export function createSupabaseService(
       try {
         const { data: current, error: currentError } =
           await client.auth.getUser();
-        if (currentError) throw currentError;
+        if (currentError && !isAuthSessionMissingError(currentError)) {
+          throw currentError;
+        }
 
         const needsAnonymousUser = current.user?.is_anonymous !== true;
         if (current.user && needsAnonymousUser) {
