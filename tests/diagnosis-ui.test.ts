@@ -146,3 +146,34 @@ test("links a radio-group error to every invalid choice", async () => {
       expect(radio.getAttribute("aria-invalid")).toBe("true"),
     );
 });
+
+test.each(["0", "-1"])(
+  "keeps a known monthly customer count of %s on step two with an error",
+  async (customerCount) => {
+    const root = document.querySelector<HTMLElement>("#app");
+    if (!root) throw new Error("missing test root");
+    await createApp(root, createDemoService()).start();
+    click("[data-start-diagnosis]");
+    setValue("averageMonthlyRevenue", "30,000,000");
+    setValue("targetMonthlyRevenue", "40,000,000");
+    setValue("averageOrderValue", "25,000");
+    setValue("operatingDays", "20");
+    click("[data-next-step]");
+    choose("monthlyCustomerCountStatus", "known");
+    setValue("monthlyCustomerCount", customerCount);
+    choose("primaryConcern", "unknown");
+    click("[data-next-step]");
+
+    const input = document.querySelector<HTMLInputElement>(
+      "[name='monthlyCustomerCount']",
+    );
+    expect(input?.getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(input);
+    expect(document.querySelector<HTMLElement>("[data-step='2']")?.hidden).toBe(
+      false,
+    );
+    expect(document.querySelector<HTMLElement>("[data-step='3']")?.hidden).toBe(
+      true,
+    );
+  },
+);

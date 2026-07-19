@@ -210,6 +210,28 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
         errors.push({ name, message: "하나를 선택해 주세요." });
       }
     });
+    if (radioValue(form, "monthlyCustomerCountStatus") === "known") {
+      const customerCount = form.elements.namedItem("monthlyCustomerCount");
+      if (
+        customerCount instanceof HTMLInputElement &&
+        customerCount.value.trim() === ""
+      ) {
+        errors.push({
+          name: "monthlyCustomerCount",
+          message: "값을 입력해 주세요.",
+        });
+      } else if (hasInvalidNumber(form, "monthlyCustomerCount")) {
+        errors.push({
+          name: "monthlyCustomerCount",
+          message: "숫자만 입력해 주세요.",
+        });
+      } else if (numberValue(form, "monthlyCustomerCount") < 1) {
+        errors.push({
+          name: "monthlyCustomerCount",
+          message: "월 고객 수는 1명 이상 입력해 주세요.",
+        });
+      }
+    }
   }
   if (step === 3) {
     [
