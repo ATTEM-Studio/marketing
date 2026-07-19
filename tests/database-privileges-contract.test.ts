@@ -45,7 +45,9 @@ describe("authenticated database privileges", () => {
       "supabase/tests/database/rls.test.sql",
       "utf8",
     );
-    expect(databaseTest).toContain("insert into auth.users (id, email)");
+    expect(databaseTest).toContain(
+      "insert into auth.users (id, email, email_confirmed_at)",
+    );
     expect(databaseTest).not.toContain(
       "set local session_replication_role = replica",
     );

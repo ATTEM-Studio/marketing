@@ -78,10 +78,10 @@ set attempted_at = now() - interval '15 minutes 1 second'
 where ip_hash = repeat('a', 64);
 select is(public.consume_invite_attempt(repeat('a', 64)), true, 'a request immediately after the rolling window is accepted');
 
-insert into auth.users (id, email)
+insert into auth.users (id, email, email_confirmed_at)
 values
-  ('33333333-3333-3333-3333-333333333333', 'suspended@example.test'),
-  ('44444444-4444-4444-4444-444444444444', 'active@example.test');
+  ('33333333-3333-3333-3333-333333333333', 'suspended@example.test', now()),
+  ('44444444-4444-4444-4444-444444444444', 'active@example.test', now());
 insert into public.profiles (id, name, email, region, business_name, access_status)
 values
   ('33333333-3333-3333-3333-333333333333', 'suspended', 'suspended@example.test', 'seoul', 'store', 'suspended'),
