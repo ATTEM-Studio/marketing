@@ -5,8 +5,8 @@ import type {
   RestaurantOperationsInput,
 } from "./types";
 
-const positiveNumberMessage = "0蹂대떎 ???レ옄瑜??낅젰?댁＜?몄슂.";
-const shareMessage = "鍮꾩쨷? 0~100 ?ъ씠濡??낅젰?댁＜?몄슂.";
+const positiveNumberMessage = "0보다 큰 숫자를 입력해주세요.";
+const shareMessage = "비중은 0~100 사이로 입력해주세요.";
 
 const stayRanges = {
   under_30: { min: 20, max: 30 },
@@ -62,7 +62,7 @@ export function validateRestaurantOperations(
   ) {
     errors.push({
       field: "channelShares",
-      message: "?쨌?ъ옣쨌諛곕떖 鍮꾩쨷???⑷퀎瑜?100%濡?留욎떠二쇱꽭??",
+      message: "홀·포장·배달 비중의 합계를 100%로 맞춰주세요.",
     });
   }
 

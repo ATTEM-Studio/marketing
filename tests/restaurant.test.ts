@@ -64,7 +64,7 @@ describe("restaurant operations", () => {
       }),
     ).toContainEqual({
       field: "channelShares",
-      message: "?쨌?ъ옣쨌諛곕떖 鍮꾩쨷???⑷퀎瑜?100%濡?留욎떠二쇱꽭??",
+      message: "홀·포장·배달 비중의 합계를 100%로 맞춰주세요.",
     });
   });
 
@@ -89,27 +89,27 @@ describe("restaurant operations", () => {
     ).toEqual([
       {
         field: "seats",
-        message: "0蹂대떎 ???レ옄瑜??낅젰?댁＜?몄슂.",
+        message: "0보다 큰 숫자를 입력해주세요.",
       },
       {
         field: "hallHours",
-        message: "0蹂대떎 ???レ옄瑜??낅젰?댁＜?몄슂.",
+        message: "0보다 큰 숫자를 입력해주세요.",
       },
       {
         field: "averagePartySize",
-        message: "0蹂대떎 ???レ옄瑜??낅젰?댁＜?몄슂.",
+        message: "0보다 큰 숫자를 입력해주세요.",
       },
       {
         field: "dineIn",
-        message: "鍮꾩쨷? 0~100 ?ъ씠濡??낅젰?댁＜?몄슂.",
+        message: "비중은 0~100 사이로 입력해주세요.",
       },
       {
         field: "takeout",
-        message: "鍮꾩쨷? 0~100 ?ъ씠濡??낅젰?댁＜?몄슂.",
+        message: "비중은 0~100 사이로 입력해주세요.",
       },
       {
         field: "delivery",
-        message: "鍮꾩쨷? 0~100 ?ъ씠濡??낅젰?댁＜?몄슂.",
+        message: "비중은 0~100 사이로 입력해주세요.",
       },
     ]);
   });
