@@ -1,9 +1,10 @@
 begin;
 
-select plan(96);
+select plan(103);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
+select has_column('public', 'invite_codes', 'is_reusable');
 select has_table('public'::name, 'pending_registrations'::name, 'pending registrations table exists');
 select has_table('public'::name, 'assessments'::name, 'assessments table exists');
 select has_function('public', 'finalize_buyer_registration', array['uuid', 'text']);
@@ -68,6 +69,22 @@ select ok(exists (select 1 from pg_extension where extname = 'pg_cron'), 'pg_cro
 select ok(exists (select 1 from cron.job where jobname = 'cleanup-expired-buyer-registrations'), 'expired registration cleanup is scheduled');
 select alike(obj_description('public.cleanup_expired_buyer_registrations()'::regprocedure, 'pg_proc'), '%35 minutes%', 'cleanup retention contract includes the cron delay');
 select alike(obj_description('public.finalize_buyer_registration(uuid, text)'::regprocedure, 'pg_proc'), '%explicit user confirmation%', 'finalization contract prohibits automatic callback completion');
+select alike((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.is_reusable%', 'registration supports reusable access codes');
+select alike((select prosrc from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%if not v_invite.is_reusable then%', 'finalization does not redeem reusable access codes');
+select is((select count(*) from public.invite_codes where is_reusable and code_hash = encode(digest('DOITNOW', 'sha256'), 'hex')), 1::bigint, 'DOITNOW is seeded once as a reusable normalized hash');
+select ok(
+  public.reserve_buyer_registration(encode(digest('DOITNOW', 'sha256'), 'hex'), 'reader-one@example.test', 'reader one', 'seoul', 'store one', true, false),
+  'the reusable code accepts the first reader'
+);
+select ok(
+  public.reserve_buyer_registration(encode(digest('DOITNOW', 'sha256'), 'hex'), 'reader-two@example.test', 'reader two', 'busan', 'store two', true, false),
+  'the reusable code accepts a second reader'
+);
+select is(
+  (select status from public.invite_codes where is_reusable and code_hash = encode(digest('DOITNOW', 'sha256'), 'hex')),
+  'available',
+  'the reusable code remains available after multiple reservations'
+);
 
 insert into public.invite_attempts (ip_hash, attempted_at)
 select repeat('a', 64), now() - interval '14 minutes 59 seconds'
