@@ -1,6 +1,6 @@
 begin;
 
-select plan(59);
+select plan(79);
 
 select has_table('public', 'profiles');
 select has_table('public', 'invite_codes');
@@ -13,7 +13,8 @@ select has_function('public', 'reserve_buyer_registration', array['text', 'text'
 select has_function('public', 'consume_invite_attempt', array['text']);
 select has_function('public', 'cleanup_expired_buyer_registrations', array[]::text[]);
 select has_function('public', 'complete_action_plan', array['uuid', 'text', 'text', 'text']);
-select policies_are('public', 'assessments', array['assessment_owner_select', 'assessment_owner_insert']);
+select policies_are('public', 'assessments', array['assessment_owner_select']);
+select policies_are('public', 'goals', array['goal_owner_select']);
 select policies_are('public', 'action_plans', array['action_owner_select', 'action_owner_insert', 'action_owner_update']);
 select policies_are('public', 'check_ins', array['checkin_owner_select', 'checkin_owner_insert', 'checkin_owner_update']);
 select ok((select relrowsecurity from pg_class where oid = 'public.pending_registrations'::regclass), 'pending registrations has RLS enabled');
@@ -26,6 +27,14 @@ select ok(not has_table_privilege('authenticated', 'public.consent_events', 'ins
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'update'), 'clients cannot alter email or access status');
 select ok(not has_table_privilege('authenticated', 'public.action_plans', 'update'), 'clients cannot complete an action plan directly');
 select ok(not has_table_privilege('authenticated', 'public.check_ins', 'insert'), 'clients cannot insert a check-in directly');
+select ok(not has_table_privilege('anon', 'public.assessments', 'insert'), 'anon cannot insert assessments directly');
+select ok(not has_table_privilege('anon', 'public.goals', 'insert'), 'anon cannot insert goals directly');
+select ok(not has_table_privilege('authenticated', 'public.assessments', 'insert'), 'authenticated users cannot insert assessments directly');
+select ok(not has_table_privilege('authenticated', 'public.assessments', 'update'), 'authenticated users cannot update assessments directly');
+select ok(not has_table_privilege('authenticated', 'public.assessments', 'delete'), 'authenticated users cannot delete assessments directly');
+select ok(not has_table_privilege('authenticated', 'public.goals', 'insert'), 'authenticated users cannot insert goals directly');
+select ok(not has_table_privilege('authenticated', 'public.goals', 'update'), 'authenticated users cannot update goals directly');
+select ok(not has_table_privilege('authenticated', 'public.goals', 'delete'), 'authenticated users cannot delete goals directly');
 select ok(not has_function_privilege('authenticated', 'public.finalize_buyer_registration(uuid, text)', 'execute'), 'only server can finalize registration');
 select ok(not has_function_privilege('authenticated', 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)', 'execute'), 'only server can reserve an invite');
 select ok(not has_function_privilege('authenticated', 'public.cleanup_expired_buyer_registrations()', 'execute'), 'only server can clean expired PII');
@@ -45,7 +54,7 @@ select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_regist
 select like((select prosrc from pg_proc where oid = 'public.consume_invite_attempt(text)'::regprocedure), '%pg_advisory_xact_lock%', 'rate limiting locks each IP rolling window atomically');
 select like((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%access_status = ''active''%', 'assessment RPC rejects inactive users');
 select like((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%p_allocation%', 'assessment RPC validates the saved allocation');
-select like((select with_check from pg_policies where schemaname = 'public' and tablename = 'assessments' and policyname = 'assessment_owner_insert'), '%access_status = ''active''%', 'assessment INSERT RLS requires an active profile');
+select ok(not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'assessments' and policyname = 'assessment_owner_insert'), 'direct assessment INSERT policy is removed');
 select ok(exists (select 1 from pg_extension where extname = 'pg_cron'), 'pg_cron is installed for scheduled cleanup');
 select ok(exists (select 1 from cron.job where jobname = 'cleanup-expired-buyer-registrations'), 'expired registration cleanup is scheduled');
 select like(obj_description('public.cleanup_expired_buyer_registrations()'::regprocedure, 'pg_proc'), '%35 minutes%', 'cleanup retention contract includes the cron delay');
@@ -108,6 +117,61 @@ reset role;
 
 select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
 set local role authenticated;
+select throws_ok(
+  $$insert into public.assessments (user_id, store_id, input_data, calculated_metrics, diagnosis) values ('44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb)$$,
+  '42501', null,
+  'an active authenticated user cannot insert an assessment directly'
+);
+select throws_ok(
+  $$insert into public.goals (user_id, store_id, assessment_id, target_revenue, allocation, period_start, period_end) values ('44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '66666666-6666-6666-6666-666666666666', 40000000, '{}'::jsonb, current_date, current_date)$$,
+  '42501', null,
+  'an active authenticated user cannot insert a goal directly'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, null::jsonb, '{}'::jsonb, 40000000, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects SQL NULL calculated metrics'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 40000000, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects missing shortfall revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, 'null'::jsonb, '{}'::jsonb, 40000000, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects JSON null calculated metrics'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": null}'::jsonb, '{}'::jsonb, 40000000, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects a JSON null shortfall revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": "10000000"}'::jsonb, '{}'::jsonb, 40000000, '{}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects a non-number shortfall revenue'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 40000000, null::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects SQL NULL allocation'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 40000000, 'null'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects JSON null allocation'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 40000000, '{"newCustomerRevenue": null, "returningCustomerRevenue": 0, "averageOrderValueRevenue": 0}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects an allocation with a null value'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 40000000, '{"newCustomerRevenue": 0, "returningCustomerRevenue": 0}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects an allocation with a missing key'
+);
 select ok(
   (
     with saved as (

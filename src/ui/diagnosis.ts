@@ -87,6 +87,7 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
     selectedReturningDataStatus === "known" && !hasConnectedVisitHistory
       ? "unknown"
       : selectedReturningDataStatus;
+  const adsRunning = radioValue(form, "adsRunning") === "true";
   const revenue = {
     averageMonthlyRevenue: numberValue(form, "averageMonthlyRevenue"),
     targetMonthlyRevenue: numberValue(form, "targetMonthlyRevenue"),
@@ -108,11 +109,17 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
       "averageOrderValueRevenue",
     ),
   };
-  const advertising = {
-    visitConversionRate: percentageValue(form, "visitConversionRate"),
-    costPerClick: nullableNumberValue(form, "costPerClick"),
-    actualAdNewCustomers: nullableNumberValue(form, "actualAdNewCustomers"),
-  };
+  const advertising = adsRunning
+    ? {
+        visitConversionRate: percentageValue(form, "visitConversionRate"),
+        costPerClick: nullableNumberValue(form, "costPerClick"),
+        actualAdNewCustomers: nullableNumberValue(form, "actualAdNewCustomers"),
+      }
+    : {
+        visitConversionRate: null,
+        costPerClick: null,
+        actualAdNewCustomers: null,
+      };
   const adAttributionKnown =
     validateAdvertisingInputs(advertising).length === 0 &&
     advertising.visitConversionRate !== null &&
@@ -140,7 +147,7 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
     returningDataStatus,
     hasConsentDb: radioValue(form, "hasConsentDb") === "true",
     canChangeMenu: radioValue(form, "canChangeMenu") === "true",
-    adsRunning: radioValue(form, "adsRunning") === "true",
+    adsRunning,
     adAttributionKnown,
   };
 }
@@ -172,12 +179,14 @@ function allocationFields(): string {
 }
 
 function advertisingFields(): string {
-  return `<details class="optional-details"><summary>실제 광고 데이터를 입력하기 (선택)</summary>
-    <p>세 값을 모두 실제 기록으로 입력한 경우에만 광고 추정치를 보여 드립니다.</p>
-    ${numberField("visitConversionRate", "실제 방문 전환율 (%)", false)}
-    ${numberField("costPerClick", "실제 평균 클릭 비용", false)}
-    ${numberField("actualAdNewCustomers", "광고 유입 실제 신규 고객 수", false)}
-  </details>`;
+  return `<section data-advertising-fields hidden>
+    <details class="optional-details"><summary>실제 광고 데이터를 입력하기 (선택)</summary>
+      <p>세 값을 모두 실제 기록으로 입력한 경우에만 광고 추정치를 보여 드립니다.</p>
+      ${numberField("visitConversionRate", "실제 방문 전환율 (%)", false)}
+      ${numberField("costPerClick", "실제 평균 클릭 비용", false)}
+      ${numberField("actualAdNewCustomers", "광고 유입 실제 신규 고객 수", false)}
+    </details>
+  </section>`;
 }
 
 function choice(name: string, value: string, label: string): string {
@@ -246,6 +255,27 @@ function clearErrors(form: HTMLFormElement): void {
     });
 }
 
+function syncAdvertisingFields(
+  form: HTMLFormElement,
+  enabled = radioValue(form, "adsRunning") === "true",
+): void {
+  const fields = form.querySelector<HTMLElement>("[data-advertising-fields]");
+  if (!fields) return;
+  fields.hidden = !enabled;
+  fields.querySelectorAll<HTMLInputElement>("input").forEach((input) => {
+    input.disabled = !enabled;
+    if (!enabled) {
+      input.value = "";
+      input.removeAttribute("aria-invalid");
+    }
+  });
+  if (!enabled) {
+    fields.querySelectorAll<HTMLElement>(".field-error").forEach((error) => {
+      error.textContent = "";
+    });
+  }
+}
+
 function validateStep(form: HTMLFormElement, step: Step): boolean {
   clearErrors(form);
   const errors: { name: string; message: string }[] = [];
@@ -261,6 +291,15 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
       if (input instanceof HTMLInputElement && input.value.trim() === "") {
         errors.push({ name, message: "값을 입력해 주세요." });
       }
+      if (hasInvalidNumber(form, name)) {
+        errors.push({ name, message: "숫자만 입력해 주세요." });
+      }
+    });
+    [
+      "newCustomerRevenue",
+      "returningCustomerRevenue",
+      "averageOrderValueRevenue",
+    ].forEach((name) => {
       if (hasInvalidNumber(form, name)) {
         errors.push({ name, message: "숫자만 입력해 주세요." });
       }
@@ -324,14 +363,16 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
         errors.push({ name, message: "하나를 선택해 주세요." });
       }
     });
-    ["visitConversionRate", "costPerClick", "actualAdNewCustomers"].forEach(
-      (name) => {
-        if (hasInvalidNumber(form, name)) {
-          errors.push({ name, message: "숫자만 입력해 주세요." });
-        }
-      },
-    );
-    if (errors.length === 0) {
+    if (radioValue(form, "adsRunning") === "true") {
+      ["visitConversionRate", "costPerClick", "actualAdNewCustomers"].forEach(
+        (name) => {
+          if (hasInvalidNumber(form, name)) {
+            errors.push({ name, message: "숫자만 입력해 주세요." });
+          }
+        },
+      );
+    }
+    if (errors.length === 0 && radioValue(form, "adsRunning") === "true") {
       validateAdvertisingInputs(readDiagnosisForm(form).advertising).forEach(
         (error) => {
           errors.push({ name: error.field, message: error.message });
@@ -434,7 +475,21 @@ export function renderDiagnosis(
 
   const form = root.querySelector<HTMLFormElement>("[data-diagnosis-form]");
   if (!form) return;
+  syncAdvertisingFields(form);
   let step: Step = 1;
+  form.addEventListener("change", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.name === "adsRunning") {
+      syncAdvertisingFields(form, target.value === "true");
+    }
+  });
+  form
+    .querySelectorAll<HTMLInputElement>("[name='adsRunning']")
+    .forEach((input) => {
+      input.addEventListener("click", () =>
+        syncAdvertisingFields(form, input.value === "true"),
+      );
+    });
   form.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLButtonElement)) return;

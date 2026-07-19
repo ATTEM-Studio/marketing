@@ -21,3 +21,29 @@ test("replaces the assessment RPC with a secured allocation contract", () => {
     "grant execute on function public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date) to authenticated;",
   );
 });
+
+test("fails closed for nullable metrics and allocation JSON", () => {
+  expect(migration).toContain(
+    "jsonb_typeof(p_calculated_metrics) is distinct from 'object'",
+  );
+  expect(migration).toContain(
+    "jsonb_typeof(p_calculated_metrics -> 'shortfallRevenue') is distinct from 'number'",
+  );
+  expect(migration).toContain(
+    "jsonb_typeof(p_allocation) is distinct from 'object'",
+  );
+  expect(migration).toContain("v_shortfall_revenue is null");
+  expect(migration).toContain("v_allocation_total is null");
+});
+
+test("makes the secured RPC the only assessment and goal write path", () => {
+  expect(migration).toContain(
+    "revoke insert, update, delete on public.assessments, public.goals from anon, authenticated;",
+  );
+  expect(migration).toContain(
+    "drop policy if exists assessment_owner_insert on public.assessments;",
+  );
+  expect(migration).toContain(
+    "drop policy if exists goal_owner_insert on public.goals;",
+  );
+});

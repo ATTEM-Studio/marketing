@@ -22,6 +22,26 @@ const choose = (name: string, value: string) => {
   input.click();
 };
 
+const openStepThree = async (primaryConcern = "unknown") => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing test root");
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "25,000");
+  setValue("operatingDays", "20");
+  click("[data-next-step]");
+  choose("monthlyCustomerCountStatus", "unknown");
+  choose("primaryConcern", primaryConcern);
+  click("[data-next-step]");
+  choose("capacity", "yes");
+  choose("returningDataStatus", "unknown");
+  choose("hasConsentDb", "false");
+  choose("canChangeMenu", "true");
+  return root;
+};
+
 beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>';
 });
@@ -206,6 +226,81 @@ test("requires an exact direct revenue allocation before the next step", async (
   expect(document.querySelector<HTMLElement>("[data-step='1']")?.hidden).toBe(
     false,
   );
+});
+
+test.each(
+  [
+    "newCustomerRevenue",
+    "returningCustomerRevenue",
+    "averageOrderValueRevenue",
+  ].flatMap((field) =>
+    ["abc", "Infinity", "1e309"].map((value) => [field, value] as const),
+  ),
+)("rejects malformed direct allocation %s=%s", async (field, value) => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing test root");
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "25,000");
+  setValue("operatingDays", "20");
+  setValue(field, value);
+  click("[data-next-step]");
+
+  const input = document.querySelector<HTMLInputElement>(`[name='${field}']`);
+  expect(input?.getAttribute("aria-invalid")).toBe("true");
+  expect(document.activeElement).toBe(input);
+  expect(document.querySelector<HTMLElement>("[data-step='1']")?.hidden).toBe(
+    false,
+  );
+});
+
+test("only enables and reads advertising details while ads are running", async () => {
+  const root = await openStepThree();
+  const fields = root.querySelector<HTMLElement>("[data-advertising-fields]");
+  const costPerClick = root.querySelector<HTMLInputElement>(
+    "[name='costPerClick']",
+  );
+
+  expect(fields?.hidden).toBe(true);
+  expect(costPerClick?.disabled).toBe(true);
+
+  choose("adsRunning", "true");
+  expect(fields?.hidden).toBe(false);
+  expect(costPerClick?.disabled).toBe(false);
+  setValue("costPerClick", "500");
+
+  choose("adsRunning", "false");
+  expect(fields?.hidden).toBe(true);
+  expect(costPerClick?.disabled).toBe(true);
+  expect(costPerClick?.value).toBe("");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(document.querySelectorAll("[data-recommended-action]")).toHaveLength(
+    1,
+  );
+  expect(text()).not.toContain("광고 비용은 아직 계산하지 않았어요");
+  expect(text()).not.toContain("7일 동안 신규 고객의 방문 경로를 기록하세요");
+});
+
+test("uses exactly one measurement action for partial live advertising data", async () => {
+  await openStepThree("ads");
+  choose("adsRunning", "true");
+  setValue("costPerClick", "500");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(document.querySelectorAll("[data-recommended-action]")).toHaveLength(
+    1,
+  );
+  expect(
+    document.querySelector("[data-recommended-action]")?.textContent,
+  ).toContain("7일 동안 신규 고객의 방문 경로를 기록하세요");
+  expect(text()).not.toContain("예상 광고비:");
 });
 
 test("shows advertising estimates only after all actual advertising values are entered", async () => {
