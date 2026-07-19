@@ -50,6 +50,42 @@ export interface FieldError {
   message: string;
 }
 
+export type PeakOccupancy =
+  | "spacious"
+  | "half"
+  | "almost_full"
+  | "waiting";
+export type AverageStayBand =
+  | "under_30"
+  | "30_60"
+  | "60_90"
+  | "over_90"
+  | "unknown";
+export type RestaurantCapacityStatus =
+  | "available"
+  | "time_limited"
+  | "saturated"
+  | "insufficient";
+
+export interface RestaurantOperationsInput {
+  seats: number | null;
+  hallHours: number | null;
+  peakOccupancy: PeakOccupancy | null;
+  averagePartySize: number | null;
+  averageStayBand: AverageStayBand | null;
+  channelShares: {
+    dineIn: number | null;
+    takeout: number | null;
+    delivery: number | null;
+  };
+}
+
+export interface RestaurantOperationsInsight {
+  status: RestaurantCapacityStatus;
+  requiredPartiesPerDay: number | null;
+  theoreticalTurns: { min: number; max: number } | null;
+}
+
 export type BottleneckKey =
   "exposure" | "click" | "visit" | "averageOrderValue" | "returning";
 
