@@ -32,5 +32,11 @@ enabled = true
 policy = "per_worker"
 inspector_port = 8083
 
+[functions.redeem-invite]
+verify_jwt = false
+
+[functions.finalize-registration]
+verify_jwt = true
+
 [analytics]
 enabled = false

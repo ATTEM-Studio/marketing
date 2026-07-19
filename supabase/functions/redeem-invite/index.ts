@@ -26,8 +26,8 @@ function text(value: unknown, maximum: number): string | null {
 
 function clientIp(request: Request): string {
   return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("cf-connecting-ip") ??
+    request.headers.get("fly-client-ip") ??
     "unknown"
   );
 }
@@ -53,18 +53,12 @@ Deno.serve(async (request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const ipHash = await sha256(`${pepper}:${clientIp(request)}`);
-  const { error: attemptError } = await adminClient
-    .from("invite_attempts")
-    .insert({ ip_hash: ipHash });
+  const { data: attemptAllowed, error: attemptError } = await adminClient.rpc(
+    "consume_invite_attempt",
+    { p_ip_hash: ipHash },
+  );
   if (attemptError) return json(500, { error: "registration_unavailable" });
-
-  const { count, error: countError } = await adminClient
-    .from("invite_attempts")
-    .select("id", { count: "exact", head: true })
-    .eq("ip_hash", ipHash)
-    .gte("attempted_at", new Date(Date.now() - 15 * 60 * 1000).toISOString());
-  if (countError) return json(500, { error: "registration_unavailable" });
-  if ((count ?? 0) > 5) return json(429, { error: "too_many_requests" });
+  if (!attemptAllowed) return json(429, { error: "too_many_requests" });
 
   let body: RegistrationInput;
   try {
@@ -94,50 +88,17 @@ Deno.serve(async (request) => {
   }
 
   const codeHash = await sha256(`${pepper}${inviteCode}`);
-  const { data: invite, error: inviteError } = await adminClient
-    .from("invite_codes")
-    .select("id, status, reserved_email, expires_at")
-    .eq("code_hash", codeHash)
-    .maybeSingle();
-  if (
-    inviteError ||
-    !invite ||
-    invite.status !== "available" ||
-    new Date(invite.expires_at).getTime() <= Date.now()
-  ) {
-    return invalidInvite();
-  }
-
-  const { data: reservedInvite, error: reserveError } = await adminClient
-    .from("invite_codes")
-    .update({
-      status: "reserved",
-      reserved_email: email,
-      reserved_at: new Date().toISOString(),
-    })
-    .eq("id", invite.id)
-    .eq("status", "available")
-    .gt("expires_at", new Date().toISOString())
-    .select("id")
-    .maybeSingle();
-  if (reserveError || !reservedInvite) return invalidInvite();
-
-  const { error: pendingError } = await adminClient
-    .from("pending_registrations")
-    .upsert(
-      {
-        email,
-        name,
-        region,
-        business_name: businessName,
-        required_consent: true,
-        marketing_consent: body.marketingConsent,
-        invite_code_id: invite.id,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "email" },
-    );
-  if (pendingError) return json(500, { error: "registration_unavailable" });
+  const { data: reservationAccepted, error: reserveError } =
+    await adminClient.rpc("reserve_buyer_registration", {
+      p_code_hash: codeHash,
+      p_email: email,
+      p_name: name,
+      p_region: region,
+      p_business_name: businessName,
+      p_required_consent: true,
+      p_marketing_consent: body.marketingConsent,
+    });
+  if (reserveError || !reservationAccepted) return invalidInvite();
 
   const { error: otpError } = await authClient.auth.signInWithOtp({
     email,

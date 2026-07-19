@@ -8,6 +8,16 @@ Deno.serve(async (request) => {
   if (request.method !== "POST")
     return json(405, { error: "method_not_allowed" });
 
+  let body: { confirm?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return json(400, { error: "confirmation_required" });
+  }
+  if (body.confirm !== true) {
+    return json(400, { error: "confirmation_required" });
+  }
+
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) {
     return json(401, { error: "unauthorized" });
