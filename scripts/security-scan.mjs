@@ -14,25 +14,33 @@ const serverSecretNames = [
   "SUPABASE_JWT_SECRET",
 ];
 const serverSecretAssignment = new RegExp(
-  `\\b(?:${serverSecretNames.join("|")})\\b\\s*(?:=|:)\\s*(?:"([^"]*)"|'([^']*)'|([^\\s,;#]+))`,
+  `(?:"|')?\\b(?:${serverSecretNames.join("|")})\\b(?:"|')?\\s*(?:=|:)\\s*(?:"([^"]*)"|'([^']*)'|([^\\s,;#]+))`,
   "g",
 );
 const jwtLikeToken = /eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+const allowedPlaceholders = new Set([
+  "<set-in-supabase-dashboard>",
+  "<generate-and-store-securely>",
+]);
 
 function isPlaceholderOrReference(value) {
   const normalized = value.trim();
-  return (
-    normalized === "" ||
-    /^<[^>]+>$/.test(normalized) ||
-    /^\$\{?[A-Z0-9_]+\}?$/.test(normalized) ||
-    /^(?:\.{3}|\*+)$/.test(normalized) ||
-    /^(?:your|example|placeholder|replace|set|generate)[-_]/i.test(
-      normalized,
-    ) ||
-    /(?:Deno\.env\.get|process\.env|import\.meta\.env|secrets\.)/.test(
-      normalized,
-    )
+  if (normalized === "" || allowedPlaceholders.has(normalized)) return true;
+
+  const shellReference = normalized.match(/^\$\{?([A-Z0-9_]+)\}?$/);
+  if (shellReference) return serverSecretNames.includes(shellReference[1]);
+
+  const denoReference = normalized.match(
+    /^Deno\.env\.get\(["']([A-Z0-9_]+)["']\)$/,
   );
+  if (denoReference) return serverSecretNames.includes(denoReference[1]);
+
+  const propertyReference = normalized.match(
+    /^(?:process\.env|import\.meta\.env|secrets)\.([A-Z0-9_]+)$/,
+  );
+  return propertyReference
+    ? serverSecretNames.includes(propertyReference[1])
+    : false;
 }
 
 function isServiceRoleJwt(token) {

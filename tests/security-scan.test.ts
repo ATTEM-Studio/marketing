@@ -24,6 +24,33 @@ describe("security scan", () => {
     ).toBe(true);
   });
 
+  test("rejects quoted JSON and object-key server-secret assignments", () => {
+    const findings = securityScan.findSecretExposures([
+      {
+        file: "config.json",
+        source: JSON.stringify({ [serviceRoleName]: liveValue }),
+      },
+      {
+        file: "config.ts",
+        source: `({ "${pepperName}": "${liveValue}" })`,
+      },
+    ]);
+
+    expect(findings).toHaveLength(2);
+  });
+
+  test("does not treat a placeholder-looking prefix as a safe value", () => {
+    const findings = securityScan.findSecretExposures([
+      {
+        file: "config.env",
+        source: `${pepperName}=${["generate", liveValue].join("-")}`,
+      },
+    ]);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain("server secret assignment");
+  });
+
   test("rejects Supabase secret tokens and legacy service-role JWTs", () => {
     const header = Buffer.from(
       JSON.stringify({ alg: "HS256", typ: "JWT" }),
@@ -58,7 +85,11 @@ describe("security scan", () => {
       },
       {
         file: "function.ts",
-        source: `Deno.env.get("${serviceRoleName}"); Deno.env.get("${pepperName}");`,
+        source: [
+          `Deno.env.get("${serviceRoleName}"); Deno.env.get("${pepperName}");`,
+          `${serviceRoleName}=\${${serviceRoleName}}`,
+          `${pepperName}=Deno.env.get("${pepperName}")`,
+        ].join("\n"),
       },
     ]);
 
