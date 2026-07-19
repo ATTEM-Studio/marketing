@@ -1,6 +1,6 @@
 begin;
 
-select plan(94);
+select plan(96);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
@@ -263,6 +263,22 @@ select is(
   )->'check_in'->>'after_value',
   '길찾기 12회',
   'an idempotent retry returns the original unit-bearing result'
+);
+reset role;
+select is(
+  public.finalize_buyer_registration(
+    '44444444-4444-4444-4444-444444444444',
+    'active@example.test'
+  ),
+  '55555555-5555-5555-5555-555555555555'::uuid,
+  'finalization returns the existing store when retried after completion'
+);
+set local role authenticated;
+select throws_ok(
+  $$insert into public.action_plans (user_id, store_id, assessment_id, action_key, action_snapshot, status)
+    values ('44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '66666666-6666-6666-6666-666666666666', 'tamper', '{}'::jsonb, 'completed')$$,
+  '42501', null,
+  'an authenticated user cannot create a completed action plan directly'
 );
 reset role;
 

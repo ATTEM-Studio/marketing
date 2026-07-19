@@ -3,6 +3,8 @@ import { describe, expect, test } from "vitest";
 
 const migrationPath =
   "supabase/migrations/202607190005_authenticated_read_privileges.sql";
+const hardeningMigrationPath =
+  "supabase/migrations/202607190006_live_flow_hardening.sql";
 
 describe("authenticated database privileges", () => {
   test("grants only the table operations used by the live service", () => {
@@ -28,7 +30,7 @@ describe("authenticated database privileges", () => {
       "supabase/tests/database/rls.test.sql",
       "utf8",
     );
-    expect(databaseTest).toContain("select plan(94)");
+    expect(databaseTest).toContain("select plan(96)");
     expect(databaseTest).toContain(
       "authenticated can read their profile through RLS",
     );
@@ -51,5 +53,13 @@ describe("authenticated database privileges", () => {
     expect(databaseTest).toContain(
       "where id = current_setting('test.saved_goal_id')::uuid",
     );
+  });
+
+  test("hardens retries and client-created action states", () => {
+    expect(existsSync(hardeningMigrationPath)).toBe(true);
+    const migration = readFileSync(hardeningMigrationPath, "utf8");
+    expect(migration).toContain("action_owner_insert");
+    expect(migration).toContain("status = 'scheduled'");
+    expect(migration).toContain("already finalized");
   });
 });
