@@ -35,6 +35,24 @@ function liveService(signOut = vi.fn(async () => undefined)): AppService {
   };
 }
 
+test("shows the landing page before onboarding for a signed-out live visitor", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const fake = liveService();
+  fake.getSession = vi.fn(async () => ({
+    mode: "live" as const,
+    profile: null,
+  }));
+
+  await createApp(root, fake, { isLive: true }).start();
+
+  expect(root.querySelector("[data-start-registration]")).not.toBeNull();
+  expect(root.querySelector("[data-registration-form]")).toBeNull();
+  root.querySelector<HTMLButtonElement>("[data-start-registration]")?.click();
+  expect(root.querySelector("[data-registration-form]")).not.toBeNull();
+});
+
 test("lets an active live buyer sign out accessibly", async () => {
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.querySelector<HTMLElement>("#app");
@@ -144,7 +162,7 @@ test("consumes only the auth callback flag before logout and a later reload", as
   }).start();
 
   expect(root.querySelector("[data-confirm-registration]")).toBeNull();
-  expect(root.querySelector("[data-registration-form]")).not.toBeNull();
+  expect(root.querySelector("[data-start-registration]")).not.toBeNull();
 });
 
 test("consumes the callback after explicit new-buyer finalization", async () => {

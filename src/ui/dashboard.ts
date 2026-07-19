@@ -4,7 +4,6 @@ import type {
   AppSession,
   AssessmentSnapshot,
 } from "../services/contracts";
-import { renderLandingShell } from "./shell";
 
 const number = new Intl.NumberFormat("ko-KR");
 
@@ -162,12 +161,13 @@ export async function renderDashboard(
   session: AppSession,
   service: AppService,
   onStartDiagnosis: () => void,
+  onSignedOut: () => void = onStartDiagnosis,
 ): Promise<void> {
   const signOut = async (button: HTMLButtonElement) => {
     button.disabled = true;
     try {
       await service.signOut();
-      renderLandingShell(root, () => undefined, false);
+      onSignedOut();
     } catch {
       button.disabled = false;
       const status = root.querySelector<HTMLElement>("[data-dashboard-status]");

@@ -33,11 +33,29 @@ export function createApp(
   service: AppService,
   options: { authCallback?: boolean; isLive?: boolean } = {},
 ): { start(): Promise<void> } {
+  const showLanding = () => {
+    renderLandingShell(
+      root,
+      {
+        onRegister: () => showOnboarding(false),
+        onLogin: () => showOnboarding(false),
+        onDemo: () => showDiagnosis(),
+      },
+      { mode: options.isLive ? "live" : "demo" },
+    );
+  };
+
   const showDashboard = async () => {
     const session = await service.getSession();
-    await renderDashboard(root, session, service, () => {
-      showDiagnosis(session.mode === "live");
-    });
+    await renderDashboard(
+      root,
+      session,
+      service,
+      () => {
+        showDiagnosis(session.mode === "live");
+      },
+      showLanding,
+    );
   };
 
   const showDiagnosis = (liveSession = false) => {
@@ -135,7 +153,7 @@ export function createApp(
       if (signOutStatus) signOutStatus.textContent = "로그아웃하고 있습니다.";
       try {
         await service.signOut();
-        renderLandingShell(root, () => undefined, false);
+        showLanding();
       } catch {
         if (signOutStatus) {
           signOutStatus.textContent =
@@ -163,12 +181,12 @@ export function createApp(
 
   return {
     async start() {
-      if (!options.isLive) renderLandingShell(root, () => showDiagnosis());
+      if (!options.isLive) showLanding();
       let session;
       try {
         session = await service.getSession();
       } catch {
-        if (options.isLive) renderLandingShell(root, () => undefined, false);
+        if (options.isLive) showLanding();
         return;
       }
       if (session.mode !== "live") return;
@@ -177,7 +195,8 @@ export function createApp(
         await showDashboard();
         return;
       }
-      showOnboarding(options.authCallback);
+      if (options.authCallback) showOnboarding(true);
+      else showLanding();
     },
   };
 }
