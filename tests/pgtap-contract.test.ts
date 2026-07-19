@@ -39,4 +39,9 @@ describe("pgTAP database contract", () => {
       "the reusable code remains available after multiple reservations",
     );
   });
+
+  test("uses Supabase's pgcrypto extension schema explicitly", () => {
+    expect(reusableAccessMigration).toContain("extensions.digest(");
+    expect(databaseTest).toContain("extensions.digest(");
+  });
 });

@@ -31,7 +31,7 @@ alter table public.pending_registrations
 
 insert into public.invite_codes (code_hash, status, expires_at, is_reusable)
 values (
-  encode(digest('DOITNOW', 'sha256'), 'hex'),
+  encode(extensions.digest('DOITNOW', 'sha256'), 'hex'),
   'available',
   '2099-12-31 23:59:59+00',
   true

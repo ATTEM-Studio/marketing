@@ -71,17 +71,17 @@ select alike(obj_description('public.cleanup_expired_buyer_registrations()'::reg
 select alike(obj_description('public.finalize_buyer_registration(uuid, text)'::regprocedure, 'pg_proc'), '%explicit user confirmation%', 'finalization contract prohibits automatic callback completion');
 select alike((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.is_reusable%', 'registration supports reusable access codes');
 select alike((select prosrc from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%if not v_invite.is_reusable then%', 'finalization does not redeem reusable access codes');
-select is((select count(*) from public.invite_codes where is_reusable and code_hash = encode(digest('DOITNOW', 'sha256'), 'hex')), 1::bigint, 'DOITNOW is seeded once as a reusable normalized hash');
+select is((select count(*) from public.invite_codes where is_reusable and code_hash = encode(extensions.digest('DOITNOW', 'sha256'), 'hex')), 1::bigint, 'DOITNOW is seeded once as a reusable normalized hash');
 select ok(
-  public.reserve_buyer_registration(encode(digest('DOITNOW', 'sha256'), 'hex'), 'reader-one@example.test', 'reader one', 'seoul', 'store one', true, false),
+  public.reserve_buyer_registration(encode(extensions.digest('DOITNOW', 'sha256'), 'hex'), 'reader-one@example.test', 'reader one', 'seoul', 'store one', true, false),
   'the reusable code accepts the first reader'
 );
 select ok(
-  public.reserve_buyer_registration(encode(digest('DOITNOW', 'sha256'), 'hex'), 'reader-two@example.test', 'reader two', 'busan', 'store two', true, false),
+  public.reserve_buyer_registration(encode(extensions.digest('DOITNOW', 'sha256'), 'hex'), 'reader-two@example.test', 'reader two', 'busan', 'store two', true, false),
   'the reusable code accepts a second reader'
 );
 select is(
-  (select status from public.invite_codes where is_reusable and code_hash = encode(digest('DOITNOW', 'sha256'), 'hex')),
+  (select status from public.invite_codes where is_reusable and code_hash = encode(extensions.digest('DOITNOW', 'sha256'), 'hex')),
   'available',
   'the reusable code remains available after multiple reservations'
 );
