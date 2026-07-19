@@ -16,7 +16,7 @@ pnpm verify
 
 `pnpm verify`는 서식, 타입 검사, 단위·계약 테스트, 비밀정보 노출 검사, 프로덕션 빌드를 차례로 실행합니다. `pnpm security:scan`만 별도로 실행할 수도 있습니다.
 
-GitHub Actions CI도 같은 `pnpm verify`를 실행합니다. 데이터베이스 마이그레이션·RLS의 pgTAP 검증과 Edge Function 실행 확인은 Docker 기반 Supabase 로컬 스택이 필요하므로, 아래 운영 절차를 릴리스 전 별도로 실행합니다.
+GitHub Actions CI는 `pnpm verify`와 Docker 기반 `database` 작업을 모두 실행합니다. `database` 작업은 Supabase CLI 2.109.1로 로컬 스택을 시작하고 마이그레이션 초기화, RLS pgTAP, Edge Function OPTIONS 스모크 테스트를 수행합니다. 어느 작업이든 실패하면 전체 CI가 실패하며, `main` 브랜치 보호 규칙에서는 이 Verify 워크플로를 필수 검사로 지정해야 합니다. 아래 명령은 같은 데이터베이스 검증을 로컬에서 재현할 때 사용합니다.
 
 ### 공개 데모
 

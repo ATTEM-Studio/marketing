@@ -5,11 +5,16 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 11.9.0
@@ -19,3 +24,35 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+      - run: supabase start
+      - run: supabase db reset
+      - run: supabase test db
+      - name: Smoke Edge Functions
+        shell: bash
+        run: |
+          supabase functions serve --no-verify-jwt > "$RUNNER_TEMP/edge-functions.log" 2>&1 &
+          edge_pid=$!
+          trap 'kill "$edge_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --request OPTIONS http://127.0.0.1:54321/functions/v1/redeem-invite)
+            if [ "$status" = "204" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/edge-functions.log"
+          exit 1
+      - if: always()
+        run: supabase stop --no-backup
