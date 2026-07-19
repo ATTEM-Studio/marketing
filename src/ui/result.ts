@@ -11,6 +11,10 @@ export interface ResultViewModel {
   action: RecommendedAction;
 }
 
+export interface ResultCallbacks {
+  onSaveAction: () => Promise<void> | void;
+}
+
 const won = new Intl.NumberFormat("ko-KR");
 const bottleneckName = {
   exposure: "노출",
@@ -41,7 +45,20 @@ function bottleneckCopy(bottleneck: BottleneckResult): string {
   return "비교 가능한 수치에서 뚜렷한 감소를 확인하지 못했습니다.";
 }
 
-export function renderResult(root: HTMLElement, model: ResultViewModel): void {
+export function checkInDueDate(assessmentCreatedAt: string): string {
+  const assessmentDate = new Date(assessmentCreatedAt);
+  if (Number.isNaN(assessmentDate.getTime())) {
+    throw new Error("진단 날짜를 확인할 수 없습니다.");
+  }
+  assessmentDate.setUTCDate(assessmentDate.getUTCDate() + 7);
+  return assessmentDate.toISOString().slice(0, 10);
+}
+
+export function renderResult(
+  root: HTMLElement,
+  model: ResultViewModel,
+  callbacks?: ResultCallbacks,
+): void {
   const coaching = COACHING[model.action.coachingKey as keyof typeof COACHING];
   const summary = coaching
     ? coachingSummary[model.action.coachingKey]
@@ -65,7 +82,30 @@ export function renderResult(root: HTMLElement, model: ResultViewModel): void {
         <h3>실행 방법 세 단계</h3><ol>${model.action.steps.map((step) => `<li>${step}</li>`).join("")}</ol>
         <h3>확인할 숫자 하나</h3><p>${model.action.metric}</p>
         <h3>하지 말아야 할 행동</h3><p>${model.action.avoid}</p>
+        ${callbacks ? '<button type="button" data-save-action>실행할게요</button><p class="form-status" role="status" aria-live="polite" data-action-status></p>' : ""}
       </section>
       <section class="coaching-principle"><h2>관련 코칭 원칙</h2><p>${summary ?? "한 번에 한 가지 행동만 바꾸고, 결과를 기록하세요."}</p></section>
     </main>`;
+
+  const saveAction =
+    root.querySelector<HTMLButtonElement>("[data-save-action]");
+  const status = root.querySelector<HTMLElement>("[data-action-status]");
+  let saving = false;
+  saveAction?.addEventListener("click", async () => {
+    if (!callbacks || saving) return;
+    saving = true;
+    saveAction.disabled = true;
+    if (status) status.textContent = "실행 계획을 저장하고 있습니다.";
+    try {
+      await callbacks.onSaveAction();
+    } catch {
+      saving = false;
+      saveAction.disabled = false;
+      if (status) {
+        status.textContent =
+          "실행 계획을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      }
+      saveAction.focus();
+    }
+  });
 }

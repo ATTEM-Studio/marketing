@@ -64,7 +64,8 @@ footer {
 
 .diagnosis-shell,
 .result-shell,
-.onboarding-shell {
+.onboarding-shell,
+.dashboard-shell {
   width: min(100% - 2rem, 860px);
   margin: 2rem auto 4rem;
   padding: clamp(1.25rem, 4vw, 3rem);
@@ -74,7 +75,8 @@ footer {
 
 .diagnosis-shell h1,
 .result-shell h1,
-.onboarding-shell h1 {
+.onboarding-shell h1,
+.dashboard-shell h1 {
   max-width: 24ch;
   font-size: clamp(1.8rem, 4vw, 3rem);
 }
@@ -116,7 +118,18 @@ input {
   font: inherit;
 }
 
+textarea {
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid #8b968e;
+  border-radius: 0.5rem;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
 input:focus-visible,
+textarea:focus-visible,
 summary:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
@@ -193,7 +206,12 @@ summary {
 
 .result-summary,
 .recommended-action,
-.coaching-principle {
+.coaching-principle,
+.dashboard-summary,
+.current-action,
+.checkin-panel,
+.upcoming-actions,
+.action-history {
   margin-top: var(--space-3);
   padding: var(--space-3);
   border-radius: var(--radius);
@@ -215,6 +233,42 @@ summary {
 
 .recommended-action {
   border: 2px solid var(--color-accent);
+  background: var(--color-panel);
+}
+
+.current-action {
+  border: 2px solid var(--color-accent);
+  background: var(--color-panel);
+}
+
+.dashboard-summary p,
+.current-action p,
+.checkin-panel p,
+.upcoming-actions p,
+.action-history p {
+  margin-bottom: 0;
+}
+
+.upcoming-actions ul,
+.action-history ul {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: 1.25rem;
+}
+
+.action-history li {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.optional {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.quiet-button {
+  width: auto;
+  color: var(--color-accent);
   background: var(--color-panel);
 }
 

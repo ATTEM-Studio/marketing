@@ -7,7 +7,8 @@ import {
   renderDiagnosis,
   type DiagnosisInput,
 } from "./ui/diagnosis";
-import { renderResult } from "./ui/result";
+import { checkInDueDate, renderResult } from "./ui/result";
+import { renderDashboard } from "./ui/dashboard";
 import { renderOnboarding } from "./ui/onboarding";
 import { renderLandingShell } from "./ui/shell";
 
@@ -27,6 +28,13 @@ export function createApp(
   service: AppService,
   options: { authCallback?: boolean; isLive?: boolean } = {},
 ): { start(): Promise<void> } {
+  const showDashboard = async () => {
+    const session = await service.getSession();
+    await renderDashboard(root, session, service, () => {
+      showDiagnosis(session.mode === "live");
+    });
+  };
+
   const showDiagnosis = (liveSession = false) => {
     renderDiagnosis(root, {
       async onSubmit(input: DiagnosisInput) {
@@ -40,12 +48,26 @@ export function createApp(
         if (submit) submit.disabled = true;
         if (status) status.textContent = "결과를 저장하고 있습니다.";
         try {
-          await service.saveAssessment({
+          const assessment = await service.saveAssessment({
             inputs: input as unknown as Record<string, unknown>,
             metrics: metrics as unknown as Record<string, unknown>,
             diagnosis: { bottleneck, actionKey: action.key },
           });
-          renderResult(root, { metrics, bottleneck, action });
+          renderResult(
+            root,
+            { metrics, bottleneck, action },
+            {
+              async onSaveAction() {
+                await service.saveActionPlan({
+                  assessmentId: assessment.id,
+                  actionKey: action.key,
+                  metric: action.metric,
+                  checkInDueAt: checkInDueDate(assessment.createdAt),
+                });
+                await showDashboard();
+              },
+            },
+          );
         } catch {
           if (status) {
             status.textContent =
@@ -114,7 +136,7 @@ export function createApp(
       if (session.mode !== "live") return;
       if (session.profile) {
         if (options.authCallback) consumeAuthCallback();
-        showDiagnosis(true);
+        await showDashboard();
         return;
       }
       showOnboarding(options.authCallback);

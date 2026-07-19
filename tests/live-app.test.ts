@@ -82,6 +82,7 @@ test("keeps the diagnosis visible when saving fails", async () => {
     throw new Error("network");
   });
   await createApp(root, fake, { isLive: true }).start();
+  root.querySelector<HTMLButtonElement>("[data-start-diagnosis]")?.click();
   const set = (name: string, value: string) => {
     const input = root.querySelector<HTMLInputElement>(`[name='${name}']`);
     if (!input) throw new Error(`missing ${name}`);
