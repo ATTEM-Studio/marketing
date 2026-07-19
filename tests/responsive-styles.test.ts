@@ -25,3 +25,13 @@ test("keeps the skip link fully off-screen until keyboard focus", () => {
     /\.skip-link:focus\s*{[^}]*transform:\s*translateY\(0\)/s,
   );
 });
+
+test("keeps Korean words intact while long machine tokens remain safe", () => {
+  expect(css).toContain("word-break: keep-all");
+  expect(css).toContain("text-wrap: balance");
+  expect(css).toContain("text-wrap: pretty");
+  expect(css).not.toMatch(
+    /h1,\s*\n?h2,\s*\n?h3,[^{]+\{[^}]*overflow-wrap:\s*anywhere/s,
+  );
+  expect(css).toMatch(/\.long-token,[^{]+\{[^}]*overflow-wrap:\s*anywhere/s);
+});

@@ -48,6 +48,8 @@ body {
   font-family: inherit;
   font-size: 16px;
   line-height: 1.65;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -121,11 +123,26 @@ p {
 
 h1,
 h2,
-h3,
+h3 {
+  word-break: keep-all;
+  overflow-wrap: normal;
+  text-wrap: balance;
+}
+
+p,
+li,
+label,
+button,
+legend,
+summary {
+  text-wrap: pretty;
+}
+
+.long-token,
 .metric-value,
-.business-name,
-.action-card,
-.metric-card {
+input,
+textarea {
+  word-break: normal;
   overflow-wrap: anywhere;
 }
 
