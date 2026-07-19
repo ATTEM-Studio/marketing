@@ -8,8 +8,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format:check": "prettier --check .",
+    "security:scan": "node scripts/security-scan.mjs",
     "build": "vite build",
-    "verify": "pnpm format:check && pnpm typecheck && pnpm test && pnpm build"
+    "verify": "pnpm format:check && pnpm typecheck && pnpm test && pnpm security:scan && pnpm build"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.110.7"

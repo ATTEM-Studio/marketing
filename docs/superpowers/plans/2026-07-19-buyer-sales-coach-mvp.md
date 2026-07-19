@@ -79,6 +79,7 @@ README.md                                실행·Supabase·배포 안내
 ### Task 1: Toolchain and Accessible App Shell
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.json`
 - Create: `vite.config.ts`
@@ -91,6 +92,7 @@ README.md                                실행·Supabase·배포 안내
 - Create: `tests/app-shell.test.ts`
 
 **Interfaces:**
+
 - Produces: `mountApp(root: HTMLElement): void` from `src/main.ts`
 - Produces: stable DOM landmarks `header`, `main#app`, and `footer`
 
@@ -157,9 +159,15 @@ describe("app shell", () => {
     const root = document.querySelector<HTMLElement>("#app");
     if (!root) throw new Error("missing test root");
     mountApp(root);
-    expect(document.querySelector("h1")?.textContent).toContain("매출이 막힌 지점");
-    expect(document.querySelector("[data-action='register']")?.textContent).toContain("구매자 인증");
-    expect(document.querySelector("[data-action='demo']")?.textContent).toContain("샘플로 둘러보기");
+    expect(document.querySelector("h1")?.textContent).toContain(
+      "매출이 막힌 지점",
+    );
+    expect(
+      document.querySelector("[data-action='register']")?.textContent,
+    ).toContain("구매자 인증");
+    expect(
+      document.querySelector("[data-action='demo']")?.textContent,
+    ).toContain("샘플로 둘러보기");
   });
 });
 ```
@@ -229,11 +237,13 @@ git commit -m "feat: add buyer coach app shell"
 ### Task 2: Revenue Goal Domain
 
 **Files:**
+
 - Create: `src/domain/types.ts`
 - Create: `src/domain/revenue.ts`
 - Create: `tests/revenue.test.ts`
 
 **Interfaces:**
+
 - Produces: `validateRevenueInputs(input: RevenueInputs): FieldError[]`
 - Produces: `calculateRevenueMetrics(input: RevenueInputs): RevenueMetrics`
 - Produces types `RevenueInputs`, `RevenueMetrics`, `FieldError`, `ReturningDataStatus`, and `Capacity`
@@ -244,7 +254,10 @@ Create `tests/revenue.test.ts`:
 
 ```ts
 import { describe, expect, test } from "vitest";
-import { calculateRevenueMetrics, validateRevenueInputs } from "../src/domain/revenue";
+import {
+  calculateRevenueMetrics,
+  validateRevenueInputs,
+} from "../src/domain/revenue";
 
 const base = {
   averageMonthlyRevenue: 30_000_000,
@@ -267,21 +280,42 @@ describe("revenue goal calculation", () => {
   });
 
   test("uses an actual customer count when provided", () => {
-    expect(calculateRevenueMetrics({ ...base, monthlyCustomerCount: 980 }).monthlyCustomerCount).toBe(980);
-    expect(calculateRevenueMetrics({ ...base, monthlyCustomerCount: 980 }).customerCountSource).toBe("actual");
+    expect(
+      calculateRevenueMetrics({ ...base, monthlyCustomerCount: 980 })
+        .monthlyCustomerCount,
+    ).toBe(980);
+    expect(
+      calculateRevenueMetrics({ ...base, monthlyCustomerCount: 980 })
+        .customerCountSource,
+    ).toBe("actual");
   });
 
   test("does not return a negative shortfall after reaching target", () => {
-    const result = calculateRevenueMetrics({ ...base, averageMonthlyRevenue: 45_000_000 });
+    const result = calculateRevenueMetrics({
+      ...base,
+      averageMonthlyRevenue: 45_000_000,
+    });
     expect(result.shortfallRevenue).toBe(0);
     expect(result.maxNewCustomers).toBe(0);
     expect(result.targetReached).toBe(true);
   });
 
   test("returns field errors instead of dividing by zero", () => {
-    expect(validateRevenueInputs({ ...base, averageOrderValue: 0, operatingDays: 0 })).toEqual([
-      { field: "averageOrderValue", message: "평균 객단가를 1원 이상 입력해 주세요." },
-      { field: "operatingDays", message: "월 영업일을 1일 이상 입력해 주세요." },
+    expect(
+      validateRevenueInputs({
+        ...base,
+        averageOrderValue: 0,
+        operatingDays: 0,
+      }),
+    ).toEqual([
+      {
+        field: "averageOrderValue",
+        message: "평균 객단가를 1원 이상 입력해 주세요.",
+      },
+      {
+        field: "operatingDays",
+        message: "월 영업일을 1일 이상 입력해 주세요.",
+      },
     ]);
   });
 });
@@ -335,25 +369,51 @@ import type { FieldError, RevenueInputs, RevenueMetrics } from "./types";
 
 export function validateRevenueInputs(input: RevenueInputs): FieldError[] {
   const errors: FieldError[] = [];
-  if (input.averageMonthlyRevenue < 0) errors.push({ field: "averageMonthlyRevenue", message: "최근 월평균 매출은 0원 이상이어야 합니다." });
-  if (input.targetMonthlyRevenue <= 0) errors.push({ field: "targetMonthlyRevenue", message: "목표 월 매출을 1원 이상 입력해 주세요." });
-  if (input.averageOrderValue <= 0) errors.push({ field: "averageOrderValue", message: "평균 객단가를 1원 이상 입력해 주세요." });
-  if (input.operatingDays <= 0) errors.push({ field: "operatingDays", message: "월 영업일을 1일 이상 입력해 주세요." });
-  if (input.monthlyCustomerCount !== null && input.monthlyCustomerCount <= 0) errors.push({ field: "monthlyCustomerCount", message: "월 고객 수는 1명 이상 입력하거나 모름을 선택해 주세요." });
+  if (input.averageMonthlyRevenue < 0)
+    errors.push({
+      field: "averageMonthlyRevenue",
+      message: "최근 월평균 매출은 0원 이상이어야 합니다.",
+    });
+  if (input.targetMonthlyRevenue <= 0)
+    errors.push({
+      field: "targetMonthlyRevenue",
+      message: "목표 월 매출을 1원 이상 입력해 주세요.",
+    });
+  if (input.averageOrderValue <= 0)
+    errors.push({
+      field: "averageOrderValue",
+      message: "평균 객단가를 1원 이상 입력해 주세요.",
+    });
+  if (input.operatingDays <= 0)
+    errors.push({
+      field: "operatingDays",
+      message: "월 영업일을 1일 이상 입력해 주세요.",
+    });
+  if (input.monthlyCustomerCount !== null && input.monthlyCustomerCount <= 0)
+    errors.push({
+      field: "monthlyCustomerCount",
+      message: "월 고객 수는 1명 이상 입력하거나 모름을 선택해 주세요.",
+    });
   return errors;
 }
 
 export function calculateRevenueMetrics(input: RevenueInputs): RevenueMetrics {
   const errors = validateRevenueInputs(input);
-  if (errors.length > 0) throw new TypeError(errors.map((error) => error.message).join(" "));
-  const shortfallRevenue = Math.max(input.targetMonthlyRevenue - input.averageMonthlyRevenue, 0);
+  if (errors.length > 0)
+    throw new TypeError(errors.map((error) => error.message).join(" "));
+  const shortfallRevenue = Math.max(
+    input.targetMonthlyRevenue - input.averageMonthlyRevenue,
+    0,
+  );
   const maxNewCustomers = Math.ceil(shortfallRevenue / input.averageOrderValue);
   const actualCount = input.monthlyCustomerCount;
   return {
     shortfallRevenue,
     maxNewCustomers,
     maxNewCustomersPerDay: Math.ceil(maxNewCustomers / input.operatingDays),
-    monthlyCustomerCount: actualCount ?? Math.ceil(input.averageMonthlyRevenue / input.averageOrderValue),
+    monthlyCustomerCount:
+      actualCount ??
+      Math.ceil(input.averageMonthlyRevenue / input.averageOrderValue),
     customerCountSource: actualCount === null ? "estimated" : "actual",
     targetReached: input.averageMonthlyRevenue >= input.targetMonthlyRevenue,
   };
@@ -383,6 +443,7 @@ git commit -m "feat: calculate revenue goal customer ceiling"
 ### Task 3: Evidence-Rated Bottleneck and Safe Single-Action Recommendation Engine
 
 **Files:**
+
 - Modify: `src/domain/types.ts`
 - Create: `src/domain/bottleneck.ts`
 - Create: `src/domain/recommendation.ts`
@@ -391,6 +452,7 @@ git commit -m "feat: calculate revenue goal customer ceiling"
 - Create: `tests/recommendation.test.ts`
 
 **Interfaces:**
+
 - Consumes: `RevenueMetrics`, `Capacity`, and `ReturningDataStatus`
 - Produces: `selectBottleneck(input: BottleneckInputs): BottleneckResult`
 - Produces: `selectAction(context: RecommendationContext): RecommendedAction`
@@ -404,7 +466,10 @@ Create `tests/bottleneck.test.ts`:
 import { describe, expect, test } from "vitest";
 import { selectBottleneck } from "../src/domain/bottleneck";
 
-const metric = (previous: number | null, current: number | null) => ({ previous, current });
+const metric = (previous: number | null, current: number | null) => ({
+  previous,
+  current,
+});
 
 describe("bottleneck evidence", () => {
   test("selects the largest decline from comparable store data", () => {
@@ -416,7 +481,11 @@ describe("bottleneck evidence", () => {
       returning: metric(80, 40),
       returningDataStatus: "unknown",
     });
-    expect(result).toMatchObject({ key: "click", status: "known", changeRate: -0.3 });
+    expect(result).toMatchObject({
+      key: "click",
+      status: "known",
+      changeRate: -0.3,
+    });
   });
 
   test("excludes returning visits when the customer identity is unknown", () => {
@@ -440,7 +509,12 @@ describe("bottleneck evidence", () => {
       returning: metric(null, null),
       returningDataStatus: "unknown",
     });
-    expect(result).toEqual({ key: null, status: "insufficient", changeRate: null, reason: "비교할 이전 기간 수치가 부족해 병목을 단정하지 않았습니다." });
+    expect(result).toEqual({
+      key: null,
+      status: "insufficient",
+      changeRate: null,
+      reason: "비교할 이전 기간 수치가 부족해 병목을 단정하지 않았습니다.",
+    });
   });
 });
 ```
@@ -456,8 +530,12 @@ Expected: FAIL because `selectBottleneck` does not exist.
 Append these types to `src/domain/types.ts`:
 
 ```ts
-export type BottleneckKey = "exposure" | "click" | "visit" | "averageOrderValue" | "returning";
-export interface ComparableMetric { previous: number | null; current: number | null }
+export type BottleneckKey =
+  "exposure" | "click" | "visit" | "averageOrderValue" | "returning";
+export interface ComparableMetric {
+  previous: number | null;
+  current: number | null;
+}
 export interface BottleneckInputs {
   exposure: ComparableMetric;
   click: ComparableMetric;
@@ -520,19 +598,40 @@ describe("single action selection", () => {
   });
 
   test("does not recommend more acquisition without capacity", () => {
-    expect(selectAction({ ...context, capacity: "no" }).key).toBe("average-order-value");
+    expect(selectAction({ ...context, capacity: "no" }).key).toBe(
+      "average-order-value",
+    );
   });
 
   test("asks for attribution before changing ad budget", () => {
-    expect(selectAction({ ...context, primaryConcern: "ads", adsRunning: true }).key).toBe("measure-acquisition-source");
+    expect(
+      selectAction({ ...context, primaryConcern: "ads", adsRunning: true }).key,
+    ).toBe("measure-acquisition-source");
   });
 
   test("does not recommend customer messages without consent", () => {
-    expect(selectAction({ ...context, primaryConcern: "returning", returningDataStatus: "known" }).key).not.toBe("returning-message");
+    expect(
+      selectAction({
+        ...context,
+        primaryConcern: "returning",
+        returningDataStatus: "known",
+      }).key,
+    ).not.toBe("returning-message");
   });
 
   test("protects profit after the target is reached", () => {
-    expect(selectAction({ ...context, metrics: { ...context.metrics, targetReached: true, shortfallRevenue: 0, maxNewCustomers: 0, maxNewCustomersPerDay: 0 } }).key).toBe("profit-review");
+    expect(
+      selectAction({
+        ...context,
+        metrics: {
+          ...context.metrics,
+          targetReached: true,
+          shortfallRevenue: 0,
+          maxNewCustomers: 0,
+          maxNewCustomersPerDay: 0,
+        },
+      }).key,
+    ).toBe("profit-review");
   });
 });
 ```
@@ -552,7 +651,8 @@ Expected: FAIL because `selectAction` does not exist.
 Append to `src/domain/types.ts`:
 
 ```ts
-export type PrimaryConcern = "customers" | "ads" | "averageOrderValue" | "returning" | "unknown";
+export type PrimaryConcern =
+  "customers" | "ads" | "averageOrderValue" | "returning" | "unknown";
 
 export interface RecommendationContext {
   metrics: RevenueMetrics;
@@ -567,7 +667,13 @@ export interface RecommendationContext {
 }
 
 export interface RecommendedAction {
-  key: "profit-review" | "average-order-value" | "measure-acquisition-source" | "returning-message" | "off-peak-offer" | "local-discovery";
+  key:
+    | "profit-review"
+    | "average-order-value"
+    | "measure-acquisition-source"
+    | "returning-message"
+    | "off-peak-offer"
+    | "local-discovery";
   title: string;
   reason: string;
   steps: readonly [string, string, string];
@@ -589,8 +695,13 @@ const ACTIONS: Record<RecommendedAction["key"], RecommendedAction> = {
   "profit-review": {
     key: "profit-review",
     title: "추가 광고보다 남는 매출부터 확인하세요",
-    reason: "최근 월평균 매출이 목표에 도달했습니다. 손님을 더 모으기 전에 이익과 운영 효율을 확인할 차례입니다.",
-    steps: ["대표 메뉴 세 개의 판매가와 재료비를 적으세요.", "메뉴별로 판매가에서 직접 재료비를 빼세요.", "남는 금액이 가장 적은 메뉴 한 개의 가격이나 구성을 검토하세요."],
+    reason:
+      "최근 월평균 매출이 목표에 도달했습니다. 손님을 더 모으기 전에 이익과 운영 효율을 확인할 차례입니다.",
+    steps: [
+      "대표 메뉴 세 개의 판매가와 재료비를 적으세요.",
+      "메뉴별로 판매가에서 직접 재료비를 빼세요.",
+      "남는 금액이 가장 적은 메뉴 한 개의 가격이나 구성을 검토하세요.",
+    ],
     metric: "대표 메뉴별 판매가에서 직접 재료비를 뺀 금액",
     avoid: "목표를 달성했다는 이유만으로 광고비부터 늘리지 마세요.",
     minutes: 20,
@@ -599,8 +710,13 @@ const ACTIONS: Record<RecommendedAction["key"], RecommendedAction> = {
   "average-order-value": {
     key: "average-order-value",
     title: "대표 메뉴 옆에 추가 메뉴 한 개를 배치하세요",
-    reason: "지금은 추가 손님을 충분히 받을 수 없어 이미 방문한 손님의 선택을 개선하는 편이 현실적입니다.",
-    steps: ["가장 많이 팔리는 메뉴 한 개를 고르세요.", "함께 주문하기 좋은 추가 메뉴 한 개를 정하세요.", "메뉴판과 직원 안내 문장을 같은 표현으로 바꾸세요."],
+    reason:
+      "지금은 추가 손님을 충분히 받을 수 없어 이미 방문한 손님의 선택을 개선하는 편이 현실적입니다.",
+    steps: [
+      "가장 많이 팔리는 메뉴 한 개를 고르세요.",
+      "함께 주문하기 좋은 추가 메뉴 한 개를 정하세요.",
+      "메뉴판과 직원 안내 문장을 같은 표현으로 바꾸세요.",
+    ],
     metric: "7일간 추가 메뉴 선택 건수와 평균 객단가",
     avoid: "모든 메뉴와 가격을 한꺼번에 바꾸지 마세요.",
     minutes: 20,
@@ -609,8 +725,13 @@ const ACTIONS: Record<RecommendedAction["key"], RecommendedAction> = {
   "measure-acquisition-source": {
     key: "measure-acquisition-source",
     title: "7일 동안 신규 고객의 방문 경로를 기록하세요",
-    reason: "광고 클릭이 실제 방문으로 이어졌는지 확인되지 않아 예산을 판단할 근거가 부족합니다.",
-    steps: ["결제할 때 처음 방문인지 확인하세요.", "처음이라면 매장을 알게 된 경로 한 가지만 표시하세요.", "7일 뒤 광고 경로 신규 고객 수와 광고비를 함께 보세요."],
+    reason:
+      "광고 클릭이 실제 방문으로 이어졌는지 확인되지 않아 예산을 판단할 근거가 부족합니다.",
+    steps: [
+      "결제할 때 처음 방문인지 확인하세요.",
+      "처음이라면 매장을 알게 된 경로 한 가지만 표시하세요.",
+      "7일 뒤 광고 경로 신규 고객 수와 광고비를 함께 보세요.",
+    ],
     metric: "광고를 보고 방문했다고 답한 실제 신규 고객 수",
     avoid: "클릭 수만 보고 광고비를 늘리지 마세요.",
     minutes: 10,
@@ -619,8 +740,13 @@ const ACTIONS: Record<RecommendedAction["key"], RecommendedAction> = {
   "returning-message": {
     key: "returning-message",
     title: "동의 고객 일부에게 다음 방문 이유를 알려주세요",
-    reason: "확인된 재방문 데이터와 홍보 수신동의 고객이 있어 작은 재방문 실험을 측정할 수 있습니다.",
-    steps: ["최근 방문 고객 중 수신동의 고객만 고르세요.", "7일 안에 다시 올 이유 한 가지를 작성하세요.", "일부 고객에게만 보내고 실제 재방문 수를 기록하세요."],
+    reason:
+      "확인된 재방문 데이터와 홍보 수신동의 고객이 있어 작은 재방문 실험을 측정할 수 있습니다.",
+    steps: [
+      "최근 방문 고객 중 수신동의 고객만 고르세요.",
+      "7일 안에 다시 올 이유 한 가지를 작성하세요.",
+      "일부 고객에게만 보내고 실제 재방문 수를 기록하세요.",
+    ],
     metric: "발송 고객 중 7일 안에 재방문한 고객 수",
     avoid: "수신동의가 없는 연락처로 홍보하지 마세요.",
     minutes: 15,
@@ -629,8 +755,13 @@ const ACTIONS: Record<RecommendedAction["key"], RecommendedAction> = {
   "off-peak-offer": {
     key: "off-peak-offer",
     title: "손님을 더 받을 수 있는 시간대 하나를 정하세요",
-    reason: "시간대에 따라 수용 여력이 달라서 전체 유입보다 빈 시간대에 맞춘 행동이 먼저입니다.",
-    steps: ["최근 한 달 중 가장 비는 요일과 시간을 고르세요.", "그 시간대에 맞는 대표 메뉴와 이용 이유를 한 문장으로 쓰세요.", "한 채널에만 안내하고 해당 시간 방문 수를 기록하세요."],
+    reason:
+      "시간대에 따라 수용 여력이 달라서 전체 유입보다 빈 시간대에 맞춘 행동이 먼저입니다.",
+    steps: [
+      "최근 한 달 중 가장 비는 요일과 시간을 고르세요.",
+      "그 시간대에 맞는 대표 메뉴와 이용 이유를 한 문장으로 쓰세요.",
+      "한 채널에만 안내하고 해당 시간 방문 수를 기록하세요.",
+    ],
     metric: "선택한 시간대의 7일 방문 고객 수",
     avoid: "바쁜 시간까지 같은 혜택을 적용하지 마세요.",
     minutes: 20,
@@ -639,8 +770,13 @@ const ACTIONS: Record<RecommendedAction["key"], RecommendedAction> = {
   "local-discovery": {
     key: "local-discovery",
     title: "검색한 고객이 선택할 이유 한 가지를 고치세요",
-    reason: "추가 고객을 받을 수 있으므로 광고 확대보다 매장을 비교하는 고객에게 선택 이유를 분명히 보여주는 행동이 먼저입니다.",
-    steps: ["대표 메뉴와 핵심 이용 상황 한 가지를 정하세요.", "대표사진과 첫 설명 문장을 같은 내용으로 맞추세요.", "주차·예약·영업시간 정보가 맞는지 확인하세요."],
+    reason:
+      "추가 고객을 받을 수 있으므로 광고 확대보다 매장을 비교하는 고객에게 선택 이유를 분명히 보여주는 행동이 먼저입니다.",
+    steps: [
+      "대표 메뉴와 핵심 이용 상황 한 가지를 정하세요.",
+      "대표사진과 첫 설명 문장을 같은 내용으로 맞추세요.",
+      "주차·예약·영업시간 정보가 맞는지 확인하세요.",
+    ],
     metric: "7일간 전화·길찾기·예약 수",
     avoid: "여러 지역과 메뉴 키워드를 한꺼번에 추가하지 마세요.",
     minutes: 25,
@@ -648,12 +784,28 @@ const ACTIONS: Record<RecommendedAction["key"], RecommendedAction> = {
   },
 };
 
-export function selectAction(context: RecommendationContext): RecommendedAction {
+export function selectAction(
+  context: RecommendationContext,
+): RecommendedAction {
   if (context.metrics.targetReached) return ACTIONS["profit-review"];
-  if (context.capacity === "no") return context.canChangeMenu ? ACTIONS["average-order-value"] : ACTIONS["off-peak-offer"];
-  if (context.primaryConcern === "ads" && context.adsRunning && !context.adAttributionKnown) return ACTIONS["measure-acquisition-source"];
-  if (context.primaryConcern === "averageOrderValue" && context.canChangeMenu) return ACTIONS["average-order-value"];
-  if (context.primaryConcern === "returning" && context.returningDataStatus === "known" && context.hasConsentDb) return ACTIONS["returning-message"];
+  if (context.capacity === "no")
+    return context.canChangeMenu
+      ? ACTIONS["average-order-value"]
+      : ACTIONS["off-peak-offer"];
+  if (
+    context.primaryConcern === "ads" &&
+    context.adsRunning &&
+    !context.adAttributionKnown
+  )
+    return ACTIONS["measure-acquisition-source"];
+  if (context.primaryConcern === "averageOrderValue" && context.canChangeMenu)
+    return ACTIONS["average-order-value"];
+  if (
+    context.primaryConcern === "returning" &&
+    context.returningDataStatus === "known" &&
+    context.hasConsentDb
+  )
+    return ACTIONS["returning-message"];
   if (context.capacity === "sometimes") return ACTIONS["off-peak-offer"];
   return ACTIONS["local-discovery"];
 }
@@ -686,11 +838,13 @@ git commit -m "feat: select one safe coaching action"
 ### Task 4: Service Boundary and Synthetic Demo Mode
 
 **Files:**
+
 - Create: `src/services/contracts.ts`
 - Create: `src/services/demo-service.ts`
 - Create: `tests/demo-service.test.ts`
 
 **Interfaces:**
+
 - Produces: `AppService` with session, assessment, action-plan, and check-in methods
 - Produces: `createDemoService(): AppService`
 - Consumes: `RevenueInputs`, `RevenueMetrics`, `RecommendationContext`, `RecommendedAction`
@@ -706,17 +860,35 @@ import { createDemoService } from "../src/services/demo-service";
 describe("demo service", () => {
   test("returns only the fixed synthetic buyer", async () => {
     const service = createDemoService();
-    expect(await service.getSession()).toMatchObject({ mode: "demo", profile: { name: "샘플 사장님", businessName: "샘플 식당" } });
+    expect(await service.getSession()).toMatchObject({
+      mode: "demo",
+      profile: { name: "샘플 사장님", businessName: "샘플 식당" },
+    });
   });
 
   test("rejects real registration data in demo mode", async () => {
     const service = createDemoService();
-    await expect(service.registerBuyer({ name: "실명", email: "real@example.com", region: "서울", businessName: "실제 업체", inviteCode: "ABC", serviceConsent: true, marketingConsent: false })).rejects.toThrow("데모에서는 개인정보를 저장하지 않습니다.");
+    await expect(
+      service.registerBuyer({
+        name: "실명",
+        email: "real@example.com",
+        region: "서울",
+        businessName: "실제 업체",
+        inviteCode: "ABC",
+        serviceConsent: true,
+        marketingConsent: false,
+      }),
+    ).rejects.toThrow("데모에서는 개인정보를 저장하지 않습니다.");
   });
 
   test("stores action status only in memory", async () => {
     const service = createDemoService();
-    await service.saveActionPlan({ assessmentId: "demo-assessment", actionKey: "local-discovery", metric: "7일간 전화 수", checkInDueAt: "2026-07-26" });
+    await service.saveActionPlan({
+      assessmentId: "demo-assessment",
+      actionKey: "local-discovery",
+      metric: "7일간 전화 수",
+      checkInDueAt: "2026-07-26",
+    });
     expect(await service.listActionPlans()).toHaveLength(1);
     expect(localStorage.length).toBe(0);
   });
@@ -734,12 +906,46 @@ Expected: FAIL because the service files do not exist.
 Create `src/services/contracts.ts` with these exported types and signatures:
 
 ```ts
-export interface BuyerRegistration { name: string; email: string; region: string; businessName: string; inviteCode: string; serviceConsent: boolean; marketingConsent: boolean }
-export interface BuyerProfile { id: string; name: string; email: string; region: string; businessName: string }
-export interface AppSession { mode: "demo" | "live"; profile: BuyerProfile | null }
-export interface AssessmentSnapshot { id: string; inputs: Record<string, unknown>; metrics: Record<string, unknown>; diagnosis: Record<string, unknown>; createdAt: string }
-export interface ActionPlanDraft { assessmentId: string; actionKey: string; metric: string; checkInDueAt: string }
-export interface ActionPlanRecord extends ActionPlanDraft { id: string; status: "planned" | "completed"; beforeValue: string | null; afterValue: string | null; note: string | null }
+export interface BuyerRegistration {
+  name: string;
+  email: string;
+  region: string;
+  businessName: string;
+  inviteCode: string;
+  serviceConsent: boolean;
+  marketingConsent: boolean;
+}
+export interface BuyerProfile {
+  id: string;
+  name: string;
+  email: string;
+  region: string;
+  businessName: string;
+}
+export interface AppSession {
+  mode: "demo" | "live";
+  profile: BuyerProfile | null;
+}
+export interface AssessmentSnapshot {
+  id: string;
+  inputs: Record<string, unknown>;
+  metrics: Record<string, unknown>;
+  diagnosis: Record<string, unknown>;
+  createdAt: string;
+}
+export interface ActionPlanDraft {
+  assessmentId: string;
+  actionKey: string;
+  metric: string;
+  checkInDueAt: string;
+}
+export interface ActionPlanRecord extends ActionPlanDraft {
+  id: string;
+  status: "planned" | "completed";
+  beforeValue: string | null;
+  afterValue: string | null;
+  note: string | null;
+}
 
 export interface AppService {
   getSession(): Promise<AppSession>;
@@ -747,11 +953,18 @@ export interface AppService {
   sendLoginLink(email: string): Promise<void>;
   finalizeRegistration(): Promise<AppSession>;
   signOut(): Promise<void>;
-  saveAssessment(snapshot: Omit<AssessmentSnapshot, "id" | "createdAt">): Promise<AssessmentSnapshot>;
+  saveAssessment(
+    snapshot: Omit<AssessmentSnapshot, "id" | "createdAt">,
+  ): Promise<AssessmentSnapshot>;
   getLatestAssessment(): Promise<AssessmentSnapshot | null>;
   saveActionPlan(draft: ActionPlanDraft): Promise<ActionPlanRecord>;
   listActionPlans(): Promise<ActionPlanRecord[]>;
-  completeActionPlan(id: string, beforeValue: string, afterValue: string, note: string): Promise<ActionPlanRecord>;
+  completeActionPlan(
+    id: string,
+    beforeValue: string,
+    afterValue: string,
+    note: string,
+  ): Promise<ActionPlanRecord>;
 }
 ```
 
@@ -782,6 +995,7 @@ git commit -m "feat: add private synthetic demo service"
 ### Task 5: Three-Step Diagnosis and Result UI
 
 **Files:**
+
 - Create: `src/app.ts`
 - Create: `src/ui/shell.ts`
 - Create: `src/ui/diagnosis.ts`
@@ -791,6 +1005,7 @@ git commit -m "feat: add private synthetic demo service"
 - Create: `tests/diagnosis-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: `AppService`, `calculateRevenueMetrics`, `validateRevenueInputs`, `selectBottleneck`, `selectAction`, and coaching content
 - Produces: `createApp(root: HTMLElement, service: AppService): { start(): Promise<void> }`
 - Produces: form parser `readDiagnosisForm(form: HTMLFormElement): DiagnosisInput`
@@ -817,7 +1032,9 @@ const setValue = (name: string, value: string) => {
   input.dispatchEvent(new Event("input", { bubbles: true }));
 };
 const choose = (name: string, value: string) => {
-  const input = document.querySelector<HTMLInputElement>(`[name='${name}'][value='${value}']`);
+  const input = document.querySelector<HTMLInputElement>(
+    `[name='${name}'][value='${value}']`,
+  );
   if (!input) throw new Error(`missing choice ${name}:${value}`);
   input.click();
 };
@@ -851,7 +1068,9 @@ test("completes the three-step all-new-customer ceiling flow", async () => {
 
   expect(text()).toContain("최대 400명");
   expect(text()).toContain("전부 신규 고객으로 채운다고 가정");
-  expect(document.querySelectorAll("[data-recommended-action]")).toHaveLength(1);
+  expect(document.querySelectorAll("[data-recommended-action]")).toHaveLength(
+    1,
+  );
   expect(text()).not.toContain("재방문이 문제입니다");
 });
 ```
@@ -907,12 +1126,18 @@ Call `selectBottleneck(input.bottleneck)` before `selectAction`. Render a confir
 Create `src/config.ts`:
 
 ```ts
-export interface AppConfig { mode: "demo" | "live"; supabaseUrl: string | null; supabaseAnonKey: string | null }
+export interface AppConfig {
+  mode: "demo" | "live";
+  supabaseUrl: string | null;
+  supabaseAnonKey: string | null;
+}
 
 export function readConfig(env: ImportMetaEnv): AppConfig {
   const supabaseUrl = env.VITE_SUPABASE_URL?.trim() || null;
   const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY?.trim() || null;
-  const live = Boolean(supabaseUrl && supabaseAnonKey && env.VITE_APP_MODE === "live");
+  const live = Boolean(
+    supabaseUrl && supabaseAnonKey && env.VITE_APP_MODE === "live",
+  );
   return { mode: live ? "live" : "demo", supabaseUrl, supabaseAnonKey };
 }
 ```
@@ -944,6 +1169,7 @@ git commit -m "feat: add goal diagnosis demo flow"
 ### Task 6: Supabase Schema, RLS, and Invite Functions
 
 **Files:**
+
 - Create: `supabase/config.toml`
 - Create: `supabase/migrations/202607190001_init.sql`
 - Create: `supabase/functions/_shared/http.ts`
@@ -952,6 +1178,7 @@ git commit -m "feat: add goal diagnosis demo flow"
 - Create: `supabase/tests/database/rls.test.sql`
 
 **Interfaces:**
+
 - Produces tables: `profiles`, `consent_events`, `invite_codes`, `invite_attempts`, `pending_registrations`, `stores`, `assessments`, `goals`, `action_plans`, `check_ins`
 - Produces RPCs: `finalize_buyer_registration(p_user_id uuid, p_email text) returns uuid` and `save_assessment_with_goal(p_store_id uuid, p_input_data jsonb, p_calculated_metrics jsonb, p_diagnosis jsonb, p_target_revenue numeric, p_period_start date, p_period_end date) returns uuid`
 - Produces Edge endpoints: `redeem-invite` and `finalize-registration`
@@ -1004,13 +1231,18 @@ Create `supabase/functions/_shared/http.ts` with:
 
 ```ts
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin":
+    Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 export function json(status: number, body: Record<string, unknown>): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 export function normalizeEmail(value: string): string {
@@ -1018,8 +1250,13 @@ export function normalizeEmail(value: string): string {
 }
 
 export async function sha256(value: string): Promise<string> {
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const bytes = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(bytes)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 ```
 
@@ -1078,6 +1315,7 @@ git commit -m "feat: add secure buyer invite backend"
 ### Task 7: Live Supabase Service and Onboarding UI
 
 **Files:**
+
 - Create: `.env.example`
 - Create: `src/env.d.ts`
 - Create: `src/services/supabase-client.ts`
@@ -1089,6 +1327,7 @@ git commit -m "feat: add secure buyer invite backend"
 - Create: `tests/onboarding-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: `AppService`, `BuyerRegistration`, `readConfig`
 - Produces: `createSupabaseService(url: string, anonKey: string): AppService`
 - Produces: `renderOnboarding(root, service, callbacks): void`
@@ -1105,15 +1344,23 @@ import { renderOnboarding } from "../src/ui/onboarding";
 const registrationCalls: BuyerRegistration[] = [];
 const service = (): AppService => ({
   getSession: vi.fn(async () => ({ mode: "live", profile: null })),
-  registerBuyer: vi.fn(async (input) => { registrationCalls.push(input); }),
+  registerBuyer: vi.fn(async (input) => {
+    registrationCalls.push(input);
+  }),
   sendLoginLink: vi.fn(async () => undefined),
   finalizeRegistration: vi.fn(async () => ({ mode: "live", profile: null })),
   signOut: vi.fn(async () => undefined),
-  saveAssessment: vi.fn(async () => { throw new Error("unused"); }),
+  saveAssessment: vi.fn(async () => {
+    throw new Error("unused");
+  }),
   getLatestAssessment: vi.fn(async () => null),
-  saveActionPlan: vi.fn(async () => { throw new Error("unused"); }),
+  saveActionPlan: vi.fn(async () => {
+    throw new Error("unused");
+  }),
   listActionPlans: vi.fn(async () => []),
-  completeActionPlan: vi.fn(async () => { throw new Error("unused"); }),
+  completeActionPlan: vi.fn(async () => {
+    throw new Error("unused");
+  }),
 });
 const set = (name: string, value: string) => {
   const input = document.querySelector<HTMLInputElement>(`[name='${name}']`);
@@ -1130,11 +1377,20 @@ test("keeps marketing consent optional", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
   renderOnboarding(root, service(), { onAuthenticated: vi.fn() });
-  set("name", "구매자"); set("email", "buyer@example.com"); set("region", "서울"); set("businessName", "구매자 식당"); set("inviteCode", "BUYER-001");
+  set("name", "구매자");
+  set("email", "buyer@example.com");
+  set("region", "서울");
+  set("businessName", "구매자 식당");
+  set("inviteCode", "BUYER-001");
   document.querySelector<HTMLInputElement>("[name='serviceConsent']")?.click();
-  document.querySelector<HTMLFormElement>("[data-registration-form]")?.requestSubmit();
+  document
+    .querySelector<HTMLFormElement>("[data-registration-form]")
+    ?.requestSubmit();
   await Promise.resolve();
-  expect(registrationCalls[0]).toMatchObject({ serviceConsent: true, marketingConsent: false });
+  expect(registrationCalls[0]).toMatchObject({
+    serviceConsent: true,
+    marketingConsent: false,
+  });
   expect(document.body.textContent).toContain("이메일을 확인해 주세요");
 });
 
@@ -1142,7 +1398,9 @@ test("requires service consent", () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
   renderOnboarding(root, service(), { onAuthenticated: vi.fn() });
-  const button = document.querySelector<HTMLButtonElement>("[data-register-submit]");
+  const button = document.querySelector<HTMLButtonElement>(
+    "[data-register-submit]",
+  );
   expect(button?.disabled).toBe(true);
 });
 ```
@@ -1152,13 +1410,23 @@ Append these tests using the same helpers:
 ```ts
 test("shows a generic invite failure", async () => {
   const failing = service();
-  failing.registerBuyer = vi.fn(async () => { throw new Error("코드를 확인할 수 없습니다. 입력 내용을 다시 확인해 주세요."); });
+  failing.registerBuyer = vi.fn(async () => {
+    throw new Error(
+      "코드를 확인할 수 없습니다. 입력 내용을 다시 확인해 주세요.",
+    );
+  });
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
   renderOnboarding(root, failing, { onAuthenticated: vi.fn() });
-  set("name", "구매자"); set("email", "buyer@example.com"); set("region", "서울"); set("businessName", "구매자 식당"); set("inviteCode", "WRONG");
+  set("name", "구매자");
+  set("email", "buyer@example.com");
+  set("region", "서울");
+  set("businessName", "구매자 식당");
+  set("inviteCode", "WRONG");
   document.querySelector<HTMLInputElement>("[name='serviceConsent']")?.click();
-  document.querySelector<HTMLFormElement>("[data-registration-form]")?.requestSubmit();
+  document
+    .querySelector<HTMLFormElement>("[data-registration-form]")
+    ?.requestSubmit();
   await Promise.resolve();
   await Promise.resolve();
   expect(document.body.textContent).toContain("코드를 확인할 수 없습니다");
@@ -1218,9 +1486,10 @@ In `src/main.ts`:
 
 ```ts
 const config = readConfig(import.meta.env);
-const service = config.mode === "live" && config.supabaseUrl && config.supabaseAnonKey
-  ? createSupabaseService(config.supabaseUrl, config.supabaseAnonKey)
-  : createDemoService();
+const service =
+  config.mode === "live" && config.supabaseUrl && config.supabaseAnonKey
+    ? createSupabaseService(config.supabaseUrl, config.supabaseAnonKey)
+    : createDemoService();
 ```
 
 Live mode must show onboarding when no active profile exists and dashboard/diagnosis after `finalizeRegistration`. Demo mode must never render personal registration fields; it enters through the explicit sample button.
@@ -1250,6 +1519,7 @@ git commit -m "feat: connect buyer email onboarding"
 ### Task 8: Personal Dashboard and Action Check-In
 
 **Files:**
+
 - Create: `src/ui/dashboard.ts`
 - Modify: `src/app.ts`
 - Modify: `src/ui/result.ts`
@@ -1257,6 +1527,7 @@ git commit -m "feat: connect buyer email onboarding"
 - Create: `tests/dashboard-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: `AppService.getLatestAssessment`, `saveActionPlan`, `listActionPlans`, and `completeActionPlan`
 - Produces: `renderDashboard(root: HTMLElement, session: AppSession, service: AppService, onStartDiagnosis: () => void): Promise<void>`
 
@@ -1274,34 +1545,75 @@ test("shows the next action and saves before-after results", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
   const planned: ActionPlanRecord = {
-    id: "plan-1", assessmentId: "assessment-1", actionKey: "local-discovery",
-    metric: "길찾기 수", checkInDueAt: "2026-07-26", status: "planned",
-    beforeValue: null, afterValue: null, note: null,
+    id: "plan-1",
+    assessmentId: "assessment-1",
+    actionKey: "local-discovery",
+    metric: "길찾기 수",
+    checkInDueAt: "2026-07-26",
+    status: "planned",
+    beforeValue: null,
+    afterValue: null,
+    note: null,
   };
   const saved: string[] = [];
   const fake = {
-    getSession: vi.fn(async () => ({ mode: "demo", profile: { id: "demo", name: "샘플 사장님", email: "demo@example.invalid", region: "샘플", businessName: "샘플 식당" } })),
-    registerBuyer: vi.fn(), sendLoginLink: vi.fn(), finalizeRegistration: vi.fn(), signOut: vi.fn(),
+    getSession: vi.fn(async () => ({
+      mode: "demo",
+      profile: {
+        id: "demo",
+        name: "샘플 사장님",
+        email: "demo@example.invalid",
+        region: "샘플",
+        businessName: "샘플 식당",
+      },
+    })),
+    registerBuyer: vi.fn(),
+    sendLoginLink: vi.fn(),
+    finalizeRegistration: vi.fn(),
+    signOut: vi.fn(),
     saveAssessment: vi.fn(),
-    getLatestAssessment: vi.fn(async () => ({ id: "assessment-1", inputs: { averageMonthlyRevenue: 30_000_000 }, metrics: { maxNewCustomers: 400 }, diagnosis: {}, createdAt: "2026-07-19T00:00:00.000Z" })),
-    saveActionPlan: vi.fn(), listActionPlans: vi.fn(async () => [planned]),
-    completeActionPlan: vi.fn(async (_id: string, before: string, after: string, note: string) => {
-      saved.push(before, after, note);
-      return { ...planned, status: "completed" as const, beforeValue: before, afterValue: after, note };
-    }),
+    getLatestAssessment: vi.fn(async () => ({
+      id: "assessment-1",
+      inputs: { averageMonthlyRevenue: 30_000_000 },
+      metrics: { maxNewCustomers: 400 },
+      diagnosis: {},
+      createdAt: "2026-07-19T00:00:00.000Z",
+    })),
+    saveActionPlan: vi.fn(),
+    listActionPlans: vi.fn(async () => [planned]),
+    completeActionPlan: vi.fn(
+      async (_id: string, before: string, after: string, note: string) => {
+        saved.push(before, after, note);
+        return {
+          ...planned,
+          status: "completed" as const,
+          beforeValue: before,
+          afterValue: after,
+          note,
+        };
+      },
+    ),
   } as unknown as AppService;
 
   await renderDashboard(root, await fake.getSession(), fake, vi.fn());
   expect(document.body.textContent).toContain("오늘 할 행동 찾기");
   expect(document.body.textContent).toContain("결과 확인 예정");
-  document.querySelector<HTMLButtonElement>("[data-complete-plan='plan-1']")?.click();
+  document
+    .querySelector<HTMLButtonElement>("[data-complete-plan='plan-1']")
+    ?.click();
   const set = (name: string, value: string) => {
-    const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name='${name}']`);
+    const input = document.querySelector<
+      HTMLInputElement | HTMLTextAreaElement
+    >(`[name='${name}']`);
     if (!input) throw new Error(`missing ${name}`);
     input.value = value;
   };
-  set("beforeValue", "길찾기 7회"); set("afterValue", "길찾기 12회"); set("note", "대표사진 변경");
-  document.querySelector<HTMLFormElement>("[data-checkin-form]")?.requestSubmit();
+  set("beforeValue", "길찾기 7회");
+  set("afterValue", "길찾기 12회");
+  set("note", "대표사진 변경");
+  document
+    .querySelector<HTMLFormElement>("[data-checkin-form]")
+    ?.requestSubmit();
   await Promise.resolve();
   expect(saved).toEqual(["길찾기 7회", "길찾기 12회", "대표사진 변경"]);
   expect(document.body.textContent).toContain("결과 기록 완료");
@@ -1353,6 +1665,7 @@ git commit -m "feat: track coaching actions and results"
 ### Task 9: CI, GitHub Pages Demo, and Operations Guide
 
 **Files:**
+
 - Create: `.github/workflows/ci.yml`
 - Create: `.github/workflows/pages.yml`
 - Create: `README.md`
@@ -1360,6 +1673,7 @@ git commit -m "feat: track coaching actions and results"
 - Test: all `tests/*.test.ts`
 
 **Interfaces:**
+
 - Consumes: `pnpm verify`, Vite `dist/`, demo mode
 - Produces: repeatable pull-request checks and `main` GitHub Pages artifact
 
@@ -1374,7 +1688,9 @@ import { describe, expect, test } from "vitest";
 describe("deployment configuration", () => {
   test("uses the repository base path in GitHub Actions", () => {
     const source = readFileSync("vite.config.ts", "utf8");
-    expect(source).toContain('process.env.GITHUB_ACTIONS ? "/marketing/" : "/"');
+    expect(source).toContain(
+      'process.env.GITHUB_ACTIONS ? "/marketing/" : "/"',
+    );
   });
 
   test("never exposes service role configuration to Vite", () => {
