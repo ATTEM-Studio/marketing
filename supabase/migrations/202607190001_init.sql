@@ -1,4 +1,5 @@
 create extension if not exists pgcrypto;
+create extension if not exists pg_cron;
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -37,13 +38,10 @@ create unique index invite_codes_active_reservation_email_idx
 create table public.invite_attempts (
   id uuid primary key default gen_random_uuid(),
   ip_hash text not null check (char_length(ip_hash) = 64),
-  window_started_at timestamptz not null,
-  attempt_count integer not null default 1 check (attempt_count between 1 and 5),
-  updated_at timestamptz not null default now(),
-  unique (ip_hash, window_started_at)
+  attempted_at timestamptz not null default now()
 );
 
-create index invite_attempts_ip_hash_window_idx on public.invite_attempts (ip_hash, window_started_at desc);
+create index invite_attempts_ip_hash_attempted_at_idx on public.invite_attempts (ip_hash, attempted_at desc);
 
 create table public.pending_registrations (
   id uuid primary key default gen_random_uuid(),
@@ -242,22 +240,30 @@ security definer
 set search_path = public
 as $$
 declare
-  v_window timestamptz := to_timestamp(floor(extract(epoch from now()) / 900) * 900);
   v_attempt_count integer;
 begin
   if char_length(p_ip_hash) <> 64 then
     return false;
   end if;
 
-  insert into public.invite_attempts (ip_hash, window_started_at)
-  values (p_ip_hash, v_window)
-  on conflict (ip_hash, window_started_at) do update
-    set attempt_count = public.invite_attempts.attempt_count + 1,
-        updated_at = now()
-    where public.invite_attempts.attempt_count < 5
-  returning attempt_count into v_attempt_count;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_ip_hash, 0));
 
-  return found and v_attempt_count <= 5;
+  delete from public.invite_attempts
+  where ip_hash = p_ip_hash
+    and attempted_at < now() - interval '15 minutes';
+
+  select count(*) into v_attempt_count
+  from public.invite_attempts
+  where ip_hash = p_ip_hash
+    and attempted_at >= now() - interval '15 minutes';
+
+  if v_attempt_count >= 5 then
+    return false;
+  end if;
+
+  insert into public.invite_attempts (ip_hash) values (p_ip_hash);
+
+  return true;
 end;
 $$;
 
@@ -286,6 +292,23 @@ begin
   select count(*) into v_released from released;
 
   return v_released;
+end;
+$$;
+
+comment on function public.cleanup_expired_buyer_registrations() is
+  'Runs every five minutes. Pending-registration PII and reserved_email are retained for no more than the 30-minute reservation lifetime, then deleted or cleared.';
+
+do $$
+begin
+  if not exists (
+    select 1 from cron.job where jobname = 'cleanup-expired-buyer-registrations'
+  ) then
+    perform cron.schedule(
+      'cleanup-expired-buyer-registrations',
+      '*/5 * * * *',
+      'select public.cleanup_expired_buyer_registrations()'
+    );
+  end if;
 end;
 $$;
 
@@ -335,7 +358,10 @@ begin
       and v_invite.expires_at > now()
       and v_invite.reservation_expires_at > now()
       and v_pending.expires_at > now() then
-      return true;
+      if v_invite.code_hash = p_code_hash then
+        return true;
+      end if;
+      return false;
     end if;
 
     delete from public.pending_registrations where id = v_pending.id;
@@ -359,6 +385,7 @@ begin
 
   if v_invite.status = 'reserved' then
     if v_invite.reserved_email = v_email
+      and v_invite.code_hash = p_code_hash
       and v_invite.reservation_expires_at > now() then
       insert into public.pending_registrations (
         email, name, region, business_name, required_consent, marketing_consent, invite_code_id, expires_at
@@ -468,6 +495,9 @@ begin
   return v_store_id;
 end;
 $$;
+
+comment on function public.finalize_buyer_registration(uuid, text) is
+  'Server-only atomic finalization. Task 7 must invoke it only after explicit user confirmation; an auth callback must never finalize registration automatically.';
 
 revoke all on function public.finalize_buyer_registration(uuid, text) from public, anon, authenticated;
 grant execute on function public.finalize_buyer_registration(uuid, text) to service_role;

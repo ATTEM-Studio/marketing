@@ -1,6 +1,6 @@
 begin;
 
-select plan(32);
+select plan(42);
 
 select has_table('public', 'profiles');
 select has_table('public', 'invite_codes');
@@ -29,8 +29,28 @@ select is((select prosecdef from pg_proc where oid = 'public.finalize_buyer_regi
 select is((select prosecdef from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'reservation is security definer');
 select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%search_path=public%', 'finalizer pins search path');
 select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%for update%', 'reservation locks its rows atomically');
+select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.code_hash = p_code_hash%', 'an idempotent pending reservation requires the same code hash');
+select like((select prosrc from pg_proc where oid = 'public.consume_invite_attempt(text)'::regprocedure), '%pg_advisory_xact_lock%', 'rate limiting locks each IP rolling window atomically');
 select like((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, date, date)'::regprocedure), '%access_status = ''active''%', 'assessment RPC rejects inactive users');
-select like((select qual from pg_policies where schemaname = 'public' and tablename = 'assessments' and policyname = 'assessment_owner_insert'), '%access_status = ''active''%', 'assessment RLS requires an active profile');
+select like((select with_check from pg_policies where schemaname = 'public' and tablename = 'assessments' and policyname = 'assessment_owner_insert'), '%access_status = ''active''%', 'assessment INSERT RLS requires an active profile');
+select ok(exists (select 1 from pg_extension where extname = 'pg_cron'), 'pg_cron is installed for scheduled cleanup');
+select ok(exists (select 1 from cron.job where jobname = 'cleanup-expired-buyer-registrations'), 'expired registration cleanup is scheduled');
+select like(obj_description('public.cleanup_expired_buyer_registrations()'::regprocedure, 'pg_proc'), '%30 minutes%', 'cleanup retention contract documents the reservation lifetime');
+select like(obj_description('public.finalize_buyer_registration(uuid, text)'::regprocedure, 'pg_proc'), '%explicit user confirmation%', 'finalization contract prohibits automatic callback completion');
+
+insert into public.invite_attempts (ip_hash, attempted_at)
+select repeat('a', 64), now() - interval '14 minutes 59 seconds'
+from generate_series(1, 5);
+select is(public.consume_invite_attempt(repeat('a', 64)), false, 'a sixth request inside the rolling 15-minute window is rejected');
+update public.invite_attempts
+set attempted_at = now() - interval '15 minutes 1 second'
+where ip_hash = repeat('a', 64);
+select is(public.consume_invite_attempt(repeat('a', 64)), true, 'a request immediately after the rolling window is accepted');
+
+set local session_replication_role = replica;
+insert into public.profiles (id, name, email, region, business_name, access_status)
+values ('33333333-3333-3333-3333-333333333333', 'suspended', 'suspended@example.test', 'seoul', 'store', 'suspended');
+set local session_replication_role = origin;
 
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 set local role authenticated;
@@ -48,6 +68,20 @@ select throws_ok(
   $$select public.save_assessment_with_goal('22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 0, current_date, current_date)$$,
   'P0001', 'store_not_found',
   'the assessment RPC rejects a user without an active profile'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+set local role authenticated;
+select throws_ok(
+  $$insert into public.assessments (user_id, store_id, input_data, calculated_metrics, diagnosis) values ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb)$$,
+  '42501', null,
+  'a suspended user cannot insert an assessment'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 0, current_date, current_date)$$,
+  'P0001', 'store_not_found',
+  'the assessment RPC rejects a suspended profile'
 );
 reset role;
 

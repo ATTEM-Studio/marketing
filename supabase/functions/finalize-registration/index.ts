@@ -14,6 +14,8 @@ Deno.serve(async (request) => {
   } catch {
     return json(400, { error: "confirmation_required" });
   }
+  // Task 7 must call this only after a user-visible confirmation. Auth callbacks
+  // must not send this flag or finalize registration automatically.
   if (body.confirm !== true) {
     return json(400, { error: "confirmation_required" });
   }

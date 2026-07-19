@@ -24,12 +24,10 @@ function text(value: unknown, maximum: number): string | null {
     : null;
 }
 
-function clientIp(request: Request): string {
-  return (
-    request.headers.get("cf-connecting-ip") ??
-    request.headers.get("fly-client-ip") ??
-    "unknown"
-  );
+function clientIp(request: Request): string | null {
+  // This deployment is behind Cloudflare; do not accept caller-controlled XFF values.
+  const value = request.headers.get("cf-connecting-ip")?.trim();
+  return value || null;
 }
 
 Deno.serve(async (request) => {
@@ -52,7 +50,9 @@ Deno.serve(async (request) => {
   const adminClient = createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const ipHash = await sha256(`${pepper}:${clientIp(request)}`);
+  const ip = clientIp(request);
+  if (!ip) return json(400, { error: "client_ip_required" });
+  const ipHash = await sha256(`${pepper}:${ip}`);
   const { data: attemptAllowed, error: attemptError } = await adminClient.rpc(
     "consume_invite_attempt",
     { p_ip_hash: ipHash },
