@@ -87,18 +87,31 @@ Deno.serve(async (request) => {
     return invalidInvite();
   }
 
-  const codeHash = await sha256(`${pepper}${inviteCode}`);
-  const { data: reservationAccepted, error: reserveError } =
-    await adminClient.rpc("reserve_buyer_registration", {
-      p_code_hash: codeHash,
-      p_email: email,
-      p_name: name,
-      p_region: region,
-      p_business_name: businessName,
-      p_required_consent: true,
-      p_marketing_consent: body.marketingConsent,
-    });
-  if (reserveError || !reservationAccepted) return invalidInvite();
+  const candidateHashes = [
+    await sha256(inviteCode),
+    await sha256(`${pepper}${inviteCode}`),
+  ];
+  let reservationAccepted = false;
+  for (const codeHash of candidateHashes) {
+    const { data, error } = await adminClient.rpc(
+      "reserve_buyer_registration",
+      {
+        p_code_hash: codeHash,
+        p_email: email,
+        p_name: name,
+        p_region: region,
+        p_business_name: businessName,
+        p_required_consent: true,
+        p_marketing_consent: body.marketingConsent,
+      },
+    );
+    if (error) return json(500, { error: "registration_unavailable" });
+    if (data) {
+      reservationAccepted = true;
+      break;
+    }
+  }
+  if (!reservationAccepted) return invalidInvite();
 
   const { error: otpError } = await authClient.auth.signInWithOtp({
     email,

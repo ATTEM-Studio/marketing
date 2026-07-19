@@ -43,4 +43,10 @@ describe("invite edge security contract", () => {
       expect(http).toContain(header);
     }
   });
+
+  test("tries a reusable normalized hash before the peppered single-use hash", () => {
+    expect(redeemInvite).toContain("await sha256(inviteCode)");
+    expect(redeemInvite).toContain("await sha256(`${pepper}${inviteCode}`)");
+    expect(redeemInvite).toContain("for (const codeHash of candidateHashes)");
+  });
 });
