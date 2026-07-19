@@ -78,7 +78,10 @@ set attempted_at = now() - interval '15 minutes 1 second'
 where ip_hash = repeat('a', 64);
 select is(public.consume_invite_attempt(repeat('a', 64)), true, 'a request immediately after the rolling window is accepted');
 
-set local session_replication_role = replica;
+insert into auth.users (id, email)
+values
+  ('33333333-3333-3333-3333-333333333333', 'suspended@example.test'),
+  ('44444444-4444-4444-4444-444444444444', 'active@example.test');
 insert into public.profiles (id, name, email, region, business_name, access_status)
 values
   ('33333333-3333-3333-3333-333333333333', 'suspended', 'suspended@example.test', 'seoul', 'store', 'suspended'),
@@ -89,7 +92,6 @@ insert into public.assessments (id, user_id, store_id, input_data, calculated_me
 values ('66666666-6666-6666-6666-666666666666', '44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb);
 insert into public.action_plans (id, user_id, store_id, assessment_id, action_key, action_snapshot, status)
 values ('77777777-7777-7777-7777-777777777777', '44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '66666666-6666-6666-6666-666666666666', 'local-discovery', '{"metric":"길찾기 수"}'::jsonb, 'scheduled');
-set local session_replication_role = origin;
 
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 set local role authenticated;
@@ -211,23 +213,29 @@ select throws_ok(
   'P0001', 'invalid_goal_allocation',
   'the assessment RPC rejects an allocation with a missing key'
 );
+do $$
+begin
+  perform set_config(
+    'test.saved_goal_id',
+    public.save_assessment_with_goal(
+      '55555555-5555-5555-5555-555555555555',
+      '{}'::jsonb,
+      '{"shortfallRevenue": 10000000}'::jsonb,
+      '{}'::jsonb,
+      40000000,
+      '{"newCustomerRevenue": 6000000, "returningCustomerRevenue": 2000000, "averageOrderValueRevenue": 2000000}'::jsonb,
+      current_date,
+      current_date
+    )::text,
+    true
+  );
+end;
+$$;
 select ok(
   (
-    with saved as (
-      select public.save_assessment_with_goal(
-        '55555555-5555-5555-5555-555555555555',
-        '{}'::jsonb,
-        '{"shortfallRevenue": 10000000}'::jsonb,
-        '{}'::jsonb,
-        40000000,
-        '{"newCustomerRevenue": 6000000, "returningCustomerRevenue": 2000000, "averageOrderValueRevenue": 2000000}'::jsonb,
-        current_date,
-        current_date
-      ) as id
-    )
     select allocation = '{"newCustomerRevenue": 6000000, "returningCustomerRevenue": 2000000, "averageOrderValueRevenue": 2000000}'::jsonb
     from public.goals
-    join saved on saved.id = public.goals.id
+    where id = current_setting('test.saved_goal_id')::uuid
   ),
   'the assessment RPC saves a valid direct allocation in goals'
 );

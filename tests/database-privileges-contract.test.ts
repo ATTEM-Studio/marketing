@@ -37,4 +37,19 @@ describe("authenticated database privileges", () => {
     );
     expect(databaseTest).toContain("anon cannot read profiles");
   });
+
+  test("uses referentially valid fixtures and a separate goal read statement", () => {
+    const databaseTest = readFileSync(
+      "supabase/tests/database/rls.test.sql",
+      "utf8",
+    );
+    expect(databaseTest).toContain("insert into auth.users (id, email)");
+    expect(databaseTest).not.toContain(
+      "set local session_replication_role = replica",
+    );
+    expect(databaseTest).toContain("test.saved_goal_id");
+    expect(databaseTest).toContain(
+      "where id = current_setting('test.saved_goal_id')::uuid",
+    );
+  });
 });
