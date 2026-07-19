@@ -178,6 +178,15 @@ export function validateAdvertisingInputs(
       message: "광고 유입 실제 신규 고객 수는 1명 이상이어야 합니다.",
     });
   }
+  if (
+    input.actualAdSpend !== null &&
+    (!isFiniteNumber(input.actualAdSpend) || input.actualAdSpend < 0)
+  ) {
+    errors.push({
+      field: "actualAdSpend",
+      message: "실제 집행 광고비는 0원 이상이어야 합니다.",
+    });
+  }
   return errors;
 }
 
@@ -185,11 +194,17 @@ export function calculateAdvertisingMetrics(
   newCustomerTarget: number,
   input: AdvertisingInputs,
 ): AdvertisingMetrics {
-  const { visitConversionRate, costPerClick, actualAdNewCustomers } = input;
+  const {
+    visitConversionRate,
+    costPerClick,
+    actualAdNewCustomers,
+    actualAdSpend,
+  } = input;
   if (
     visitConversionRate === null ||
     costPerClick === null ||
     actualAdNewCustomers === null ||
+    actualAdSpend === null ||
     validateAdvertisingInputs(input).length > 0
   ) {
     return {
@@ -208,6 +223,6 @@ export function calculateAdvertisingMetrics(
     newCustomerTarget,
     requiredClicks,
     estimatedAdSpend,
-    customerAcquisitionCost: estimatedAdSpend / actualAdNewCustomers,
+    customerAcquisitionCost: actualAdSpend / actualAdNewCustomers,
   };
 }

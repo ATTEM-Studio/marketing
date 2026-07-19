@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
 import { createDemoService } from "../src/services/demo-service";
 
@@ -262,19 +262,27 @@ test("only enables and reads advertising details while ads are running", async (
   const costPerClick = root.querySelector<HTMLInputElement>(
     "[name='costPerClick']",
   );
+  const actualAdSpend = root.querySelector<HTMLInputElement>(
+    "[name='actualAdSpend']",
+  );
 
   expect(fields?.hidden).toBe(true);
   expect(costPerClick?.disabled).toBe(true);
+  expect(actualAdSpend?.disabled).toBe(true);
 
   choose("adsRunning", "true");
   expect(fields?.hidden).toBe(false);
   expect(costPerClick?.disabled).toBe(false);
+  expect(actualAdSpend?.disabled).toBe(false);
   setValue("costPerClick", "500");
+  setValue("actualAdSpend", "750000");
 
   choose("adsRunning", "false");
   expect(fields?.hidden).toBe(true);
   expect(costPerClick?.disabled).toBe(true);
+  expect(actualAdSpend?.disabled).toBe(true);
   expect(costPerClick?.value).toBe("");
+  expect(actualAdSpend?.value).toBe("");
   click("[data-submit-diagnosis]");
   await Promise.resolve();
   await Promise.resolve();
@@ -303,10 +311,54 @@ test("uses exactly one measurement action for partial live advertising data", as
   expect(text()).not.toContain("예상 광고비:");
 });
 
+test("uses one measurement action and no figures when only actual ad spend is missing", async () => {
+  await openStepThree("ads");
+  choose("adsRunning", "true");
+  setValue("visitConversionRate", "20");
+  setValue("costPerClick", "500");
+  setValue("actualAdNewCustomers", "50");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(document.querySelectorAll("[data-recommended-action]")).toHaveLength(
+    1,
+  );
+  expect(
+    document.querySelector("[data-recommended-action]")?.textContent,
+  ).toContain("7일 동안 신규 고객의 방문 경로를 기록하세요");
+  expect(text()).not.toContain("필요 클릭 수:");
+  expect(text()).not.toContain("예상 광고비:");
+  expect(text()).not.toContain("실제 기준 CAC:");
+});
+
+test.each(["-1", "abc", "Infinity", "1e309"])(
+  "links and focuses an invalid actual ad spend %s",
+  async (value) => {
+    const root = await openStepThree("ads");
+    choose("adsRunning", "true");
+    const actualAdSpend = root.querySelector<HTMLInputElement>(
+      "[name='actualAdSpend']",
+    );
+    expect(actualAdSpend).not.toBeNull();
+    if (!actualAdSpend) return;
+    setValue("actualAdSpend", value);
+    click("[data-submit-diagnosis]");
+
+    expect(actualAdSpend.getAttribute("aria-describedby")).toContain(
+      "actualAdSpend-error",
+    );
+    expect(actualAdSpend.getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(actualAdSpend);
+  },
+);
+
 test("shows advertising estimates only after all actual advertising values are entered", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing test root");
-  await createApp(root, createDemoService()).start();
+  const service = createDemoService();
+  const saveAssessment = vi.spyOn(service, "saveAssessment");
+  await createApp(root, service).start();
   click("[data-start-diagnosis]");
   setValue("averageMonthlyRevenue", "30,000,000");
   setValue("targetMonthlyRevenue", "40,000,000");
@@ -324,6 +376,7 @@ test("shows advertising estimates only after all actual advertising values are e
   setValue("visitConversionRate", "20");
   setValue("costPerClick", "500");
   setValue("actualAdNewCustomers", "50");
+  setValue("actualAdSpend", "750000");
   click("[data-submit-diagnosis]");
   await Promise.resolve();
   await Promise.resolve();
@@ -331,8 +384,21 @@ test("shows advertising estimates only after all actual advertising values are e
   expect(text()).toContain("실제 입력값을 전제로 한 광고 추정");
   expect(text()).toContain("필요 클릭 수: 2,000회");
   expect(text()).toContain("예상 광고비: 1,000,000원");
+  expect(text()).toContain("실제 기준 CAC: 15,000원");
   expect(text()).toContain(
-    "실제 방문 전환율 20%, 평균 클릭 비용 500원, 광고 유입 실제 신규 고객 50명",
+    "실제 방문 전환율 20%, 평균 클릭 비용 500원, 광고 유입 실제 신규 고객 50명, 실제 집행 광고비 750,000원",
   );
   expect(text()).toContain("확정 비용이나 성과 보장이 아닙니다");
+  expect(saveAssessment).toHaveBeenCalledWith(
+    expect.objectContaining({
+      inputs: expect.objectContaining({
+        advertising: {
+          visitConversionRate: 0.2,
+          costPerClick: 500,
+          actualAdNewCustomers: 50,
+          actualAdSpend: 750_000,
+        },
+      }),
+    }),
+  );
 });

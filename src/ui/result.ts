@@ -81,23 +81,24 @@ function advertisingMarkup(
   if (advertising.status !== "measured") {
     return `<section class="advertising-estimate" aria-label="광고 데이터 측정 안내">
       <h2>광고 비용은 아직 계산하지 않았어요</h2>
-      <p>실제 방문 전환율, 평균 클릭 비용, 광고 유입 실제 신규 고객 수 중 모르는 값이 있어 비용을 확정하지 않았습니다. 아래 오늘의 행동으로 필요한 실제 값을 확인합니다.</p>
+      <p>실제 방문 전환율, 평균 클릭 비용, 광고 유입 실제 신규 고객 수, 실제 집행 광고비 중 모르는 값이 있어 광고 수치를 표시하지 않았습니다. 아래 오늘의 행동으로 필요한 실제 값을 확인합니다.</p>
     </section>`;
   }
   const assumptions =
     input &&
     input.visitConversionRate !== null &&
     input.costPerClick !== null &&
-    input.actualAdNewCustomers !== null
-      ? `<p>실제 방문 전환율 ${percentage.format(input.visitConversionRate)}, 평균 클릭 비용 ${won.format(input.costPerClick)}원, 광고 유입 실제 신규 고객 ${won.format(input.actualAdNewCustomers)}명을 전제로 계산했습니다.</p>`
+    input.actualAdNewCustomers !== null &&
+    input.actualAdSpend !== null
+      ? `<p>실제 방문 전환율 ${percentage.format(input.visitConversionRate)}, 평균 클릭 비용 ${won.format(input.costPerClick)}원, 광고 유입 실제 신규 고객 ${won.format(input.actualAdNewCustomers)}명, 실제 집행 광고비 ${won.format(input.actualAdSpend)}원을 전제로 계산했습니다.</p>`
       : "";
   return `<section class="advertising-estimate" aria-label="실제 입력값을 전제로 한 광고 추정">
     <h2>실제 입력값을 전제로 한 광고 추정</h2>
     ${assumptions}
     <p>필요 클릭 수: ${won.format(advertising.requiredClicks ?? 0)}회</p>
     <p>예상 광고비: ${won.format(advertising.estimatedAdSpend ?? 0)}원</p>
-    <p>고객 획득 비용: ${won.format(advertising.customerAcquisitionCost ?? 0)}원</p>
-    <p>실제 입력값을 전제로 한 계산이며, 확정 비용이나 성과 보장이 아닙니다.</p>
+    <p>실제 기준 CAC: ${won.format(advertising.customerAcquisitionCost ?? 0)}원</p>
+    <p>필요 클릭 수와 예상 광고비는 목표를 위한 미래 추정이며, CAC는 실제 집행 광고비와 광고 유입 실제 신규 고객 수를 사용했습니다. 확정 비용이나 성과 보장이 아닙니다.</p>
   </section>`;
 }
 

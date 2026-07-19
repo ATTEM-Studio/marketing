@@ -166,25 +166,47 @@ describe("revenue goal calculation", () => {
     });
   });
 
-  test("calculates advertising estimates only from all three actual inputs", () => {
+  test("keeps actual CAC independent from future estimated ad spend", () => {
     expect(
       calculateAdvertisingMetrics(400, {
         visitConversionRate: 0.2,
         costPerClick: 500,
         actualAdNewCustomers: 50,
+        actualAdSpend: 750_000,
       }),
     ).toEqual({
       status: "measured",
       newCustomerTarget: 400,
       requiredClicks: 2000,
       estimatedAdSpend: 1_000_000,
-      customerAcquisitionCost: 20_000,
+      customerAcquisitionCost: 15_000,
     });
+  });
+
+  test("keeps actual CAC when the revenue target needs no future ad clicks", () => {
+    expect(
+      calculateAdvertisingMetrics(0, {
+        visitConversionRate: 0.2,
+        costPerClick: 500,
+        actualAdNewCustomers: 50,
+        actualAdSpend: 750_000,
+      }),
+    ).toEqual({
+      status: "measured",
+      newCustomerTarget: 0,
+      requiredClicks: 0,
+      estimatedAdSpend: 0,
+      customerAcquisitionCost: 15_000,
+    });
+  });
+
+  test("requires actual ad spend for complete advertising attribution", () => {
     expect(
       calculateAdvertisingMetrics(400, {
         visitConversionRate: 0.2,
         costPerClick: 500,
-        actualAdNewCustomers: null,
+        actualAdNewCustomers: 50,
+        actualAdSpend: null,
       }),
     ).toEqual({
       status: "needs_measurement",
@@ -201,6 +223,7 @@ describe("revenue goal calculation", () => {
         visitConversionRate: null,
         costPerClick: null,
         actualAdNewCustomers: null,
+        actualAdSpend: null,
       }),
     ).toEqual([]);
     expect(
@@ -208,6 +231,7 @@ describe("revenue goal calculation", () => {
         visitConversionRate: 0,
         costPerClick: -1,
         actualAdNewCustomers: 0,
+        actualAdSpend: -1,
       }),
     ).toEqual([
       {
@@ -222,6 +246,27 @@ describe("revenue goal calculation", () => {
         field: "actualAdNewCustomers",
         message: "광고 유입 실제 신규 고객 수는 1명 이상이어야 합니다.",
       },
+      {
+        field: "actualAdSpend",
+        message: "실제 집행 광고비는 0원 이상이어야 합니다.",
+      },
     ]);
   });
+
+  test.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "rejects non-finite actual ad spend %s",
+    (actualAdSpend) => {
+      expect(
+        validateAdvertisingInputs({
+          visitConversionRate: null,
+          costPerClick: null,
+          actualAdNewCustomers: null,
+          actualAdSpend,
+        }),
+      ).toContainEqual({
+        field: "actualAdSpend",
+        message: "실제 집행 광고비는 0원 이상이어야 합니다.",
+      });
+    },
+  );
 });

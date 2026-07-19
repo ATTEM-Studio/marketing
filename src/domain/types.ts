@@ -34,6 +34,7 @@ export interface AdvertisingInputs {
   visitConversionRate: number | null;
   costPerClick: number | null;
   actualAdNewCustomers: number | null;
+  actualAdSpend: number | null;
 }
 
 export interface AdvertisingMetrics {

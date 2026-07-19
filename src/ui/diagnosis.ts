@@ -114,17 +114,20 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
         visitConversionRate: percentageValue(form, "visitConversionRate"),
         costPerClick: nullableNumberValue(form, "costPerClick"),
         actualAdNewCustomers: nullableNumberValue(form, "actualAdNewCustomers"),
+        actualAdSpend: nullableNumberValue(form, "actualAdSpend"),
       }
     : {
         visitConversionRate: null,
         costPerClick: null,
         actualAdNewCustomers: null,
+        actualAdSpend: null,
       };
   const adAttributionKnown =
     validateAdvertisingInputs(advertising).length === 0 &&
     advertising.visitConversionRate !== null &&
     advertising.costPerClick !== null &&
-    advertising.actualAdNewCustomers !== null;
+    advertising.actualAdNewCustomers !== null &&
+    advertising.actualAdSpend !== null;
 
   return {
     revenue,
@@ -181,10 +184,11 @@ function allocationFields(): string {
 function advertisingFields(): string {
   return `<section data-advertising-fields hidden>
     <details class="optional-details"><summary>실제 광고 데이터를 입력하기 (선택)</summary>
-      <p>세 값을 모두 실제 기록으로 입력한 경우에만 광고 추정치를 보여 드립니다.</p>
+      <p>네 값을 모두 실제 기록으로 입력한 경우에만 광고 추정치와 실제 기준 CAC를 보여 드립니다.</p>
       ${numberField("visitConversionRate", "실제 방문 전환율 (%)", false)}
       ${numberField("costPerClick", "실제 평균 클릭 비용", false)}
       ${numberField("actualAdNewCustomers", "광고 유입 실제 신규 고객 수", false)}
+      ${numberField("actualAdSpend", "실제 집행 광고비", false)}
     </details>
   </section>`;
 }
@@ -364,13 +368,16 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
       }
     });
     if (radioValue(form, "adsRunning") === "true") {
-      ["visitConversionRate", "costPerClick", "actualAdNewCustomers"].forEach(
-        (name) => {
-          if (hasInvalidNumber(form, name)) {
-            errors.push({ name, message: "숫자만 입력해 주세요." });
-          }
-        },
-      );
+      [
+        "visitConversionRate",
+        "costPerClick",
+        "actualAdNewCustomers",
+        "actualAdSpend",
+      ].forEach((name) => {
+        if (hasInvalidNumber(form, name)) {
+          errors.push({ name, message: "숫자만 입력해 주세요." });
+        }
+      });
     }
     if (errors.length === 0 && radioValue(form, "adsRunning") === "true") {
       validateAdvertisingInputs(readDiagnosisForm(form).advertising).forEach(

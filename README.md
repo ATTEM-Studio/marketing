@@ -64,15 +64,18 @@ Supabase Dashboard의 **Authentication → URL Configuration**도 같은 운영 
 ```bash
 read -rs INVITE_CODE
 read -rs INVITE_HASH_PEPPER
-printf '%s' "${INVITE_HASH_PEPPER}${INVITE_CODE}" | openssl dgst -sha256 -r
-unset INVITE_CODE INVITE_HASH_PEPPER
+INVITE_CODE_NORMALIZED="$(printf '%s' "${INVITE_CODE}" | node -e "let value='';process.stdin.setEncoding('utf8');process.stdin.on('data',chunk=>value+=chunk);process.stdin.on('end',()=>process.stdout.write(value.trim().toUpperCase()))")"
+printf '%s' "${INVITE_HASH_PEPPER}${INVITE_CODE_NORMALIZED}" | openssl dgst -sha256 -r
+unset INVITE_CODE INVITE_CODE_NORMALIZED INVITE_HASH_PEPPER
 ```
+
+Edge Function도 초대 코드의 앞뒤 공백을 제거하고 대문자로 바꾼 뒤 해시합니다. 소문자·혼합 대소문자 또는 앞뒤 공백이 있는 원문을 정규화 없이 해시하면 해시가 일치하지 않아 사용할 수 없습니다.
 
 출력된 해시를 복사해 Supabase SQL Editor 또는 인증된 `psql` 세션에서만 사용합니다.
 
 ```sql
 insert into public.invite_codes (code_hash, status, expires_at)
-values ('<paste-local-sha256-hash>', 'unused', now() + interval '30 days');
+values ('<paste-local-sha256-hash>', 'available', now() + interval '30 days');
 ```
 
 ## 출시 전 확인
