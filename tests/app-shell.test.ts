@@ -15,9 +15,9 @@ describe("app shell", () => {
       "필요한 고객 수와 오늘 할 일",
     );
     expect(document.body.textContent).toContain("장사네비게이션");
-    expect(document.querySelector("[data-start-diagnosis]")?.textContent).toContain(
-      "내 가게 진단 시작하기",
-    );
+    expect(
+      document.querySelector("[data-start-diagnosis]")?.textContent,
+    ).toContain("내 가게 진단 시작하기");
   });
 
   test("exposes both buyer entry choices on the live landing", () => {

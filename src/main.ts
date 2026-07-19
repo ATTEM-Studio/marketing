@@ -3,6 +3,7 @@ import { createApp } from "./app";
 import { readConfig, type AppConfig } from "./config";
 import { createDemoService } from "./services/demo-service";
 import { createSupabaseService } from "./services/supabase-service";
+import { renderLandingShell } from "./ui/shell";
 
 export function mountApp(
   root: HTMLElement,
@@ -15,6 +16,17 @@ export function mountApp(
   const authCallback =
     config.mode === "live" &&
     new URLSearchParams(window.location.search).get("auth") === "callback";
+  if (config.mode === "live") {
+    renderLandingShell(
+      root,
+      {
+        onRegister: () => undefined,
+        onLogin: () => undefined,
+        onDemo: () => undefined,
+      },
+      { mode: "live", available: false },
+    );
+  }
   void createApp(root, service, {
     authCallback,
     isLive: config.mode === "live",

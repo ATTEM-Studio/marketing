@@ -18,3 +18,8 @@ test("separates the dark brand surface from light work surfaces", () => {
   expect(css).toContain(".brand-page");
   expect(css).toContain(".work-header");
 });
+
+test("keeps the skip link fully off-screen until keyboard focus", () => {
+  expect(css).toContain("transform: translateY(-200%)");
+  expect(css).toMatch(/\.skip-link:focus\s*{[^}]*transform:\s*translateY\(0\)/s);
+});

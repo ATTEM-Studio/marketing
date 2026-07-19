@@ -170,9 +170,8 @@ test("puts the customer target before the recommended action", () => {
   expect(
     Boolean(
       metric &&
-        action &&
-        metric.compareDocumentPosition(action) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+      action &&
+      metric.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING,
     ),
   ).toBe(true);
   expect(root.querySelector(".estimate-badge")?.textContent).toContain("추정");

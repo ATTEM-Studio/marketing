@@ -24,6 +24,7 @@
 ### Task 1: 브랜드 소개와 운영 진입 흐름
 
 **Files:**
+
 - Modify: `src/ui/shell.ts`
 - Modify: `src/app.ts`
 - Modify: `src/main.ts`
@@ -32,6 +33,7 @@
 - Test: `tests/live-app.test.ts`
 
 **Interfaces:**
+
 - Consumes: `AppService.getSession(): Promise<AppSession>`과 기존 `renderOnboarding` 진입점
 - Produces: `LandingCallbacks`, `LandingOptions`, `renderLandingShell(root, callbacks, options)`
 
@@ -42,7 +44,11 @@ test("brands the landing page and exposes both live entry choices", () => {
   const root = document.querySelector<HTMLElement>("#app")!;
   const onRegister = vi.fn();
   const onLogin = vi.fn();
-  renderLandingShell(root, { onRegister, onLogin, onDemo: vi.fn() }, { mode: "live" });
+  renderLandingShell(
+    root,
+    { onRegister, onLogin, onDemo: vi.fn() },
+    { mode: "live" },
+  );
 
   expect(root.textContent).toContain("장사네비게이션");
   expect(root.textContent).toContain("필요한 고객 수와 오늘 할 일");
@@ -54,7 +60,10 @@ test("brands the landing page and exposes both live entry choices", () => {
 
 test("shows the landing page before onboarding for a signed-out live visitor", async () => {
   const fake = liveService();
-  fake.getSession = vi.fn(async () => ({ mode: "live" as const, profile: null }));
+  fake.getSession = vi.fn(async () => ({
+    mode: "live" as const,
+    profile: null,
+  }));
   const root = document.querySelector<HTMLElement>("#app")!;
   await createApp(root, fake, { isLive: true }).start();
 
@@ -118,11 +127,14 @@ export function renderLandingShell(
       </main>
     </div>`;
 
-  root.querySelector<HTMLButtonElement>("[data-start-registration]")
+  root
+    .querySelector<HTMLButtonElement>("[data-start-registration]")
     ?.addEventListener("click", callbacks.onRegister);
-  root.querySelector<HTMLButtonElement>("[data-start-diagnosis]")
+  root
+    .querySelector<HTMLButtonElement>("[data-start-diagnosis]")
     ?.addEventListener("click", callbacks.onDemo);
-  root.querySelectorAll<HTMLButtonElement>("[data-start-login]")
+  root
+    .querySelectorAll<HTMLButtonElement>("[data-start-login]")
     .forEach((button) => button.addEventListener("click", callbacks.onLogin));
 }
 ```
@@ -171,10 +183,12 @@ git commit -m "feat: add branded live entry journey"
 ### Task 2: 가입과 로그인 화면 분리
 
 **Files:**
+
 - Modify: `src/ui/onboarding.ts`
 - Test: `tests/onboarding-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: `AppService.registerBuyer`, `AppService.sendLoginLink`, `AppService.finalizeRegistration`
 - Produces: `OnboardingView = "register" | "login"`, `registrationScreenMarkup(): string`, `loginScreenMarkup(): string`, `bindRegistration(root, service): void`, `bindLogin(root, service): void`, and `renderOnboarding(root, service, callbacks, initialView?)`
 
@@ -223,12 +237,13 @@ export function renderOnboarding(
   }
 
   const renderView = (view: OnboardingView) => {
-    root.innerHTML = view === "register"
-      ? registrationScreenMarkup()
-      : loginScreenMarkup();
-    root.querySelector<HTMLButtonElement>("[data-show-register]")
+    root.innerHTML =
+      view === "register" ? registrationScreenMarkup() : loginScreenMarkup();
+    root
+      .querySelector<HTMLButtonElement>("[data-show-register]")
       ?.addEventListener("click", () => renderView("register"));
-    root.querySelector<HTMLButtonElement>("[data-show-login]")
+    root
+      .querySelector<HTMLButtonElement>("[data-show-login]")
       ?.addEventListener("click", () => renderView("login"));
     view === "register"
       ? bindRegistration(root, service, callbacks)
@@ -257,10 +272,12 @@ git commit -m "feat: simplify buyer onboarding views"
 ### Task 3: 진단 단계의 가독성과 입력 맥락
 
 **Files:**
+
 - Modify: `src/ui/diagnosis.ts`
 - Test: `tests/diagnosis-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `Step = 1 | 2 | 3`, `readDiagnosisForm`, and `RenderOptions.onSubmit`
 - Produces: `.progress-track`, `[data-progress]`, `.question-grid`, `.choice-card`, `.field-unit`
 
@@ -271,7 +288,9 @@ test("shows a readable three-step progress indicator", () => {
   const root = document.querySelector<HTMLElement>("#app")!;
   renderDiagnosis(root, { onSubmit: vi.fn() });
   expect(root.querySelector("[data-step-label]")?.textContent).toBe("1 / 3");
-  expect(root.querySelector<HTMLElement>("[data-progress]")?.style.width).toBe("33.3333%");
+  expect(root.querySelector<HTMLElement>("[data-progress]")?.style.width).toBe(
+    "33.3333%",
+  );
   root.querySelector<HTMLButtonElement>("[data-next-step]")?.click();
   expect(root.querySelector("[data-step-label]")?.textContent).toBe("2 / 3");
 });
@@ -281,8 +300,12 @@ test("treats unknown returning data as a normal selectable card", () => {
   renderDiagnosis(root, { onSubmit: vi.fn() });
   root.querySelectorAll<HTMLButtonElement>("[data-next-step]")[0]?.click();
   root.querySelectorAll<HTMLButtonElement>("[data-next-step]")[0]?.click();
-  const unknown = root.querySelector<HTMLInputElement>("[name='returningDataStatus'][value='unknown']");
-  expect(unknown?.closest(".choice-card")?.textContent).toContain("잘 모르겠어요");
+  const unknown = root.querySelector<HTMLInputElement>(
+    "[name='returningDataStatus'][value='unknown']",
+  );
+  expect(unknown?.closest(".choice-card")?.textContent).toContain(
+    "잘 모르겠어요",
+  );
 });
 ```
 
@@ -299,8 +322,12 @@ At the start of the diagnosis markup, render:
 ```html
 <header class="work-header">
   <a class="work-brand" href="/">장사네비게이션</a>
-  <div class="progress-copy"><span>매장 진단</span><strong data-step-label>1 / 3</strong></div>
-  <div class="progress-track" aria-hidden="true"><span data-progress></span></div>
+  <div class="progress-copy">
+    <span>매장 진단</span><strong data-step-label>1 / 3</strong>
+  </div>
+  <div class="progress-track" aria-hidden="true">
+    <span data-progress></span>
+  </div>
 </header>
 ```
 
@@ -331,12 +358,14 @@ git commit -m "feat: clarify diagnosis progress and inputs"
 ### Task 4: 결과와 대시보드의 의사결정 위계
 
 **Files:**
+
 - Modify: `src/ui/result.ts`
 - Modify: `src/ui/dashboard.ts`
 - Test: `tests/dashboard-ui.test.ts`
 - Test: `tests/diagnosis-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing result data, `checkInDueDate`, `ActionPlanRecord`, and dashboard service calls
 - Produces: `.metric-hero`, `.metric-card`, `.estimate-badge`, `.action-card`, `.before-after`
 
@@ -346,37 +375,43 @@ git commit -m "feat: clarify diagnosis progress and inputs"
 test("puts the customer target before the recommended action", () => {
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.querySelector<HTMLElement>("#app")!;
-  renderResult(root, {
-    metrics: {
-      shortfallRevenue: 10_000_000,
-      maxNewCustomers: 400,
-      maxNewCustomersPerDay: 20,
-      monthlyCustomerCount: 1200,
-      customerCountSource: "estimated",
-      targetReached: false,
+  renderResult(
+    root,
+    {
+      metrics: {
+        shortfallRevenue: 10_000_000,
+        maxNewCustomers: 400,
+        maxNewCustomersPerDay: 20,
+        monthlyCustomerCount: 1200,
+        customerCountSource: "estimated",
+        targetReached: false,
+      },
+      bottleneck: {
+        key: null,
+        status: "insufficient",
+        changeRate: null,
+        reason: "수치가 부족합니다.",
+      },
+      action: {
+        key: "local-discovery",
+        title: "대표 사진을 확인해요",
+        reason: "지금 할 수 있어요.",
+        steps: ["사진을 봐요", "한 장을 바꿔요", "길찾기를 적어요"],
+        metric: "길찾기 수",
+        avoid: "광고비를 먼저 늘리지 마세요.",
+        minutes: 15,
+        coachingKey: "revenue-before-ranking",
+      },
     },
-    bottleneck: {
-      key: null,
-      status: "insufficient",
-      changeRate: null,
-      reason: "수치가 부족합니다.",
-    },
-    action: {
-      key: "local-discovery",
-      title: "대표 사진을 확인해요",
-      reason: "지금 할 수 있어요.",
-      steps: ["사진을 봐요", "한 장을 바꿔요", "길찾기를 적어요"],
-      metric: "길찾기 수",
-      avoid: "광고비를 먼저 늘리지 마세요.",
-      minutes: 15,
-      coachingKey: "revenue-before-ranking",
-    },
-  }, { onSaveAction: vi.fn() });
+    { onSaveAction: vi.fn() },
+  );
   const metric = root.querySelector(".metric-hero");
   const action = root.querySelector(".action-card");
   expect(metric).not.toBeNull();
   expect(action).not.toBeNull();
-  expect(metric!.compareDocumentPosition(action!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(
+    metric!.compareDocumentPosition(action!) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
   expect(root.querySelector(".estimate-badge")?.textContent).toContain("추정");
 });
 ```
@@ -399,7 +434,10 @@ Expected: FAIL on missing `.metric-hero`, `.action-card`, `.estimate-badge`, or 
 Result markup must follow this order:
 
 ```html
-<header class="work-header"><a class="work-brand" href="/">장사네비게이션</a><span class="status-chip">진단 완료</span></header>
+<header class="work-header">
+  <a class="work-brand" href="/">장사네비게이션</a
+  ><span class="status-chip">진단 완료</span>
+</header>
 <section class="metric-hero" aria-labelledby="customer-target-title">
   <p class="eyebrow">목표까지 필요한 고객</p>
   <h1 id="customer-target-title"><strong class="metric-value">…명</strong></h1>
@@ -439,10 +477,12 @@ git commit -m "feat: prioritize coaching decisions in results"
 ### Task 5: 반응형 디자인 시스템과 접근성
 
 **Files:**
+
 - Rewrite: `src/styles.css`
 - Create: `tests/responsive-styles.test.ts`
 
 **Interfaces:**
+
 - Consumes: semantic classes produced by Tasks 1–4
 - Produces: global color/spacing/type tokens, desktop layouts, 1024px and 720px adaptations, reduced-motion behavior
 
@@ -500,7 +540,14 @@ Start `src/styles.css` with:
   --radius-lg: 32px;
   --content: 1200px;
   --work-content: 960px;
-  font-family: Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Pretendard,
+    "Noto Sans KR",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 ```
 
@@ -508,22 +555,54 @@ Implement mobile-first one-column layouts, 48px controls, visible focus outlines
 
 ```css
 @media (min-width: 1024px) {
-  .landing-shell { grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr); }
-  .onboarding-layout { grid-template-columns: minmax(0, 0.8fr) minmax(420px, 1.2fr); }
-  .question-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .landing-shell {
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  }
+  .onboarding-layout {
+    grid-template-columns: minmax(0, 0.8fr) minmax(420px, 1.2fr);
+  }
+  .question-grid,
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
-  .site-header, .work-header { padding-inline: 16px; }
-  .header-login { display: none; }
-  .landing-shell, .diagnosis-shell, .result-shell, .onboarding-shell, .dashboard-shell { width: min(100% - 24px, var(--work-content)); }
-  .button-row, .form-actions { flex-direction: column; }
-  .button-row button, .form-actions button { width: 100%; }
-  .before-after { grid-template-columns: 1fr; }
+  .site-header,
+  .work-header {
+    padding-inline: 16px;
+  }
+  .header-login {
+    display: none;
+  }
+  .landing-shell,
+  .diagnosis-shell,
+  .result-shell,
+  .onboarding-shell,
+  .dashboard-shell {
+    width: min(100% - 24px, var(--work-content));
+  }
+  .button-row,
+  .form-actions {
+    flex-direction: column;
+  }
+  .button-row button,
+  .form-actions button {
+    width: 100%;
+  }
+  .before-after {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 ```
 
@@ -545,9 +624,11 @@ git commit -m "feat: add responsive navigation design system"
 ### Task 6: 전체 검증과 운영 재배포
 
 **Files:**
+
 - Modify only if verification exposes a defect: files already listed in Tasks 1–5 and their matching tests
 
 **Interfaces:**
+
 - Consumes: complete site build and Vercel/Supabase production configuration
 - Produces: verified production deployment at the stable Vercel alias
 

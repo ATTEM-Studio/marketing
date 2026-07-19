@@ -6,6 +6,7 @@ export interface LandingCallbacks {
 
 export interface LandingOptions {
   mode: "demo" | "live";
+  available?: boolean;
 }
 
 export function renderLandingShell(
@@ -14,6 +15,7 @@ export function renderLandingShell(
   options: LandingOptions,
 ): void {
   const live = options.mode === "live";
+  const available = options.available ?? true;
   root.innerHTML = `
     <div class="brand-page">
       <header class="site-header">
@@ -30,8 +32,8 @@ export function renderLandingShell(
           <h1>목표 매출까지,<br><strong>필요한 고객 수와 오늘 할 일</strong>을 찾습니다.</h1>
           <p class="hero-description">가게의 현재 수치를 입력하면 목표까지 필요한 고객 수를 계산하고, 지금 먼저 바꿀 행동 하나를 안내합니다.</p>
           <div class="button-row">
-            <button type="button" class="primary-cta" ${live ? "data-start-registration" : "data-start-diagnosis"}>내 가게 진단 시작하기</button>
-            ${live ? '<button type="button" class="secondary-cta" data-start-login>기존 사용자 로그인</button>' : ""}
+            <button type="button" class="primary-cta" ${live ? "data-start-registration" : "data-start-diagnosis"}${available ? "" : " disabled"}>${available ? "내 가게 진단 시작하기" : "운영 연결 준비 중"}</button>
+            ${live ? `<button type="button" class="secondary-cta" data-start-login${available ? "" : " disabled"}>${available ? "기존 사용자 로그인" : "잠시 후 다시 확인해 주세요"}</button>` : ""}
           </div>
           <ul class="trust-list" aria-label="이용 안내">
             <li>약 3분</li>
@@ -49,6 +51,7 @@ export function renderLandingShell(
     </div>
   `;
 
+  if (!available) return;
   root
     .querySelector<HTMLButtonElement>("[data-start-registration]")
     ?.addEventListener("click", callbacks.onRegister);
@@ -57,7 +60,5 @@ export function renderLandingShell(
     ?.addEventListener("click", callbacks.onDemo);
   root
     .querySelectorAll<HTMLButtonElement>("[data-start-login]")
-    .forEach((button) =>
-      button.addEventListener("click", callbacks.onLogin),
-    );
+    .forEach((button) => button.addEventListener("click", callbacks.onLogin));
 }

@@ -177,9 +177,13 @@ function renderConfirmation(
 
 function bindRegistration(root: HTMLElement, service: AppService): void {
   const form = root.querySelector<HTMLFormElement>("[data-registration-form]");
-  const button = root.querySelector<HTMLButtonElement>("[data-register-submit]");
+  const button = root.querySelector<HTMLButtonElement>(
+    "[data-register-submit]",
+  );
   const status = root.querySelector<HTMLElement>(".form-status");
-  const consent = root.querySelector<HTMLInputElement>("[name='serviceConsent']");
+  const consent = root.querySelector<HTMLInputElement>(
+    "[name='serviceConsent']",
+  );
 
   consent?.addEventListener("change", () => {
     if (button) button.disabled = !consent.checked;
@@ -222,7 +226,9 @@ function bindLogin(root: HTMLElement, service: AppService): void {
     event.preventDefault();
     if (!form || !button) return;
     const email = value(form, "loginEmail");
-    const emailField = root.querySelector<HTMLInputElement>("[name='loginEmail']");
+    const emailField = root.querySelector<HTMLInputElement>(
+      "[name='loginEmail']",
+    );
     const emailError = root.querySelector<HTMLElement>("#loginEmail-error");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       if (emailError) emailError.textContent = "이메일 주소를 확인해 주세요.";
@@ -262,9 +268,7 @@ export function renderOnboarding(
 
   const renderView = (view: OnboardingView) => {
     root.innerHTML =
-      view === "register"
-        ? registrationScreenMarkup()
-        : loginScreenMarkup();
+      view === "register" ? registrationScreenMarkup() : loginScreenMarkup();
     root
       .querySelector<HTMLButtonElement>("[data-show-register]")
       ?.addEventListener("click", () => renderView("register"));

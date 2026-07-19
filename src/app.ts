@@ -170,17 +170,22 @@ export function createApp(
     authCallback = false,
     initialView: OnboardingView = "register",
   ) => {
-    renderOnboarding(root, service, {
-      authCallback,
-      onAuthenticated(finalized) {
-        if (finalized.profile) {
-          consumeAuthCallback();
-          showDiagnosis(true);
-          return;
-        }
-        showOnboarding(false);
+    renderOnboarding(
+      root,
+      service,
+      {
+        authCallback,
+        onAuthenticated(finalized) {
+          if (finalized.profile) {
+            consumeAuthCallback();
+            showDiagnosis(true);
+            return;
+          }
+          showOnboarding(false);
+        },
       },
-    }, initialView);
+      initialView,
+    );
   };
 
   return {
