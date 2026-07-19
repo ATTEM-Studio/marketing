@@ -127,6 +127,57 @@ test("schedules the one result action seven calendar days after assessment", asy
   expect(saveAction).toHaveBeenCalledTimes(1);
 });
 
+test("puts the customer target before the recommended action", () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+
+  renderResult(
+    root,
+    {
+      metrics: {
+        shortfallRevenue: 10_000_000,
+        maxNewCustomers: 400,
+        maxNewCustomersPerDay: 20,
+        monthlyCustomerCount: 1200,
+        customerCountSource: "estimated",
+        targetReached: false,
+      },
+      bottleneck: {
+        key: null,
+        status: "insufficient",
+        changeRate: null,
+        reason: "수치가 부족합니다.",
+      },
+      action: {
+        key: "local-discovery",
+        title: "대표 사진을 확인해요",
+        reason: "지금 할 수 있어요.",
+        steps: ["사진을 봐요", "한 장을 바꿔요", "길찾기를 적어요"],
+        metric: "길찾기 수",
+        avoid: "광고비를 먼저 늘리지 마세요.",
+        minutes: 15,
+        coachingKey: "revenue-before-ranking",
+      },
+    },
+    { onSaveAction: vi.fn() },
+  );
+
+  const metric = root.querySelector(".metric-hero");
+  const action = root.querySelector(".action-card");
+  expect(metric).not.toBeNull();
+  expect(action).not.toBeNull();
+  expect(
+    Boolean(
+      metric &&
+        action &&
+        metric.compareDocumentPosition(action) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+    ),
+  ).toBe(true);
+  expect(root.querySelector(".estimate-badge")?.textContent).toContain("추정");
+});
+
 test("keeps written check-in values after a save failure", async () => {
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.querySelector<HTMLElement>("#app");
@@ -298,6 +349,8 @@ test("shows the business summary, nearest plan, and completed history", async ()
   );
   expect(root.textContent).toContain("실행 전 2회 · 실행 후 5회");
   expect(root.textContent).toContain("사진을 바꿨어요");
+  expect(root.querySelector(".before-after")?.textContent).toContain("실행 전");
+  expect(root.querySelector(".before-after")?.textContent).toContain("실행 후");
 });
 
 test("uses gentle empty states and blocks an incomplete check-in", async () => {

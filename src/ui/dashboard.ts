@@ -101,41 +101,37 @@ function dashboardMarkup(
 
   const assessmentSummary = assessment
     ? `<section class="dashboard-summary" aria-label="최근 진단 요약">
-        <h2>최근 목표</h2>
+        <h2>최근 진단 요약</h2>
         ${target === null ? "<p>목표 매출을 다시 확인해 주세요.</p>" : `<p>목표 월 매출 ${number.format(target)}원</p>`}
         ${ceiling === null ? "" : `<p>전부 신규 고객으로 채운다고 가정한 최대 ${number.format(ceiling)}명입니다.</p>`}
       </section>`
     : `<section class="dashboard-summary"><h2>아직 진단한 내용이 없어요.</h2><p>최근 매출과 목표 매출만 먼저 적어 보면 됩니다.</p></section>`;
 
   const currentAction = currentPlan
-    ? `<section class="current-action" aria-labelledby="current-action-title">
+    ? `<section class="current-action action-card" aria-labelledby="current-action-title">
         <p class="eyebrow">지금 할 행동 하나</p>
         <h2 id="current-action-title">${escapeHtml(actionName(currentPlan))}</h2>
-        <p>결과 확인 예정: ${escapeHtml(dueDate(currentPlan.checkInDueAt))}</p>
-        <p>확인할 숫자: ${escapeHtml(currentPlan.metric)}</p>
-        <button type="button" data-complete-plan="${escapeHtml(currentPlan.id)}">실행 결과 기록하기</button>
+        <div class="action-meta"><div><span>결과 확인 예정</span><strong>${escapeHtml(dueDate(currentPlan.checkInDueAt))}</strong></div><div><span>확인할 숫자</span><strong>${escapeHtml(currentPlan.metric)}</strong></div></div>
+        <button type="button" class="primary-action" data-complete-plan="${escapeHtml(currentPlan.id)}">실행 결과 기록하기</button>
       </section>`
-    : `<section class="current-action"><h2>오늘 할 행동을 정해 볼까요?</h2><p>진단을 시작하면 지금 할 수 있는 가장 작은 행동 하나를 보여드려요.</p></section>`;
+    : `<section class="current-action action-card"><h2>오늘 할 행동을 정해 볼까요?</h2><p>진단을 시작하면 지금 할 수 있는 가장 작은 행동 하나를 보여드려요.</p></section>`;
 
   const upcomingPlans = upcoming.length
     ? `<section class="upcoming-actions"><h2>다음 예정</h2><ul>${upcoming.map((plan) => `<li>${escapeHtml(actionName(plan))} · 결과 확인 예정 ${escapeHtml(dueDate(plan.checkInDueAt))}</li>`).join("")}</ul></section>`
     : "";
   const completedPlans = completed.length
-    ? `<section class="action-history" aria-labelledby="history-title"><h2 id="history-title">지난 결과 기록</h2><ul>${completed.map((plan) => `<li><strong>${escapeHtml(actionName(plan))}</strong><span>실행 전 ${escapeHtml(text(plan.beforeValue))} · 실행 후 ${escapeHtml(text(plan.afterValue))}</span>${plan.note ? `<span>메모: ${escapeHtml(plan.note)}</span>` : ""}</li>`).join("")}</ul></section>`
+    ? `<section class="action-history" aria-labelledby="history-title"><h2 id="history-title">지난 결과 기록</h2><ul>${completed.map((plan) => `<li><strong>${escapeHtml(actionName(plan))}</strong><div class="before-after"><span><small>실행 전</small><strong>${escapeHtml(text(plan.beforeValue))}</strong></span><span class="before-after-arrow" aria-hidden="true">→</span><span><small>실행 후</small><strong>${escapeHtml(text(plan.afterValue))}</strong></span><span class="sr-only">실행 전 ${escapeHtml(text(plan.beforeValue))} · 실행 후 ${escapeHtml(text(plan.afterValue))}</span></div>${plan.note ? `<span class="history-note">메모: ${escapeHtml(plan.note)}</span>` : ""}</li>`).join("")}</ul></section>`
     : `<section class="action-history"><h2>지난 결과 기록</h2><p>아직 기록이 없습니다. 작은 변화도 적어 두면 다음 판단에 도움이 됩니다.</p></section>`;
 
   return `
-    <header class="site-header"><a href="#main">본문 바로가기</a><strong>장사 방향 코치</strong>${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : ""}</header>
+    <header class="work-header"><a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : '<span class="status-chip">샘플 모드</span>'}</header>
     <main id="main" class="dashboard-shell">
-      <p class="eyebrow">개인 대시보드</p>
-      <h1>${escapeHtml(profile?.businessName ?? "내 매장")}의 다음 한 걸음</h1>
-      <p>${escapeHtml(profile?.name ?? "사장님")}님, 모든 것을 한꺼번에 바꾸지 않아도 됩니다.</p>
-      ${assessmentSummary}
-      <div class="button-row"><button type="button" data-start-diagnosis>오늘 할 행동 찾기</button></div>
+      <section class="dashboard-hero"><div><p class="eyebrow">내 가게 대시보드</p><h1>${escapeHtml(profile?.businessName ?? "내 매장")}의 다음 한 걸음</h1><p>${escapeHtml(profile?.name ?? "사장님")}님, 모든 것을 한꺼번에 바꾸지 않아도 됩니다.</p></div>${assessmentSummary}</section>
       ${currentAction}
       ${checkInForm(activePlan, checkInValues)}
       ${upcomingPlans}
       ${completedPlans}
+      <div class="dashboard-actions"><button type="button" class="secondary-action" data-start-diagnosis>오늘 할 행동 찾기</button></div>
       <p class="form-status" role="status" aria-live="polite" data-dashboard-status>${escapeHtml(status)}</p>
     </main>`;
 }
@@ -186,7 +182,7 @@ export async function renderDashboard(
       service.listActionPlans(),
     ]);
   } catch {
-    root.innerHTML = `<header class="site-header"><a href="#main">본문 바로가기</a><strong>장사 방향 코치</strong>${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : ""}</header><main id="main" class="dashboard-shell"><h1>정보를 불러오지 못했습니다.</h1><p>잠시 후 다시 시도해 주세요.</p><button type="button" data-start-diagnosis>오늘 할 행동 찾기</button><p class="form-status" role="status" aria-live="polite" data-dashboard-status></p></main>`;
+    root.innerHTML = `<header class="work-header"><a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : ""}</header><main id="main" class="dashboard-shell error-state"><p class="eyebrow">연결 상태 확인</p><h1>정보를 불러오지 못했습니다.</h1><p>입력한 내용은 그대로 있습니다. 잠시 후 새로 진단하거나 다시 접속해 주세요.</p><button type="button" data-start-diagnosis>오늘 할 행동 찾기</button><p class="form-status" role="status" aria-live="polite" data-dashboard-status></p></main>`;
     root
       .querySelector<HTMLButtonElement>("[data-start-diagnosis]")
       ?.addEventListener("click", onStartDiagnosis);

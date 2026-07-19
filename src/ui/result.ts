@@ -120,28 +120,36 @@ export function renderResult(
   const summary = coaching
     ? coachingSummary[model.action.coachingKey]
     : undefined;
+  const estimated = model.metrics.customerCountSource === "estimated";
   root.innerHTML = `
-    <header class="site-header"><strong>장사 방향 코치</strong></header>
+    <header class="work-header">
+      <a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>
+      <span class="status-chip">진단 완료</span>
+    </header>
     <main id="main" class="result-shell">
       <p class="eyebrow">진단 결과</p>
-      <h1>목표까지 갈 길을 숫자로 확인했어요.</h1>
-      <section class="result-summary" aria-label="목표 매출 계산">
-        <h2>목표까지 부족한 매출</h2><p class="result-number">${won.format(model.metrics.shortfallRevenue)}원</p>
-        <h2>전원 신규 상한선</h2><p class="result-number">전부 신규 고객으로 채운다고 가정한 최대 ${won.format(model.metrics.maxNewCustomers)}명</p>
-        <p>월 영업일 기준 하루 최대 필요 고객 수: ${won.format(model.metrics.maxNewCustomersPerDay)}명</p>
-        <p>실제로 재방문과 객단가 개선이 포함되면 필요한 신규 고객 수는 줄어듭니다.</p>
+      <h1>목표까지 필요한 고객을 먼저 확인했어요.</h1>
+      <section class="metric-hero" aria-labelledby="customer-target-title">
+        <div>
+          <p class="metric-label">목표까지 필요한 신규 고객 상한선</p>
+          <h2 id="customer-target-title"><span>최대</span> <strong class="metric-value">${won.format(model.metrics.maxNewCustomers)}명</strong></h2>
+          <p>전부 신규 고객으로 채운다고 가정한 최대 ${won.format(model.metrics.maxNewCustomers)}명입니다.</p>
+        </div>
+        <span class="estimate-badge">${estimated ? "추정 기준" : "입력 기준"}</span>
       </section>
+      <section class="metric-grid" aria-label="목표 매출 계산">
+        <article class="metric-card"><span>목표까지 부족한 매출</span><strong>${won.format(model.metrics.shortfallRevenue)}원</strong></article>
+        <article class="metric-card"><span>영업일 기준 하루 최대</span><strong>${won.format(model.metrics.maxNewCustomersPerDay)}명</strong></article>
+      </section>
+      <p class="calculation-note">재방문과 객단가 개선이 포함되면 실제 필요한 신규 고객 수는 줄어듭니다.</p>
       ${allocationMarkup(model.allocation)}
       ${advertisingMarkup(model.advertising, model.advertisingInputs)}
-      <section data-recommended-action class="recommended-action" aria-labelledby="action-title">
-        <p class="eyebrow">오늘의 행동 한 가지</p>
-        <h2 id="action-title">${model.action.title}</h2>
-        <h3>선택 근거</h3><p>${model.bottleneck.status === "insufficient" ? "목표 크기, 고객 수용 여력, 지금 실행할 수 있는 조건을 기준으로 골랐습니다." : model.action.reason}</p>
-        <p>${bottleneckCopy(model.bottleneck)}</p>
-        <h3>실행 방법 세 단계</h3><ol>${model.action.steps.map((step) => `<li>${step}</li>`).join("")}</ol>
-        <h3>확인할 숫자 하나</h3><p>${model.action.metric}</p>
-        <h3>하지 말아야 할 행동</h3><p>${model.action.avoid}</p>
-        ${callbacks ? '<button type="button" data-save-action>실행할게요</button><p class="form-status" role="status" aria-live="polite" data-action-status></p>' : ""}
+      <section data-recommended-action class="recommended-action action-card" aria-labelledby="action-title">
+        <div class="action-heading"><div><p class="eyebrow">오늘의 행동 한 가지</p><h2 id="action-title">${model.action.title}</h2></div><span class="time-badge">약 ${model.action.minutes}분</span></div>
+        <div class="action-reason"><h3>왜 이 행동인가요?</h3><p>${model.bottleneck.status === "insufficient" ? "목표 크기, 고객 수용 여력, 지금 실행할 수 있는 조건을 기준으로 골랐습니다." : model.action.reason}</p><p>${bottleneckCopy(model.bottleneck)}</p></div>
+        <div class="action-steps"><h3>이 순서로 실행하세요</h3><ol>${model.action.steps.map((step) => `<li>${step}</li>`).join("")}</ol></div>
+        <div class="action-meta"><div><span>확인할 숫자</span><strong>${model.action.metric}</strong></div><div class="avoid-note"><span>지금 피할 것</span><strong>${model.action.avoid}</strong></div></div>
+        ${callbacks ? '<button type="button" class="primary-action" data-save-action>7일 행동으로 저장하기</button><p class="form-status" role="status" aria-live="polite" data-action-status></p>' : ""}
       </section>
       <section class="coaching-principle"><h2>관련 코칭 원칙</h2><p>${summary ?? "한 번에 한 가지 행동만 바꾸고, 결과를 기록하세요."}</p></section>
     </main>`;
