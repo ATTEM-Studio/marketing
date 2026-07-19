@@ -271,6 +271,9 @@ export async function renderDashboard(
           saving = false;
           status = "결과를 기록하지 못했습니다. 잠시 후 다시 시도해 주세요.";
           render();
+          root
+            .querySelector<HTMLButtonElement>("[data-submit-checkin]")
+            ?.focus();
         }
       });
     root

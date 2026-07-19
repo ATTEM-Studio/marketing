@@ -1,6 +1,6 @@
 begin;
 
-select plan(50);
+select plan(52);
 
 select has_table('public', 'profiles');
 select has_table('public', 'invite_codes');
@@ -11,7 +11,7 @@ select has_function('public', 'save_assessment_with_goal', array['uuid', 'jsonb'
 select has_function('public', 'reserve_buyer_registration', array['text', 'text', 'text', 'text', 'text', 'boolean', 'boolean']);
 select has_function('public', 'consume_invite_attempt', array['text']);
 select has_function('public', 'cleanup_expired_buyer_registrations', array[]::text[]);
-select has_function('public', 'complete_action_plan', array['uuid', 'numeric', 'numeric', 'text']);
+select has_function('public', 'complete_action_plan', array['uuid', 'text', 'text', 'text']);
 select policies_are('public', 'assessments', array['assessment_owner_select', 'assessment_owner_insert']);
 select policies_are('public', 'action_plans', array['action_owner_select', 'action_owner_insert', 'action_owner_update']);
 select policies_are('public', 'check_ins', array['checkin_owner_select', 'checkin_owner_insert', 'checkin_owner_update']);
@@ -30,12 +30,12 @@ select ok(not has_function_privilege('authenticated', 'public.reserve_buyer_regi
 select ok(not has_function_privilege('authenticated', 'public.cleanup_expired_buyer_registrations()', 'execute'), 'only server can clean expired PII');
 select is((select prosecdef from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), true, 'finalizer is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'reservation is security definer');
-select is((select prosecdef from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), true, 'action completion is security definer');
+select is((select prosecdef from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), true, 'action completion is security definer');
 select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%search_path=public%', 'finalizer pins search path');
-select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), '%search_path=public%', 'action completion pins search path');
+select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), '%search_path=public%', 'action completion pins search path');
 select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%for update%', 'reservation locks its rows atomically');
-select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), '%for update%', 'action completion locks its plan atomically');
-select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), '%v_action.status = ''completed''%', 'action completion returns the existing result when retried');
+select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), '%for update%', 'action completion locks its plan atomically');
+select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), '%v_action.status = ''completed''%', 'action completion returns the existing result when retried');
 select ok(exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'check_ins_action_plan_user_unique_idx'), 'a check-in is unique per completed action plan');
 select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.code_hash = p_code_hash%', 'an idempotent pending reservation requires the same code hash');
 select like((select prosrc from pg_proc where oid = 'public.consume_invite_attempt(text)'::regprocedure), '%pg_advisory_xact_lock%', 'rate limiting locks each IP rolling window atomically');
@@ -57,7 +57,15 @@ select is(public.consume_invite_attempt(repeat('a', 64)), true, 'a request immed
 
 set local session_replication_role = replica;
 insert into public.profiles (id, name, email, region, business_name, access_status)
-values ('33333333-3333-3333-3333-333333333333', 'suspended', 'suspended@example.test', 'seoul', 'store', 'suspended');
+values
+  ('33333333-3333-3333-3333-333333333333', 'suspended', 'suspended@example.test', 'seoul', 'store', 'suspended'),
+  ('44444444-4444-4444-4444-444444444444', 'active', 'active@example.test', 'seoul', 'active store', 'active');
+insert into public.stores (id, user_id, name, region)
+values ('55555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444', 'active store', 'seoul');
+insert into public.assessments (id, user_id, store_id, input_data, calculated_metrics, diagnosis)
+values ('66666666-6666-6666-6666-666666666666', '44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb);
+insert into public.action_plans (id, user_id, store_id, assessment_id, action_key, action_snapshot, status)
+values ('77777777-7777-7777-7777-777777777777', '44444444-4444-4444-4444-444444444444', '55555555-5555-5555-5555-555555555555', '66666666-6666-6666-6666-666666666666', 'local-discovery', '{"metric":"길찾기 수"}'::jsonb, 'scheduled');
 set local session_replication_role = origin;
 
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -90,6 +98,30 @@ select throws_ok(
   $$select public.save_assessment_with_goal('22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 0, current_date, current_date)$$,
   'P0001', 'store_not_found',
   'the assessment RPC rejects a suspended profile'
+);
+reset role;
+
+select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+set local role authenticated;
+select is(
+  public.complete_action_plan(
+    '77777777-7777-7777-7777-777777777777',
+    '길찾기 7회',
+    '길찾기 12회',
+    '대표사진 변경'
+  )->'check_in'->>'before_value',
+  '길찾기 7회',
+  'the action completion RPC stores a unit-bearing before value'
+);
+select is(
+  public.complete_action_plan(
+    '77777777-7777-7777-7777-777777777777',
+    '다른 값',
+    '다른 값',
+    'retry'
+  )->'check_in'->>'after_value',
+  '길찾기 12회',
+  'an idempotent retry returns the original unit-bearing result'
 );
 reset role;
 

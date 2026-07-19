@@ -169,6 +169,12 @@ test("keeps written check-in values after a save failure", async () => {
   await Promise.resolve();
 
   expect(root.textContent).toContain("기록하지 못했습니다");
+  const retry = root.querySelector<HTMLButtonElement>("[data-submit-checkin]");
+  expect(retry?.disabled).toBe(false);
+  expect(document.activeElement).toBe(retry);
+  expect(
+    root.querySelector("[data-dashboard-status]")?.getAttribute("role"),
+  ).toBe("status");
   expect(
     root.querySelector<HTMLInputElement>("[name='beforeValue']")?.value,
   ).toBe("길찾기 7회");

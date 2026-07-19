@@ -113,24 +113,28 @@ test("completes an action with one atomic RPC call", async () => {
       action_snapshot: { metric: "calls" },
       status: "completed",
       check_in_due_at: "2026-07-26",
-      check_in: { before_value: 2, after_value: 5, note: "done" },
+      check_in: {
+        before_value: "길찾기 7회",
+        after_value: "길찾기 12회",
+        note: "done",
+      },
     },
     error: null,
   }));
   const service = createSupabaseService("https://example.supabase.co", "anon");
 
   await expect(
-    service.completeActionPlan("plan-1", "2", "5", "done"),
+    service.completeActionPlan("plan-1", "길찾기 7회", "길찾기 12회", "done"),
   ).resolves.toMatchObject({
     status: "completed",
-    beforeValue: "2",
-    afterValue: "5",
+    beforeValue: "길찾기 7회",
+    afterValue: "길찾기 12회",
   });
   expect(mocked.client.rpc).toHaveBeenCalledTimes(1);
   expect(mocked.client.rpc).toHaveBeenCalledWith("complete_action_plan", {
     p_action_plan_id: "plan-1",
-    p_before_value: "2",
-    p_after_value: "5",
+    p_before_value: "길찾기 7회",
+    p_after_value: "길찾기 12회",
     p_note: "done",
   });
 });
