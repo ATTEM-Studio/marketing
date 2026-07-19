@@ -117,3 +117,62 @@ test("keeps the diagnosis visible when saving fails", async () => {
     root.querySelector("[data-submit-diagnosis]"),
   );
 });
+
+test("consumes only the auth callback flag before logout and a later reload", async () => {
+  window.history.replaceState({}, "", "/?auth=callback&keep=1#magic-link");
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const signedIn = liveService();
+  await createApp(root, signedIn, { isLive: true, authCallback: true }).start();
+
+  expect(window.location.search).toBe("?keep=1");
+  expect(window.location.hash).toBe("#magic-link");
+  root.querySelector<HTMLButtonElement>("[data-sign-out]")?.click();
+  await Promise.resolve();
+
+  const signedOut = liveService();
+  signedOut.getSession = vi.fn(async () => ({
+    mode: "live" as const,
+    profile: null,
+  }));
+  await createApp(root, signedOut, {
+    isLive: true,
+    authCallback:
+      new URLSearchParams(window.location.search).get("auth") === "callback",
+  }).start();
+
+  expect(root.querySelector("[data-confirm-registration]")).toBeNull();
+  expect(root.querySelector("[data-registration-form]")).not.toBeNull();
+});
+
+test("consumes the callback after explicit new-buyer finalization", async () => {
+  window.history.replaceState({}, "", "/?auth=callback&keep=1#magic-link");
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const fake = liveService();
+  fake.getSession = vi.fn(async () => ({
+    mode: "live" as const,
+    profile: null,
+  }));
+  fake.finalizeRegistration = vi.fn(async () => ({
+    mode: "live" as const,
+    profile: {
+      id: "buyer-1",
+      name: "구매자",
+      email: "buyer@example.com",
+      region: "서울",
+      businessName: "구매자 식당",
+    },
+  }));
+  await createApp(root, fake, { isLive: true, authCallback: true }).start();
+  expect(fake.finalizeRegistration).not.toHaveBeenCalled();
+
+  root.querySelector<HTMLButtonElement>("[data-confirm-registration]")?.click();
+  await Promise.resolve();
+
+  expect(fake.finalizeRegistration).toHaveBeenCalledTimes(1);
+  expect(window.location.search).toBe("?keep=1");
+  expect(window.location.hash).toBe("#magic-link");
+});

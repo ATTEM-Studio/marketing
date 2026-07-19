@@ -11,6 +11,17 @@ import { renderResult } from "./ui/result";
 import { renderOnboarding } from "./ui/onboarding";
 import { renderLandingShell } from "./ui/shell";
 
+function consumeAuthCallback(): void {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("auth") !== "callback") return;
+  url.searchParams.delete("auth");
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+}
+
 export function createApp(
   root: HTMLElement,
   service: AppService,
@@ -81,6 +92,7 @@ export function createApp(
       authCallback,
       onAuthenticated(finalized) {
         if (finalized.profile) {
+          consumeAuthCallback();
           showDiagnosis(true);
           return;
         }
@@ -101,6 +113,7 @@ export function createApp(
       }
       if (session.mode !== "live") return;
       if (session.profile) {
+        if (options.authCallback) consumeAuthCallback();
         showDiagnosis(true);
         return;
       }
