@@ -66,8 +66,8 @@ describe("invite edge security contract", () => {
     expect(redeemInvite).toContain("return json(200, { active: true })");
   });
 
-  test("enables anonymous auth and requires a valid JWT at the edge", () => {
+  test("enables anonymous auth and delegates modern JWT validation to the function", () => {
     expect(config).toContain("enable_anonymous_sign_ins = true");
-    expect(config).toMatch(/\[functions\.redeem-invite\]\s+verify_jwt = true/);
+    expect(config).toMatch(/\[functions\.redeem-invite\]\s+verify_jwt = false/);
   });
 });
