@@ -8,11 +8,13 @@ import {
   type DiagnosisInput,
 } from "./ui/diagnosis";
 import { renderResult } from "./ui/result";
+import { renderOnboarding } from "./ui/onboarding";
 import { renderLandingShell } from "./ui/shell";
 
 export function createApp(
   root: HTMLElement,
   service: AppService,
+  options: { authCallback?: boolean; isLive?: boolean } = {},
 ): { start(): Promise<void> } {
   const showDiagnosis = () => {
     renderDiagnosis(root, {
@@ -30,9 +32,35 @@ export function createApp(
     });
   };
 
+  const showOnboarding = (authCallback = false) => {
+    renderOnboarding(root, service, {
+      authCallback,
+      onAuthenticated(finalized) {
+        if (finalized.profile) {
+          showDiagnosis();
+          return;
+        }
+        showOnboarding(false);
+      },
+    });
+  };
+
   return {
     async start() {
-      renderLandingShell(root, showDiagnosis);
+      if (!options.isLive) renderLandingShell(root, showDiagnosis);
+      let session;
+      try {
+        session = await service.getSession();
+      } catch {
+        if (options.isLive) renderLandingShell(root, () => undefined, false);
+        return;
+      }
+      if (session.mode !== "live") return;
+      if (session.profile) {
+        showDiagnosis();
+        return;
+      }
+      showOnboarding(options.authCallback);
     },
   };
 }

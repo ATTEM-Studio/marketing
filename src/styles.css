@@ -63,7 +63,8 @@ footer {
 }
 
 .diagnosis-shell,
-.result-shell {
+.result-shell,
+.onboarding-shell {
   width: min(100% - 2rem, 860px);
   margin: 2rem auto 4rem;
   padding: clamp(1.25rem, 4vw, 3rem);
@@ -72,7 +73,8 @@ footer {
 }
 
 .diagnosis-shell h1,
-.result-shell h1 {
+.result-shell h1,
+.onboarding-shell h1 {
   max-width: 24ch;
   font-size: clamp(1.8rem, 4vw, 3rem);
 }
@@ -125,6 +127,17 @@ summary:focus-visible {
   margin: 0;
   color: #9d1b1b;
   font-size: 0.875rem;
+}
+
+.form-status,
+.login-status {
+  min-height: 1.5rem;
+  margin-block: var(--space-2);
+  color: var(--color-muted);
+}
+
+.consent-field {
+  margin-top: var(--space-1);
 }
 
 .choice-group {
