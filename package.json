@@ -1,0 +1,29 @@
+{
+  "name": "attem-buyer-sales-coach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format:check": "prettier --check .",
+    "build": "vite build",
+    "verify": "pnpm format:check && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.110.7"
+  },
+  "devDependencies": {
+    "happy-dom": "20.10.6",
+    "prettier": "3.9.5",
+    "supabase": "2.109.1",
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.9.0"
+}

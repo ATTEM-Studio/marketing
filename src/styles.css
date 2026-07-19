@@ -1,0 +1,140 @@
+:root {
+  --color-ink: #19221d;
+  --color-muted: #58635b;
+  --color-surface: #f7f8f4;
+  --color-panel: #ffffff;
+  --color-accent: #176b4d;
+  --color-accent-hover: #0d5239;
+  --color-focus: #1459c5;
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2.5rem;
+  --radius: 0.75rem;
+  --font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+.site-header,
+.landing-shell,
+footer {
+  width: min(100% - 2rem, 1180px);
+  margin-inline: auto;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.5rem;
+}
+
+.site-header a {
+  position: absolute;
+  left: var(--space-2);
+  top: -3rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  color: #ffffff;
+  background: var(--color-ink);
+}
+
+.site-header a:focus {
+  top: var(--space-1);
+}
+
+.landing-shell {
+  margin-block: 4rem;
+  padding: clamp(2rem, 6vw, 5rem);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+h1 {
+  max-width: 18ch;
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+  line-height: 1.15;
+}
+
+h1 + p {
+  max-width: 46rem;
+  margin-block: var(--space-3);
+  color: var(--color-muted);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+button {
+  min-height: 44px;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  color: #ffffff;
+  background: var(--color-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button + button {
+  color: var(--color-accent);
+  background: var(--color-panel);
+}
+
+button:hover {
+  border-color: var(--color-accent-hover);
+  background: var(--color-accent-hover);
+}
+
+button + button:hover {
+  color: #ffffff;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+footer {
+  padding-block: var(--space-3);
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 719px) {
+  .landing-shell {
+    margin-block: var(--space-3);
+  }
+
+  .button-row {
+    flex-direction: column;
+  }
+
+  button {
+    width: 100%;
+  }
+}
