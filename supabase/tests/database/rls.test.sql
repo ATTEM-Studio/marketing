@@ -4,7 +4,12 @@ select plan(103);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
-select has_column('public', 'invite_codes', 'is_reusable');
+select has_column(
+  'public'::name,
+  'invite_codes'::name,
+  'is_reusable'::name,
+  'invite codes support reusable access'
+);
 select has_table('public'::name, 'pending_registrations'::name, 'pending registrations table exists');
 select has_table('public'::name, 'assessments'::name, 'assessments table exists');
 select has_function('public', 'finalize_buyer_registration', array['uuid', 'text']);

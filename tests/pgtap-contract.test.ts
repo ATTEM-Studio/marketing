@@ -51,4 +51,10 @@ describe("pgTAP database contract", () => {
       .map((name) => name.split("_")[0]);
     expect(new Set(versions).size).toBe(versions.length);
   });
+
+  test("uses the unambiguous four-argument pgTAP column assertion", () => {
+    expect(databaseTest).toMatch(
+      /has_column\(\s*'public'::name,\s*'invite_codes'::name,\s*'is_reusable'::name,\s*'invite codes support reusable access'\s*\)/s,
+    );
+  });
 });
