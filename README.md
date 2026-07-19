@@ -1,6 +1,6 @@
 # 장사 방향 코치
 
-전자책 구매 인증을 마친 소상공인이 매장 숫자를 바탕으로 목표 매출까지 필요한 고객 규모와 오늘 실행할 행동 두 가지를 확인하는 도구입니다. 결과는 매출을 보장하는 예측이 아니라, 확인된 수치와 다음 측정 행동을 연결하는 코칭 안내입니다.
+전자책 구매 인증을 마친 소상공인이 매장 숫자를 바탕으로 목표 매출까지 필요한 고객 규모와 오늘 실행할 행동 한 가지를 확인하는 도구입니다. 결과는 매출을 보장하는 예측이 아니라, 확인된 수치와 다음 측정 행동을 연결하는 코칭 안내입니다.
 
 첫 버전에는 전자책 본문 열람, 결제, 관리자 대시보드, 여러 매장 관리, 업종 평균 비교, 광고·POS 자동 수집, AI 자유 대화가 포함되지 않습니다.
 
@@ -49,6 +49,13 @@ pnpm exec supabase functions deploy finalize-registration
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY`, `INVITE_HASH_PEPPER`, `SITE_URL`, `ALLOWED_ORIGIN`은 Supabase Edge Function secrets에만 둡니다. 저장소, GitHub Pages, 브라우저 번들, `.env.example`에 넣지 않습니다. 브라우저에서 허용되는 변수는 `VITE_SUPABASE_URL`과 공개 가능한 `VITE_SUPABASE_ANON_KEY`뿐입니다.
+
+Supabase Dashboard의 **Authentication → URL Configuration**도 같은 운영 주소로 맞춥니다.
+
+- **Site URL**: 운영 서비스의 기준 주소를 입력합니다. 예: `https://your-live-site.example`. 하위 경로 배포라면 `https://your-live-site.example/marketing`처럼 기준 경로까지 포함하고 끝의 `/`와 `?auth=callback`은 넣지 않습니다.
+- **Redirect URLs**: 가입 Edge Function과 기존 로그인 링크가 보내는 콜백 주소를 허용합니다. 예: `https://your-live-site.example/?auth=callback`. 하위 경로 배포라면 `https://your-live-site.example/marketing/?auth=callback`도 별도로 추가합니다.
+
+`SITE_URL` secret은 위 Site URL과 정확히 같은 운영 origin/base를 사용합니다. Edge Function은 `${SITE_URL}/?auth=callback`로, 브라우저 로그인은 현재 origin/base의 `?auth=callback`으로 돌아가므로 두 Redirect URL이 실제 배포 경로와 일치해야 합니다.
 
 ### 첫 초대 코드 만들기
 

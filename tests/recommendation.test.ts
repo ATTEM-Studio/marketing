@@ -42,6 +42,17 @@ describe("single action selection", () => {
     ).toBe("measure-acquisition-source");
   });
 
+  test("uses the single seven-day measurement action whenever live ads lack all actual data", () => {
+    expect(
+      selectAction({
+        ...context,
+        primaryConcern: "unknown",
+        capacity: "no",
+        adsRunning: true,
+      }).key,
+    ).toBe("measure-acquisition-source");
+  });
+
   test("does not recommend customer messages without consent", () => {
     expect(
       selectAction({

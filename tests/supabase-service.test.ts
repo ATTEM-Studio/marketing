@@ -9,7 +9,10 @@ vi.mock("../src/services/supabase-client", () => ({
   createSupabaseClient: mocked.createClient,
 }));
 
-import { createSupabaseService } from "../src/services/supabase-service";
+import {
+  createSupabaseService,
+  koreaBusinessMonthPeriod,
+} from "../src/services/supabase-service";
 
 const assessment = {
   select: vi.fn(),
@@ -142,13 +145,42 @@ test("completes an action with one atomic RPC call", async () => {
 test("saves the target revenue from the nested diagnosis revenue input", async () => {
   const service = createSupabaseService("https://example.supabase.co", "anon");
   await service.saveAssessment({
-    inputs: { revenue: { targetMonthlyRevenue: 40_000_000 } },
+    inputs: {
+      revenue: { targetMonthlyRevenue: 40_000_000 },
+      allocation: {
+        newCustomerRevenue: 6_000_000,
+        returningCustomerRevenue: 2_000_000,
+        averageOrderValueRevenue: 2_000_000,
+      },
+    },
     metrics: {},
     diagnosis: {},
   });
 
   expect(mocked.client.rpc).toHaveBeenCalledWith(
     "save_assessment_with_goal",
-    expect.objectContaining({ p_target_revenue: 40_000_000 }),
+    expect.objectContaining({
+      p_target_revenue: 40_000_000,
+      p_allocation: {
+        newCustomerRevenue: 6_000_000,
+        returningCustomerRevenue: 2_000_000,
+        averageOrderValueRevenue: 2_000_000,
+      },
+    }),
   );
+});
+
+test("uses the Korea business month at a UTC month boundary", () => {
+  expect(
+    koreaBusinessMonthPeriod(new Date("2026-07-31T14:59:59.999Z")),
+  ).toEqual({
+    start: "2026-07-01",
+    end: "2026-07-31",
+  });
+  expect(
+    koreaBusinessMonthPeriod(new Date("2026-07-31T15:00:00.000Z")),
+  ).toEqual({
+    start: "2026-08-01",
+    end: "2026-08-31",
+  });
 });

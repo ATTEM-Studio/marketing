@@ -1,14 +1,23 @@
 import type {
+  AdvertisingInputs,
   BottleneckInputs,
   Capacity,
+  GoalAllocationInput,
   PrimaryConcern,
   ReturningDataStatus,
   RevenueInputs,
 } from "../domain/types";
-import { validateRevenueInputs } from "../domain/revenue";
+import {
+  calculateRevenueMetrics,
+  validateAdvertisingInputs,
+  validateGoalAllocation,
+  validateRevenueInputs,
+} from "../domain/revenue";
 
 export interface DiagnosisInput {
   revenue: RevenueInputs;
+  allocation: GoalAllocationInput;
+  advertising: AdvertisingInputs;
   bottleneck: BottleneckInputs;
   primaryConcern: PrimaryConcern;
   capacity: Capacity;
@@ -50,6 +59,14 @@ const nullableNumberValue = (
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const percentageValue = (
+  form: HTMLFormElement,
+  name: string,
+): number | null => {
+  const value = nullableNumberValue(form, name);
+  return value === null ? null : value / 100;
+};
+
 const radioValue = (form: HTMLFormElement, name: string): string | null =>
   form.querySelector<HTMLInputElement>(`[name='${name}']:checked`)?.value ??
   null;
@@ -80,9 +97,32 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
         ? nullableNumberValue(form, "monthlyCustomerCount")
         : null,
   };
+  const allocation = {
+    newCustomerRevenue: nullableNumberValue(form, "newCustomerRevenue"),
+    returningCustomerRevenue: nullableNumberValue(
+      form,
+      "returningCustomerRevenue",
+    ),
+    averageOrderValueRevenue: nullableNumberValue(
+      form,
+      "averageOrderValueRevenue",
+    ),
+  };
+  const advertising = {
+    visitConversionRate: percentageValue(form, "visitConversionRate"),
+    costPerClick: nullableNumberValue(form, "costPerClick"),
+    actualAdNewCustomers: nullableNumberValue(form, "actualAdNewCustomers"),
+  };
+  const adAttributionKnown =
+    validateAdvertisingInputs(advertising).length === 0 &&
+    advertising.visitConversionRate !== null &&
+    advertising.costPerClick !== null &&
+    advertising.actualAdNewCustomers !== null;
 
   return {
     revenue,
+    allocation,
+    advertising,
     bottleneck: {
       exposure: comparable(form, "exposure"),
       click: comparable(form, "click"),
@@ -101,7 +141,7 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
     hasConsentDb: radioValue(form, "hasConsentDb") === "true",
     canChangeMenu: radioValue(form, "canChangeMenu") === "true",
     adsRunning: radioValue(form, "adsRunning") === "true",
-    adAttributionKnown: radioValue(form, "adAttributionKnown") === "true",
+    adAttributionKnown,
   };
 }
 
@@ -119,6 +159,25 @@ function numberField(name: string, label: string, required = true): string {
       <input id="${name}" name="${name}" inputmode="numeric" aria-describedby="${name}-error" />
       ${renderError(name)}
     </div>`;
+}
+
+function allocationFields(): string {
+  return `<details class="optional-details"><summary>부족 매출을 직접 나눠 보기 (선택)</summary>
+    <p>입력하지 않으면 전원 신규 고객 상한선만 계산합니다. 비율이나 추천 분배는 제시하지 않습니다.</p>
+    ${numberField("newCustomerRevenue", "신규 고객 증가로 채울 매출", false)}
+    ${numberField("returningCustomerRevenue", "재방문 증가로 채울 매출", false)}
+    ${numberField("averageOrderValueRevenue", "객단가 상승으로 채울 매출", false)}
+    ${renderError("allocation")}
+  </details>`;
+}
+
+function advertisingFields(): string {
+  return `<details class="optional-details"><summary>실제 광고 데이터를 입력하기 (선택)</summary>
+    <p>세 값을 모두 실제 기록으로 입력한 경우에만 광고 추정치를 보여 드립니다.</p>
+    ${numberField("visitConversionRate", "실제 방문 전환율 (%)", false)}
+    ${numberField("costPerClick", "실제 평균 클릭 비용", false)}
+    ${numberField("actualAdNewCustomers", "광고 유입 실제 신규 고객 수", false)}
+  </details>`;
 }
 
 function choice(name: string, value: string, label: string): string {
@@ -151,11 +210,21 @@ function showStep(root: HTMLElement, step: Step): void {
 function setError(form: HTMLFormElement, name: string, message: string): void {
   const error = form.querySelector<HTMLElement>(`#${name}-error`);
   if (error) error.textContent = message;
-  form
-    .querySelectorAll<HTMLInputElement>(`[name='${name}']`)
-    .forEach((control) => {
-      control.setAttribute("aria-invalid", "true");
-    });
+  const controlNames =
+    name === "allocation"
+      ? [
+          "newCustomerRevenue",
+          "returningCustomerRevenue",
+          "averageOrderValueRevenue",
+        ]
+      : [name];
+  controlNames.forEach((controlName) => {
+    form
+      .querySelectorAll<HTMLInputElement>(`[name='${controlName}']`)
+      .forEach((control) => {
+        control.setAttribute("aria-invalid", "true");
+      });
+  });
   form
     .querySelector<HTMLElement>(`[data-choice-group='${name}']`)
     ?.setAttribute("aria-invalid", "true");
@@ -203,6 +272,16 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
         },
       );
     }
+    if (errors.length === 0) {
+      const input = readDiagnosisForm(form);
+      const metrics = calculateRevenueMetrics(input.revenue);
+      validateGoalAllocation(
+        input.allocation,
+        metrics.shortfallRevenue,
+      ).forEach((error) => {
+        errors.push({ name: error.field, message: error.message });
+      });
+    }
   }
   if (step === 2) {
     ["monthlyCustomerCountStatus", "primaryConcern"].forEach((name) => {
@@ -245,10 +324,26 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
         errors.push({ name, message: "하나를 선택해 주세요." });
       }
     });
+    ["visitConversionRate", "costPerClick", "actualAdNewCustomers"].forEach(
+      (name) => {
+        if (hasInvalidNumber(form, name)) {
+          errors.push({ name, message: "숫자만 입력해 주세요." });
+        }
+      },
+    );
+    if (errors.length === 0) {
+      validateAdvertisingInputs(readDiagnosisForm(form).advertising).forEach(
+        (error) => {
+          errors.push({ name: error.field, message: error.message });
+        },
+      );
+    }
   }
   errors.forEach((error) => setError(form, error.name, error.message));
   if (errors[0]) {
-    form.querySelector<HTMLElement>(`[name='${errors[0].name}']`)?.focus();
+    const focusName =
+      errors[0].name === "allocation" ? "newCustomerRevenue" : errors[0].name;
+    form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
     return false;
   }
   return true;
@@ -270,6 +365,7 @@ export function renderDiagnosis(
           ${numberField("targetMonthlyRevenue", "목표 월매출")}
           ${numberField("averageOrderValue", "평균 객단가")}
           ${numberField("operatingDays", "월 영업일")}
+          ${allocationFields()}
           <button type="button" data-next-step>다음</button>
         </fieldset>
         <fieldset data-step="2" hidden><legend>2. 현재 고객 상황</legend>
@@ -319,14 +415,6 @@ export function renderDiagnosis(
             ["false", "하지 않아요"],
           ])}
           ${choiceGroup(
-            "adAttributionKnown",
-            "광고를 보고 실제 방문한 고객 수를 알고 있나요?",
-            [
-              ["true", "알고 있어요"],
-              ["false", "모르겠어요"],
-            ],
-          )}
-          ${choiceGroup(
             "hasConnectedVisitHistory",
             "연결된 방문 이력이 있나요?",
             [
@@ -334,6 +422,7 @@ export function renderDiagnosis(
               ["false", "없어요"],
             ],
           )}
+          ${advertisingFields()}
           <details><summary>비교할 수치가 있으면 더 입력하기 (선택)</summary>
             ${detailsFields("exposure", "노출")}${detailsFields("click", "클릭")}${detailsFields("visit", "방문")}${detailsFields("averageOrderValueMetric", "객단가")}${detailsFields("returning", "재방문")}
           </details>

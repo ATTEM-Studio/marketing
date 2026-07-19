@@ -18,6 +18,32 @@ export interface RevenueMetrics {
   targetReached: boolean;
 }
 
+export interface GoalAllocationInput {
+  newCustomerRevenue: number | null;
+  returningCustomerRevenue: number | null;
+  averageOrderValueRevenue: number | null;
+}
+
+export interface GoalAllocation {
+  newCustomerRevenue: number;
+  returningCustomerRevenue: number;
+  averageOrderValueRevenue: number;
+}
+
+export interface AdvertisingInputs {
+  visitConversionRate: number | null;
+  costPerClick: number | null;
+  actualAdNewCustomers: number | null;
+}
+
+export interface AdvertisingMetrics {
+  status: "measured" | "needs_measurement";
+  newCustomerTarget: number;
+  requiredClicks: number | null;
+  estimatedAdSpend: number | null;
+  customerAcquisitionCost: number | null;
+}
+
 export interface FieldError {
   field: keyof RevenueInputs | string;
   message: string;

@@ -57,6 +57,7 @@ test("completes the three-step all-new-customer ceiling flow", async () => {
     1,
   );
   expect(text()).not.toContain("재방문이 문제입니다");
+  expect(text()).not.toContain("광고 비용은 아직 계산하지 않았어요");
 });
 
 test("shows a linked error and moves focus when required revenue is missing", async () => {
@@ -181,3 +182,62 @@ test.each(["0", "-1"])(
     );
   },
 );
+
+test("requires an exact direct revenue allocation before the next step", async () => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing test root");
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "25,000");
+  setValue("operatingDays", "20");
+
+  const allocation = document.querySelector<HTMLInputElement>(
+    "[name='newCustomerRevenue']",
+  );
+  expect(allocation).not.toBeNull();
+  if (!allocation) return;
+  allocation.value = "9,999,999";
+  allocation.dispatchEvent(new Event("input", { bubbles: true }));
+  click("[data-next-step]");
+
+  expect(allocation.getAttribute("aria-invalid")).toBe("true");
+  expect(document.querySelector<HTMLElement>("[data-step='1']")?.hidden).toBe(
+    false,
+  );
+});
+
+test("shows advertising estimates only after all actual advertising values are entered", async () => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing test root");
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "25,000");
+  setValue("operatingDays", "20");
+  click("[data-next-step]");
+  choose("monthlyCustomerCountStatus", "unknown");
+  choose("primaryConcern", "ads");
+  click("[data-next-step]");
+  choose("capacity", "yes");
+  choose("returningDataStatus", "unknown");
+  choose("hasConsentDb", "false");
+  choose("canChangeMenu", "true");
+  choose("adsRunning", "true");
+  setValue("visitConversionRate", "20");
+  setValue("costPerClick", "500");
+  setValue("actualAdNewCustomers", "50");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(text()).toContain("실제 입력값을 전제로 한 광고 추정");
+  expect(text()).toContain("필요 클릭 수: 2,000회");
+  expect(text()).toContain("예상 광고비: 1,000,000원");
+  expect(text()).toContain(
+    "실제 방문 전환율 20%, 평균 클릭 비용 500원, 광고 유입 실제 신규 고객 50명",
+  );
+  expect(text()).toContain("확정 비용이나 성과 보장이 아닙니다");
+});

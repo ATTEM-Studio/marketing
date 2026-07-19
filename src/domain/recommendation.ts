@@ -97,17 +97,13 @@ export function selectAction(
   context: RecommendationContext,
 ): RecommendedAction {
   if (context.metrics.targetReached) return ACTIONS["profit-review"];
+  if (context.adsRunning && !context.adAttributionKnown) {
+    return ACTIONS["measure-acquisition-source"];
+  }
   if (context.capacity === "no") {
     return context.canChangeMenu
       ? ACTIONS["average-order-value"]
       : ACTIONS["off-peak-offer"];
-  }
-  if (
-    context.primaryConcern === "ads" &&
-    context.adsRunning &&
-    !context.adAttributionKnown
-  ) {
-    return ACTIONS["measure-acquisition-source"];
   }
   if (context.primaryConcern === "averageOrderValue" && context.canChangeMenu) {
     return ACTIONS["average-order-value"];

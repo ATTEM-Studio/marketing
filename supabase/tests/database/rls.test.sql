@@ -1,13 +1,14 @@
 begin;
 
-select plan(52);
+select plan(59);
 
 select has_table('public', 'profiles');
 select has_table('public', 'invite_codes');
 select has_table('public', 'pending_registrations');
 select has_table('public', 'assessments');
 select has_function('public', 'finalize_buyer_registration', array['uuid', 'text']);
-select has_function('public', 'save_assessment_with_goal', array['uuid', 'jsonb', 'jsonb', 'jsonb', 'numeric', 'date', 'date']);
+select has_function('public', 'save_assessment_with_goal', array['uuid', 'jsonb', 'jsonb', 'jsonb', 'numeric', 'jsonb', 'date', 'date']);
+select hasnt_function('public', 'save_assessment_with_goal', array['uuid', 'jsonb', 'jsonb', 'jsonb', 'numeric', 'date', 'date']);
 select has_function('public', 'reserve_buyer_registration', array['text', 'text', 'text', 'text', 'text', 'boolean', 'boolean']);
 select has_function('public', 'consume_invite_attempt', array['text']);
 select has_function('public', 'cleanup_expired_buyer_registrations', array[]::text[]);
@@ -28,18 +29,22 @@ select ok(not has_table_privilege('authenticated', 'public.check_ins', 'insert')
 select ok(not has_function_privilege('authenticated', 'public.finalize_buyer_registration(uuid, text)', 'execute'), 'only server can finalize registration');
 select ok(not has_function_privilege('authenticated', 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)', 'execute'), 'only server can reserve an invite');
 select ok(not has_function_privilege('authenticated', 'public.cleanup_expired_buyer_registrations()', 'execute'), 'only server can clean expired PII');
+select ok(has_function_privilege('authenticated', 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)', 'execute'), 'active authenticated buyers can save an assessment through the RPC');
 select is((select prosecdef from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), true, 'finalizer is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'reservation is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), true, 'action completion is security definer');
+select is((select prosecdef from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), true, 'assessment save is security definer');
 select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%search_path=public%', 'finalizer pins search path');
 select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), '%search_path=public%', 'action completion pins search path');
+select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%search_path=public%', 'assessment save pins search path');
 select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%for update%', 'reservation locks its rows atomically');
 select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), '%for update%', 'action completion locks its plan atomically');
 select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), '%v_action.status = ''completed''%', 'action completion returns the existing result when retried');
 select ok(exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'check_ins_action_plan_user_unique_idx'), 'a check-in is unique per completed action plan');
 select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.code_hash = p_code_hash%', 'an idempotent pending reservation requires the same code hash');
 select like((select prosrc from pg_proc where oid = 'public.consume_invite_attempt(text)'::regprocedure), '%pg_advisory_xact_lock%', 'rate limiting locks each IP rolling window atomically');
-select like((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, date, date)'::regprocedure), '%access_status = ''active''%', 'assessment RPC rejects inactive users');
+select like((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%access_status = ''active''%', 'assessment RPC rejects inactive users');
+select like((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%p_allocation%', 'assessment RPC validates the saved allocation');
 select like((select with_check from pg_policies where schemaname = 'public' and tablename = 'assessments' and policyname = 'assessment_owner_insert'), '%access_status = ''active''%', 'assessment INSERT RLS requires an active profile');
 select ok(exists (select 1 from pg_extension where extname = 'pg_cron'), 'pg_cron is installed for scheduled cleanup');
 select ok(exists (select 1 from cron.job where jobname = 'cleanup-expired-buyer-registrations'), 'expired registration cleanup is scheduled');
@@ -81,7 +86,7 @@ select throws_ok(
   'an authenticated user without an active profile cannot insert an assessment'
 );
 select throws_ok(
-  $$select public.save_assessment_with_goal('22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 0, current_date, current_date)$$,
+  $$select public.save_assessment_with_goal('22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 0, '{}'::jsonb, current_date, current_date)$$,
   'P0001', 'store_not_found',
   'the assessment RPC rejects a user without an active profile'
 );
@@ -95,7 +100,7 @@ select throws_ok(
   'a suspended user cannot insert an assessment'
 );
 select throws_ok(
-  $$select public.save_assessment_with_goal('22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, 0, current_date, current_date)$$,
+  $$select public.save_assessment_with_goal('22222222-2222-2222-2222-222222222222', '{}'::jsonb, '{"shortfallRevenue": 0}'::jsonb, '{}'::jsonb, 0, '{}'::jsonb, current_date, current_date)$$,
   'P0001', 'store_not_found',
   'the assessment RPC rejects a suspended profile'
 );
@@ -103,6 +108,31 @@ reset role;
 
 select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
 set local role authenticated;
+select ok(
+  (
+    with saved as (
+      select public.save_assessment_with_goal(
+        '55555555-5555-5555-5555-555555555555',
+        '{}'::jsonb,
+        '{"shortfallRevenue": 10000000}'::jsonb,
+        '{}'::jsonb,
+        40000000,
+        '{"newCustomerRevenue": 6000000, "returningCustomerRevenue": 2000000, "averageOrderValueRevenue": 2000000}'::jsonb,
+        current_date,
+        current_date
+      ) as id
+    )
+    select allocation = '{"newCustomerRevenue": 6000000, "returningCustomerRevenue": 2000000, "averageOrderValueRevenue": 2000000}'::jsonb
+    from public.goals
+    join saved on saved.id = public.goals.id
+  ),
+  'the assessment RPC saves a valid direct allocation in goals'
+);
+select throws_ok(
+  $$select public.save_assessment_with_goal('55555555-5555-5555-5555-555555555555', '{}'::jsonb, '{"shortfallRevenue": 10000000}'::jsonb, '{}'::jsonb, 40000000, '{"newCustomerRevenue": 9999999, "returningCustomerRevenue": 0, "averageOrderValueRevenue": 0}'::jsonb, current_date, current_date)$$,
+  'P0001', 'invalid_goal_allocation',
+  'the assessment RPC rejects an allocation that does not exactly match the shortfall'
+);
 select is(
   public.complete_action_plan(
     '77777777-7777-7777-7777-777777777777',

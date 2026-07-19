@@ -1,6 +1,11 @@
 import { selectBottleneck } from "./domain/bottleneck";
 import { selectAction } from "./domain/recommendation";
-import { calculateRevenueMetrics } from "./domain/revenue";
+import {
+  allocationNewCustomerTarget,
+  calculateAdvertisingMetrics,
+  calculateRevenueMetrics,
+  normalizeGoalAllocation,
+} from "./domain/revenue";
 import type { AppService } from "./services/contracts";
 import {
   readDiagnosisForm,
@@ -39,6 +44,26 @@ export function createApp(
     renderDiagnosis(root, {
       async onSubmit(input: DiagnosisInput) {
         const metrics = calculateRevenueMetrics(input.revenue);
+        const allocation = normalizeGoalAllocation(input.allocation);
+        const newCustomerTarget = allocationNewCustomerTarget(
+          metrics.maxNewCustomers,
+          input.revenue.averageOrderValue,
+          allocation,
+        );
+        const advertising = calculateAdvertisingMetrics(
+          newCustomerTarget,
+          input.advertising,
+        );
+        const hasAdvertisingInputs = Object.values(input.advertising).some(
+          (value) => value !== null,
+        );
+        const advertisingResult =
+          input.adsRunning || hasAdvertisingInputs
+            ? {
+                advertising,
+                advertisingInputs: input.advertising,
+              }
+            : {};
         const bottleneck = selectBottleneck(input.bottleneck);
         const action = selectAction({ ...input, metrics, bottleneck });
         const submit = root.querySelector<HTMLButtonElement>(
@@ -49,13 +74,26 @@ export function createApp(
         if (status) status.textContent = "결과를 저장하고 있습니다.";
         try {
           const assessment = await service.saveAssessment({
-            inputs: input as unknown as Record<string, unknown>,
-            metrics: metrics as unknown as Record<string, unknown>,
+            inputs: {
+              ...input,
+              allocation,
+            } as unknown as Record<string, unknown>,
+            metrics: {
+              ...metrics,
+              newCustomerTarget,
+              advertising,
+            } as unknown as Record<string, unknown>,
             diagnosis: { bottleneck, actionKey: action.key },
           });
           renderResult(
             root,
-            { metrics, bottleneck, action },
+            {
+              metrics,
+              allocation,
+              ...advertisingResult,
+              bottleneck,
+              action,
+            },
             {
               async onSaveAction() {
                 await service.saveActionPlan({

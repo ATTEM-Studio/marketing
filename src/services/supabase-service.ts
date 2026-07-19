@@ -88,17 +88,49 @@ function targetRevenue(inputs: Record<string, unknown>): number {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
-function period(): { start: string; end: string } {
-  const today = new Date();
-  const start = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1),
-  );
-  const end = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0),
-  );
+function goalAllocation(
+  inputs: Record<string, unknown>,
+): Record<string, number> {
+  const allocation = asObject(inputs.allocation);
+  const keys = [
+    "newCustomerRevenue",
+    "returningCustomerRevenue",
+    "averageOrderValueRevenue",
+  ] as const;
+  if (keys.every((key) => !(key in allocation))) return {};
+  if (
+    !keys.every(
+      (key) =>
+        typeof allocation[key] === "number" &&
+        Number.isFinite(allocation[key]) &&
+        allocation[key] >= 0,
+    )
+  ) {
+    return {};
+  }
+  return Object.fromEntries(
+    keys.map((key) => [key, allocation[key]]),
+  ) as Record<string, number>;
+}
+
+export function koreaBusinessMonthPeriod(now = new Date()): {
+  start: string;
+  end: string;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const part = (type: "year" | "month") =>
+    Number(parts.find((item) => item.type === type)?.value);
+  const year = part("year");
+  const month = part("month");
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const formattedMonth = String(month).padStart(2, "0");
   return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    start: `${year}-${formattedMonth}-01`,
+    end: `${year}-${formattedMonth}-${String(lastDay).padStart(2, "0")}`,
   };
 }
 
@@ -195,13 +227,14 @@ export function createSupabaseService(
       const id = await userId(client);
       if (!id) throw new Error(SAVE_ERROR);
       const storeId = await currentStoreId(client, id);
-      const dates = period();
+      const dates = koreaBusinessMonthPeriod();
       const { error } = await client.rpc("save_assessment_with_goal", {
         p_store_id: storeId,
         p_input_data: snapshot.inputs,
         p_calculated_metrics: snapshot.metrics,
         p_diagnosis: snapshot.diagnosis,
         p_target_revenue: targetRevenue(snapshot.inputs),
+        p_allocation: goalAllocation(snapshot.inputs),
         p_period_start: dates.start,
         p_period_end: dates.end,
       });

@@ -1,12 +1,18 @@
 import { COACHING } from "../content/coaching";
 import type {
+  AdvertisingInputs,
+  AdvertisingMetrics,
   BottleneckResult,
+  GoalAllocation,
   RecommendedAction,
   RevenueMetrics,
 } from "../domain/types";
 
 export interface ResultViewModel {
   metrics: RevenueMetrics;
+  allocation?: GoalAllocation | Record<string, never>;
+  advertising?: AdvertisingMetrics;
+  advertisingInputs?: AdvertisingInputs;
   bottleneck: BottleneckResult;
   action: RecommendedAction;
 }
@@ -16,6 +22,10 @@ export interface ResultCallbacks {
 }
 
 const won = new Intl.NumberFormat("ko-KR");
+const percentage = new Intl.NumberFormat("ko-KR", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
 const bottleneckName = {
   exposure: "노출",
   click: "클릭",
@@ -40,9 +50,55 @@ function bottleneckCopy(bottleneck: BottleneckResult): string {
     return "비교할 이전 기간 수치가 부족해 병목을 단정하지 않았습니다.";
   }
   if (bottleneck.status === "known" && bottleneck.key) {
+    const changeRate = bottleneck.changeRate;
+    if (typeof changeRate === "number" && Number.isFinite(changeRate)) {
+      const direction = changeRate < 0 ? "감소" : "증가";
+      return `확인 가능한 수치에서는 ${bottleneckName[bottleneck.key]}이 이전 기간보다 ${percentage.format(Math.abs(changeRate))} ${direction}해 가장 낮았습니다.`;
+    }
     return `확인 가능한 수치에서는 ${bottleneckName[bottleneck.key]} 변화가 가장 낮았습니다.`;
   }
   return "비교 가능한 수치에서 뚜렷한 감소를 확인하지 못했습니다.";
+}
+
+function allocationMarkup(
+  allocation: GoalAllocation | Record<string, never> | undefined,
+): string {
+  if (!allocation || !("newCustomerRevenue" in allocation)) return "";
+  return `<section class="result-allocation" aria-label="직접 정한 목표 분배">
+    <h2>직접 정한 목표 분배</h2>
+    <p>신규 고객 증가: ${won.format(allocation.newCustomerRevenue)}원</p>
+    <p>재방문 증가: ${won.format(allocation.returningCustomerRevenue)}원</p>
+    <p>객단가 상승: ${won.format(allocation.averageOrderValueRevenue)}원</p>
+    <p>이 분배는 사용자가 정한 실행 계획이며, 재방문 병목 진단은 아닙니다.</p>
+  </section>`;
+}
+
+function advertisingMarkup(
+  advertising: AdvertisingMetrics | undefined,
+  input: AdvertisingInputs | undefined,
+): string {
+  if (!advertising) return "";
+  if (advertising.status !== "measured") {
+    return `<section class="advertising-estimate" aria-label="광고 데이터 측정 안내">
+      <h2>광고 비용은 아직 계산하지 않았어요</h2>
+      <p>실제 방문 전환율, 평균 클릭 비용, 광고 유입 실제 신규 고객 수 중 모르는 값이 있어 비용을 확정하지 않았습니다. 아래 오늘의 행동으로 필요한 실제 값을 확인합니다.</p>
+    </section>`;
+  }
+  const assumptions =
+    input &&
+    input.visitConversionRate !== null &&
+    input.costPerClick !== null &&
+    input.actualAdNewCustomers !== null
+      ? `<p>실제 방문 전환율 ${percentage.format(input.visitConversionRate)}, 평균 클릭 비용 ${won.format(input.costPerClick)}원, 광고 유입 실제 신규 고객 ${won.format(input.actualAdNewCustomers)}명을 전제로 계산했습니다.</p>`
+      : "";
+  return `<section class="advertising-estimate" aria-label="실제 입력값을 전제로 한 광고 추정">
+    <h2>실제 입력값을 전제로 한 광고 추정</h2>
+    ${assumptions}
+    <p>필요 클릭 수: ${won.format(advertising.requiredClicks ?? 0)}회</p>
+    <p>예상 광고비: ${won.format(advertising.estimatedAdSpend ?? 0)}원</p>
+    <p>고객 획득 비용: ${won.format(advertising.customerAcquisitionCost ?? 0)}원</p>
+    <p>실제 입력값을 전제로 한 계산이며, 확정 비용이나 성과 보장이 아닙니다.</p>
+  </section>`;
 }
 
 export function checkInDueDate(assessmentCreatedAt: string): string {
@@ -74,6 +130,8 @@ export function renderResult(
         <p>월 영업일 기준 하루 최대 필요 고객 수: ${won.format(model.metrics.maxNewCustomersPerDay)}명</p>
         <p>실제로 재방문과 객단가 개선이 포함되면 필요한 신규 고객 수는 줄어듭니다.</p>
       </section>
+      ${allocationMarkup(model.allocation)}
+      ${advertisingMarkup(model.advertising, model.advertisingInputs)}
       <section data-recommended-action class="recommended-action" aria-labelledby="action-title">
         <p class="eyebrow">오늘의 행동 한 가지</p>
         <h2 id="action-title">${model.action.title}</h2>
