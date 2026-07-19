@@ -102,8 +102,32 @@ test("sends an existing buyer login link", async () => {
   document.querySelector<HTMLFormElement>("[data-login-form]")?.requestSubmit();
   await Promise.resolve();
   expect(fake.sendLoginLink).toHaveBeenCalledWith("buyer@example.com");
-  expect(document.body.textContent).toContain("로그인 링크를 보냈습니다");
+  expect(document.body.textContent).toContain(
+    "등록된 주소라면 링크를 보냅니다",
+  );
 });
+
+test.each(["not-registered", "auth-rejected"])(
+  "keeps login acknowledgement the same when %s",
+  async (_outcome) => {
+    const fake = service();
+    fake.sendLoginLink = vi.fn(async () => {
+      throw new Error("authentication response");
+    });
+    const root = document.querySelector<HTMLElement>("#app");
+    if (!root) throw new Error("missing root");
+    renderOnboarding(root, fake, { onAuthenticated: vi.fn() });
+    set("loginEmail", "buyer@example.com");
+    document
+      .querySelector<HTMLFormElement>("[data-login-form]")
+      ?.requestSubmit();
+    await Promise.resolve();
+
+    expect(document.body.textContent).toContain(
+      "등록된 주소라면 링크를 보냅니다",
+    );
+  },
+);
 
 test("does not finalize after an auth callback until the user confirms", async () => {
   const fake = service();

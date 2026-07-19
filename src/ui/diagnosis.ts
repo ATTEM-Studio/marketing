@@ -338,6 +338,7 @@ export function renderDiagnosis(
             ${detailsFields("exposure", "노출")}${detailsFields("click", "클릭")}${detailsFields("visit", "방문")}${detailsFields("averageOrderValueMetric", "객단가")}${detailsFields("returning", "재방문")}
           </details>
           <div class="button-row"><button type="button" data-prev-step>이전</button><button type="submit" data-submit-diagnosis>결과 보기</button></div>
+          <p data-save-status class="form-status" role="status" aria-live="polite"></p>
         </fieldset>
       </form>
     </main>`;

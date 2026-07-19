@@ -81,7 +81,8 @@ function latestCheckIn(row: Row): Row | null {
 }
 
 function targetRevenue(inputs: Record<string, unknown>): number {
-  const raw = inputs.targetMonthlyRevenue;
+  const revenue = asObject(inputs.revenue);
+  const raw = revenue.targetMonthlyRevenue;
   const value =
     typeof raw === "number" ? raw : Number(String(raw).replaceAll(",", ""));
   return Number.isFinite(value) && value >= 0 ? value : 0;
@@ -158,14 +159,17 @@ export function createSupabaseService(
     },
 
     async sendLoginLink(email: string): Promise<void> {
-      const { error } = await client.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}${window.location.pathname}?auth=callback`,
-        },
-      });
-      if (error) throw new Error(LOGIN_ERROR);
+      try {
+        await client.auth.signInWithOtp({
+          email,
+          options: {
+            shouldCreateUser: false,
+            emailRedirectTo: `${window.location.origin}${window.location.pathname}?auth=callback`,
+          },
+        });
+      } catch {
+        // The acknowledgement deliberately does not reveal whether this address exists.
+      }
     },
 
     async finalizeRegistration(): Promise<AppSession> {
@@ -250,9 +254,14 @@ export function createSupabaseService(
       const { data, error } = await client
         .from("action_plans")
         .select(
-          "id, assessment_id, action_key, action_snapshot, status, check_in_due_at",
+          "id, assessment_id, action_key, action_snapshot, status, check_in_due_at, check_ins(before_value, after_value, note, recorded_at)",
         )
         .eq("user_id", id)
+        .order("recorded_at", {
+          referencedTable: "check_ins",
+          ascending: false,
+        })
+        .limit(1, { referencedTable: "check_ins" })
         .order("created_at", { ascending: false });
       if (error) throw new Error(DATA_ERROR);
       return (data ?? []).map((row) => {
@@ -267,32 +276,14 @@ export function createSupabaseService(
       afterValue,
       note,
     ): Promise<ActionPlanRecord> {
-      const currentUserId = await userId(client);
-      if (!currentUserId) throw new Error(SAVE_ERROR);
-      const { error: checkInError } = await client.from("check_ins").insert({
-        user_id: currentUserId,
-        action_plan_id: id,
-        before_value: beforeValue,
-        after_value: afterValue,
-        note,
+      const { data, error } = await client.rpc("complete_action_plan", {
+        p_action_plan_id: id,
+        p_before_value: beforeValue,
+        p_after_value: afterValue,
+        p_note: note,
       });
-      if (checkInError) throw new Error(SAVE_ERROR);
-      const { data, error } = await client
-        .from("action_plans")
-        .update({ status: "completed" })
-        .eq("id", id)
-        .eq("user_id", currentUserId)
-        .select(
-          "id, assessment_id, action_key, action_snapshot, status, check_in_due_at",
-        )
-        .single();
       if (error || !data) throw new Error(SAVE_ERROR);
-      return {
-        ...actionPlanFromRow(data as Row),
-        beforeValue,
-        afterValue,
-        note,
-      };
+      return actionPlanFromRow(data as Row, asObject(data).check_in as Row);
     },
   };
 }

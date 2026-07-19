@@ -14,8 +14,6 @@ const INVITE_ERROR =
   "코드를 확인할 수 없습니다. 입력 내용을 다시 확인해 주세요.";
 const REGISTER_ERROR =
   "가입을 진행하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-const LOGIN_ERROR =
-  "로그인 링크를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.";
 const FINALIZE_ERROR =
   "확인 처리를 마치지 못했습니다. 잠시 후 다시 시도해 주세요.";
 
@@ -226,10 +224,12 @@ export function renderOnboarding(
       await service.sendLoginLink(email);
       if (loginStatus)
         loginStatus.textContent =
-          "로그인 링크를 보냈습니다. 이메일을 확인해 주세요.";
+          "등록된 주소라면 링크를 보냅니다. 이메일을 확인해 주세요.";
       loginForm.reset();
     } catch {
-      if (loginStatus) loginStatus.textContent = LOGIN_ERROR;
+      if (loginStatus)
+        loginStatus.textContent =
+          "등록된 주소라면 링크를 보냅니다. 이메일을 확인해 주세요.";
     } finally {
       loginButton.disabled = false;
     }

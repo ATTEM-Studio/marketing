@@ -1,6 +1,6 @@
 begin;
 
-select plan(42);
+select plan(50);
 
 select has_table('public', 'profiles');
 select has_table('public', 'invite_codes');
@@ -11,6 +11,7 @@ select has_function('public', 'save_assessment_with_goal', array['uuid', 'jsonb'
 select has_function('public', 'reserve_buyer_registration', array['text', 'text', 'text', 'text', 'text', 'boolean', 'boolean']);
 select has_function('public', 'consume_invite_attempt', array['text']);
 select has_function('public', 'cleanup_expired_buyer_registrations', array[]::text[]);
+select has_function('public', 'complete_action_plan', array['uuid', 'numeric', 'numeric', 'text']);
 select policies_are('public', 'assessments', array['assessment_owner_select', 'assessment_owner_insert']);
 select policies_are('public', 'action_plans', array['action_owner_select', 'action_owner_insert', 'action_owner_update']);
 select policies_are('public', 'check_ins', array['checkin_owner_select', 'checkin_owner_insert', 'checkin_owner_update']);
@@ -22,13 +23,20 @@ select ok(not has_table_privilege('authenticated', 'public.invite_codes', 'selec
 select ok(not has_table_privilege('authenticated', 'public.stores', 'insert'), 'clients cannot create stores directly');
 select ok(not has_table_privilege('authenticated', 'public.consent_events', 'insert'), 'clients cannot create consent events directly');
 select ok(not has_table_privilege('authenticated', 'public.profiles', 'update'), 'clients cannot alter email or access status');
+select ok(not has_table_privilege('authenticated', 'public.action_plans', 'update'), 'clients cannot complete an action plan directly');
+select ok(not has_table_privilege('authenticated', 'public.check_ins', 'insert'), 'clients cannot insert a check-in directly');
 select ok(not has_function_privilege('authenticated', 'public.finalize_buyer_registration(uuid, text)', 'execute'), 'only server can finalize registration');
 select ok(not has_function_privilege('authenticated', 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)', 'execute'), 'only server can reserve an invite');
 select ok(not has_function_privilege('authenticated', 'public.cleanup_expired_buyer_registrations()', 'execute'), 'only server can clean expired PII');
 select is((select prosecdef from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), true, 'finalizer is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'reservation is security definer');
+select is((select prosecdef from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), true, 'action completion is security definer');
 select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%search_path=public%', 'finalizer pins search path');
+select like((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), '%search_path=public%', 'action completion pins search path');
 select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%for update%', 'reservation locks its rows atomically');
+select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), '%for update%', 'action completion locks its plan atomically');
+select like((select prosrc from pg_proc where oid = 'public.complete_action_plan(uuid, numeric, numeric, text)'::regprocedure), '%v_action.status = ''completed''%', 'action completion returns the existing result when retried');
+select ok(exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'check_ins_action_plan_user_unique_idx'), 'a check-in is unique per completed action plan');
 select like((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.code_hash = p_code_hash%', 'an idempotent pending reservation requires the same code hash');
 select like((select prosrc from pg_proc where oid = 'public.consume_invite_attempt(text)'::regprocedure), '%pg_advisory_xact_lock%', 'rate limiting locks each IP rolling window atomically');
 select like((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, date, date)'::regprocedure), '%access_status = ''active''%', 'assessment RPC rejects inactive users');

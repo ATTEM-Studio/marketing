@@ -48,6 +48,8 @@ test("completes the three-step all-new-customer ceiling flow", async () => {
   choose("canChangeMenu", "true");
   choose("adsRunning", "false");
   click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
 
   expect(text()).toContain("최대 400명");
   expect(text()).toContain("전부 신규 고객으로 채운다고 가정");
@@ -116,6 +118,8 @@ test("does not use unconnected repeat data for a repeat recommendation", async (
   choose("adsRunning", "false");
   choose("hasConnectedVisitHistory", "false");
   click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
 
   expect(
     document.querySelector("[data-recommended-action]")?.textContent,

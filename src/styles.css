@@ -140,6 +140,19 @@ summary:focus-visible {
   margin-top: var(--space-1);
 }
 
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.account-actions button {
+  width: auto;
+}
+
 .choice-group {
   gap: 0.5rem;
   padding: var(--space-2);
