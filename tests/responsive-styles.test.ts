@@ -21,5 +21,7 @@ test("separates the dark brand surface from light work surfaces", () => {
 
 test("keeps the skip link fully off-screen until keyboard focus", () => {
   expect(css).toContain("transform: translateY(-200%)");
-  expect(css).toMatch(/\.skip-link:focus\s*{[^}]*transform:\s*translateY\(0\)/s);
+  expect(css).toMatch(
+    /\.skip-link:focus\s*{[^}]*transform:\s*translateY\(0\)/s,
+  );
 });
