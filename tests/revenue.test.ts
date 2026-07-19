@@ -45,6 +45,33 @@ describe("revenue goal calculation", () => {
     expect(result.targetReached).toBe(true);
   });
 
+  test("rounds up all-new-customer need and daily ceiling", () => {
+    expect(
+      calculateRevenueMetrics({
+        ...base,
+        targetMonthlyRevenue: 40_000_001,
+      }),
+    ).toMatchObject({
+      shortfallRevenue: 10_000_001,
+      maxNewCustomers: 401,
+      maxNewCustomersPerDay: 21,
+    });
+  });
+
+  test("treats matching current and target revenue as reached", () => {
+    expect(
+      calculateRevenueMetrics({
+        ...base,
+        targetMonthlyRevenue: base.averageMonthlyRevenue,
+      }),
+    ).toMatchObject({
+      shortfallRevenue: 0,
+      maxNewCustomers: 0,
+      maxNewCustomersPerDay: 0,
+      targetReached: true,
+    });
+  });
+
   test("returns field errors instead of dividing by zero", () => {
     expect(
       validateRevenueInputs({
