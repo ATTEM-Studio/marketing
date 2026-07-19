@@ -27,8 +27,16 @@ type RenderOptions = {
 const numberValue = (form: HTMLFormElement, name: string): number => {
   const value = form.elements.namedItem(name);
   if (!(value instanceof HTMLInputElement)) return 0;
-  return Number(value.value.replaceAll(",", "").trim()) || 0;
+  const parsed = Number(value.value.replaceAll(",", "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
 };
+
+function hasInvalidNumber(form: HTMLFormElement, name: string): boolean {
+  const value = form.elements.namedItem(name);
+  if (!(value instanceof HTMLInputElement)) return true;
+  const normalized = value.value.replaceAll(",", "").trim();
+  return normalized !== "" && !Number.isFinite(Number(normalized));
+}
 
 const nullableNumberValue = (
   form: HTMLFormElement,
@@ -52,10 +60,16 @@ const comparable = (form: HTMLFormElement, name: string) => ({
 });
 
 export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
-  const returningDataStatus = (radioValue(form, "returningDataStatus") ??
-    "unknown") as ReturningDataStatus;
+  const selectedReturningDataStatus = (radioValue(
+    form,
+    "returningDataStatus",
+  ) ?? "unknown") as ReturningDataStatus;
   const hasConnectedVisitHistory =
     radioValue(form, "hasConnectedVisitHistory") === "true";
+  const returningDataStatus =
+    selectedReturningDataStatus === "known" && !hasConnectedVisitHistory
+      ? "unknown"
+      : selectedReturningDataStatus;
   const revenue = {
     averageMonthlyRevenue: numberValue(form, "averageMonthlyRevenue"),
     targetMonthlyRevenue: numberValue(form, "targetMonthlyRevenue"),
@@ -108,7 +122,7 @@ function numberField(name: string, label: string, required = true): string {
 }
 
 function choice(name: string, value: string, label: string): string {
-  return `<label class="choice"><input type="radio" name="${name}" value="${value}" /> ${label}</label>`;
+  return `<label class="choice"><input type="radio" name="${name}" value="${value}" aria-describedby="${name}-error" /> ${label}</label>`;
 }
 
 function choiceGroup(
@@ -116,7 +130,7 @@ function choiceGroup(
   legend: string,
   values: readonly [string, string][],
 ): string {
-  return `<fieldset class="choice-group" data-choice-group="${name}"><legend>${legend}</legend>${values
+  return `<fieldset class="choice-group" data-choice-group="${name}" aria-describedby="${name}-error"><legend>${legend}</legend>${values
     .map(([value, label]) => choice(name, value, label))
     .join(
       "",
@@ -137,8 +151,14 @@ function showStep(root: HTMLElement, step: Step): void {
 function setError(form: HTMLFormElement, name: string, message: string): void {
   const error = form.querySelector<HTMLElement>(`#${name}-error`);
   if (error) error.textContent = message;
-  const control = form.querySelector<HTMLInputElement>(`[name='${name}']`);
-  control?.setAttribute("aria-invalid", "true");
+  form
+    .querySelectorAll<HTMLInputElement>(`[name='${name}']`)
+    .forEach((control) => {
+      control.setAttribute("aria-invalid", "true");
+    });
+  form
+    .querySelector<HTMLElement>(`[data-choice-group='${name}']`)
+    ?.setAttribute("aria-invalid", "true");
 }
 
 function clearErrors(form: HTMLFormElement): void {
@@ -149,6 +169,11 @@ function clearErrors(form: HTMLFormElement): void {
     .querySelectorAll<HTMLInputElement>("[aria-invalid='true']")
     .forEach((input) => {
       input.removeAttribute("aria-invalid");
+    });
+  form
+    .querySelectorAll<HTMLElement>("[data-choice-group][aria-invalid='true']")
+    .forEach((group) => {
+      group.removeAttribute("aria-invalid");
     });
 }
 
@@ -166,6 +191,9 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
       const input = form.elements.namedItem(name);
       if (input instanceof HTMLInputElement && input.value.trim() === "") {
         errors.push({ name, message: "값을 입력해 주세요." });
+      }
+      if (hasInvalidNumber(form, name)) {
+        errors.push({ name, message: "숫자만 입력해 주세요." });
       }
     });
     if (errors.length === 0) {
