@@ -23,11 +23,13 @@
 ### Task 1: Reusable access-code database contract
 
 **Files:**
+
 - Create: `supabase/migrations/202607190007_reusable_access_code.sql`
 - Modify: `supabase/tests/database/rls.test.sql`
 - Modify: `tests/pgtap-contract.test.ts`
 
 **Interfaces:**
+
 - Consumes: `public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)` and `public.finalize_buyer_registration(uuid, text)`.
 - Produces: `invite_codes.is_reusable boolean`, a reusable `DOITNOW` hash row, and reusable-aware versions of both RPCs.
 
@@ -127,10 +129,12 @@ git commit -m "feat: add reusable ebook access code"
 ### Task 2: Edge normalization and reusable hash lookup
 
 **Files:**
+
 - Modify: `supabase/functions/redeem-invite/index.ts`
 - Modify: `tests/invite-edge-contract.test.mjs`
 
 **Interfaces:**
+
 - Consumes: reusable unpeppered hash and existing peppered single-use hash accepted by `reserve_buyer_registration`.
 - Produces: sequential server-side candidate lookup with one generic external error.
 
@@ -205,10 +209,12 @@ git commit -m "feat: validate reusable access codes on server"
 ### Task 3: Korean-aware responsive wrapping
 
 **Files:**
+
 - Modify: `src/styles.css`
 - Modify: `tests/responsive-styles.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing heading, paragraph, card, metric, and form selectors.
 - Produces: word-level Korean wrapping with targeted emergency wrapping for machine tokens.
 
@@ -219,7 +225,9 @@ test("keeps Korean words intact while long machine tokens remain safe", () => {
   expect(css).toContain("word-break: keep-all");
   expect(css).toContain("text-wrap: balance");
   expect(css).toContain("text-wrap: pretty");
-  expect(css).not.toMatch(/h1,\s*\n?h2,\s*\n?h3,[^{]+\{[^}]*overflow-wrap:\s*anywhere/s);
+  expect(css).not.toMatch(
+    /h1,\s*\n?h2,\s*\n?h3,[^{]+\{[^}]*overflow-wrap:\s*anywhere/s,
+  );
   expect(css).toMatch(/\.long-token,[^{]+\{[^}]*overflow-wrap:\s*anywhere/s);
 });
 ```
@@ -288,9 +296,11 @@ git commit -m "fix: keep Korean words intact across layouts"
 ### Task 4: Full verification and production deployment
 
 **Files:**
+
 - Verify: all source, tests, migration, and deployment configuration.
 
 **Interfaces:**
+
 - Consumes: Tasks 1–3.
 - Produces: updated Supabase database/functions, GitHub branch, and Vercel production alias.
 
