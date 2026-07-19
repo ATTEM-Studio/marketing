@@ -332,6 +332,27 @@ test("uses one measurement action and no figures when only actual ad spend is mi
   expect(text()).not.toContain("실제 기준 CAC:");
 });
 
+test("uses exactly one measurement action after target reached when actual ad spend is missing", async () => {
+  await openStepThree("ads");
+  setValue("averageMonthlyRevenue", "40,000,000");
+  choose("adsRunning", "true");
+  setValue("visitConversionRate", "20");
+  setValue("costPerClick", "500");
+  setValue("actualAdNewCustomers", "50");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  const actions = document.querySelectorAll("[data-recommended-action]");
+  expect(actions).toHaveLength(1);
+  expect(actions[0]?.textContent).toContain(
+    "7일 동안 신규 고객의 방문 경로를 기록하세요",
+  );
+  expect(actions[0]?.textContent).not.toContain(
+    "추가 광고보다 남는 매출부터 확인하세요",
+  );
+});
+
 test.each(["-1", "abc", "Infinity", "1e309"])(
   "links and focuses an invalid actual ad spend %s",
   async (value) => {

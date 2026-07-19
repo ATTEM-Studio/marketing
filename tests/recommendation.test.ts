@@ -53,6 +53,23 @@ describe("single action selection", () => {
     ).toBe("measure-acquisition-source");
   });
 
+  test("measures incomplete live ad attribution even after the revenue target is reached", () => {
+    expect(
+      selectAction({
+        ...context,
+        metrics: {
+          ...context.metrics,
+          targetReached: true,
+          shortfallRevenue: 0,
+          maxNewCustomers: 0,
+          maxNewCustomersPerDay: 0,
+        },
+        adsRunning: true,
+        adAttributionKnown: false,
+      }).key,
+    ).toBe("measure-acquisition-source");
+  });
+
   test("does not recommend customer messages without consent", () => {
     expect(
       selectAction({
@@ -74,6 +91,23 @@ describe("single action selection", () => {
           maxNewCustomers: 0,
           maxNewCustomersPerDay: 0,
         },
+      }).key,
+    ).toBe("profit-review");
+  });
+
+  test("protects profit after the target is reached when live ad attribution is complete", () => {
+    expect(
+      selectAction({
+        ...context,
+        metrics: {
+          ...context.metrics,
+          targetReached: true,
+          shortfallRevenue: 0,
+          maxNewCustomers: 0,
+          maxNewCustomersPerDay: 0,
+        },
+        adsRunning: true,
+        adAttributionKnown: true,
       }).key,
     ).toBe("profit-review");
   });

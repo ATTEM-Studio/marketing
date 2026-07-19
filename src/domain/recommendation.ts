@@ -96,10 +96,10 @@ const ACTIONS = {
 export function selectAction(
   context: RecommendationContext,
 ): RecommendedAction {
-  if (context.metrics.targetReached) return ACTIONS["profit-review"];
   if (context.adsRunning && !context.adAttributionKnown) {
     return ACTIONS["measure-acquisition-source"];
   }
+  if (context.metrics.targetReached) return ACTIONS["profit-review"];
   if (context.capacity === "no") {
     return context.canChangeMenu
       ? ACTIONS["average-order-value"]
