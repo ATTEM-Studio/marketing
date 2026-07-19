@@ -175,19 +175,48 @@ export function createSupabaseService(
   const client = createSupabaseClient(url, anonKey);
 
   return {
-    async registerBuyer(input: BuyerRegistration): Promise<void> {
-      const { error } = await client.functions.invoke("redeem-invite", {
-        body: {
-          name: input.name,
-          email: input.email,
-          region: input.region,
-          businessName: input.businessName,
-          inviteCode: input.inviteCode,
-          requiredConsent: input.serviceConsent,
-          marketingConsent: input.marketingConsent,
-        },
-      });
-      if (error) throw new Error(INVITE_ERROR);
+    async registerBuyer(input: BuyerRegistration): Promise<AppSession> {
+      try {
+        const { data: current, error: currentError } =
+          await client.auth.getUser();
+        if (currentError) throw currentError;
+
+        const needsAnonymousUser = current.user?.is_anonymous !== true;
+        if (current.user && needsAnonymousUser) {
+          const { error: signOutError } = await client.auth.signOut();
+          if (signOutError) throw signOutError;
+        }
+        if (needsAnonymousUser) {
+          const { data, error } = await client.auth.signInAnonymously();
+          if (error || !data.user) {
+            throw error ?? new Error("anonymous_auth_failed");
+          }
+        }
+
+        const { error } = await client.functions.invoke("redeem-invite", {
+          body: {
+            name: input.name,
+            email: input.email,
+            region: input.region,
+            businessName: input.businessName,
+            inviteCode: input.inviteCode,
+            requiredConsent: input.serviceConsent,
+            marketingConsent: input.marketingConsent,
+          },
+        });
+        if (error) throw error;
+
+        const session = await this.getSession();
+        if (!session.profile) throw new Error("profile_activation_failed");
+        return session;
+      } catch {
+        try {
+          await client.auth.signOut();
+        } catch {
+          // Best-effort cleanup prevents an invalid code retaining a session.
+        }
+        throw new Error(INVITE_ERROR);
+      }
     },
 
     async sendLoginLink(email: string): Promise<void> {

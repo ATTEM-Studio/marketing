@@ -24,7 +24,7 @@ export function renderLandingShell(
           <span class="brand-symbol" aria-hidden="true">N</span>
           <strong>장사네비게이션</strong>
         </a>
-        ${live ? '<button class="header-login" type="button" data-start-login>기존 사용자 로그인</button>' : '<span class="demo-badge">샘플 모드</span>'}
+        ${live ? '<span class="demo-badge">전자책 구매자 전용</span>' : '<span class="demo-badge">샘플 모드</span>'}
       </header>
       <main id="main" class="landing-shell">
         <section class="hero-copy">
@@ -33,7 +33,6 @@ export function renderLandingShell(
           <p class="hero-description">가게의 현재 수치를 입력하면 목표까지 필요한 고객 수를 계산하고, 지금 먼저 바꿀 행동 하나를 안내합니다.</p>
           <div class="button-row">
             <button type="button" class="primary-cta" ${live ? "data-start-registration" : "data-start-diagnosis"}${available ? "" : " disabled"}>${available ? "내 가게 진단 시작하기" : "운영 연결 준비 중"}</button>
-            ${live ? `<button type="button" class="secondary-cta" data-start-login${available ? "" : " disabled"}>${available ? "기존 사용자 로그인" : "잠시 후 다시 확인해 주세요"}</button>` : ""}
           </div>
           <ul class="trust-list" aria-label="이용 안내">
             <li>약 3분</li>
@@ -58,7 +57,4 @@ export function renderLandingShell(
   root
     .querySelector<HTMLButtonElement>("[data-start-diagnosis]")
     ?.addEventListener("click", callbacks.onDemo);
-  root
-    .querySelectorAll<HTMLButtonElement>("[data-start-login]")
-    .forEach((button) => button.addEventListener("click", callbacks.onLogin));
 }

@@ -7,6 +7,16 @@ const service = (): AppService => ({
   getSession: vi.fn(async () => ({ mode: "live" as const, profile: null })),
   registerBuyer: vi.fn(async (input) => {
     registrationCalls.push(input);
+    return {
+      mode: "live" as const,
+      profile: {
+        id: "buyer-1",
+        name: input.name,
+        email: input.email,
+        region: input.region,
+        businessName: input.businessName,
+      },
+    };
   }),
   sendLoginLink: vi.fn(async () => undefined),
   finalizeRegistration: vi.fn(async () => ({
@@ -38,16 +48,14 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>';
 });
 
-test("opens only the requested onboarding form and lets the buyer switch", () => {
+test("keeps the primary onboarding journey on instant registration", () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
-  renderOnboarding(root, service(), { onAuthenticated: vi.fn() }, "login");
+  renderOnboarding(root, service(), { onAuthenticated: vi.fn() }, "register");
 
-  expect(root.querySelector("[data-login-form]")).not.toBeNull();
-  expect(root.querySelector("[data-registration-form]")).toBeNull();
-  root.querySelector<HTMLButtonElement>("[data-show-register]")?.click();
   expect(root.querySelector("[data-registration-form]")).not.toBeNull();
   expect(root.querySelector("[data-login-form]")).toBeNull();
+  expect(root.querySelector("[data-show-login]")).toBeNull();
 });
 
 test("labels every registration field as required or optional", () => {
@@ -59,10 +67,11 @@ test("labels every registration field as required or optional", () => {
   expect(root.textContent).toContain("선택");
 });
 
-test("keeps marketing consent optional", async () => {
+test("keeps marketing consent optional and enters immediately", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
-  renderOnboarding(root, service(), { onAuthenticated: vi.fn() });
+  const onAuthenticated = vi.fn();
+  renderOnboarding(root, service(), { onAuthenticated });
   set("name", "구매자");
   set("email", "buyer@example.com");
   set("region", "서울");
@@ -77,7 +86,23 @@ test("keeps marketing consent optional", async () => {
     serviceConsent: true,
     marketingConsent: false,
   });
-  expect(document.body.textContent).toContain("이메일을 확인해 주세요");
+  expect(onAuthenticated).toHaveBeenCalledWith(
+    expect.objectContaining({
+      profile: expect.objectContaining({ id: "buyer-1" }),
+    }),
+  );
+});
+
+test("explains that records stay on this device", () => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  renderOnboarding(root, service(), { onAuthenticated: vi.fn() });
+
+  expect(root.textContent).toContain("이 기기에 기록이 저장됩니다");
+  expect(root.textContent).toContain(
+    "다른 기기에서는 이전 기록을 불러올 수 없어요",
+  );
+  expect(root.textContent).toContain("바로 진단 시작하기");
 });
 
 test("requires service consent", () => {

@@ -97,7 +97,7 @@ function registrationScreenMarkup(): string {
           <ol class="mini-journey"><li>구매자 확인</li><li>매장 수치 입력</li><li>오늘의 행동 확인</li></ol>
         </section>
         <section class="form-card" aria-label="신규 가입">
-          <div class="form-card-heading"><div><p class="step-kicker">처음 이용하시나요?</p><h2>구매자 인증하기</h2></div><button type="button" class="text-button" data-show-login>기존 사용자 로그인</button></div>
+          <div class="form-card-heading"><div><p class="step-kicker">처음 이용하시나요?</p><h2>구매자 인증하기</h2></div></div>
           <form data-registration-form novalidate>
             <div class="question-grid registration-grid">
               <div class="field"><label for="name">이름 <span class="required-label">필수</span></label><input id="name" name="name" required aria-describedby="name-error" autocomplete="name" placeholder="홍길동"><p id="name-error" class="field-error"></p></div>
@@ -110,7 +110,8 @@ function registrationScreenMarkup(): string {
               <div class="field consent-field"><label class="choice"><input name="serviceConsent" type="checkbox" aria-describedby="serviceConsent-error"> <span>서비스 이용과 개인정보 처리에 동의합니다. <strong>필수</strong></span></label><p id="serviceConsent-error" class="field-error"></p></div>
               <label class="choice"><input name="marketingConsent" type="checkbox"> <span>새 소식과 마케팅 안내를 받겠습니다. <small>선택</small></span></label>
             </div>
-            <button type="submit" class="primary-action" data-register-submit disabled>이메일 확인 링크 받기</button>
+            <p class="device-storage-note">이 기기에 기록이 저장됩니다. 다른 기기에서는 이전 기록을 불러올 수 없어요.</p>
+            <button type="submit" class="primary-action" data-register-submit disabled>바로 진단 시작하기</button>
           </form>
           <p class="form-status" role="status" aria-live="polite"></p>
         </section>
@@ -175,7 +176,11 @@ function renderConfirmation(
   });
 }
 
-function bindRegistration(root: HTMLElement, service: AppService): void {
+function bindRegistration(
+  root: HTMLElement,
+  service: AppService,
+  callbacks: OnboardingCallbacks,
+): void {
   const form = root.querySelector<HTMLFormElement>("[data-registration-form]");
   const button = root.querySelector<HTMLButtonElement>(
     "[data-register-submit]",
@@ -200,14 +205,12 @@ function bindRegistration(root: HTMLElement, service: AppService): void {
       return;
     }
     button.disabled = true;
-    if (status) status.textContent = "이메일 확인 링크를 보내고 있습니다.";
+    if (status) {
+      status.textContent = "입장 코드를 확인하고 내 공간을 만들고 있어요.";
+    }
     try {
-      await service.registerBuyer(input);
-      if (status) {
-        status.textContent =
-          "이메일을 확인해 주세요. 메일의 링크를 연 뒤 가입을 완료할 수 있습니다.";
-      }
-      form.reset();
+      const session = await service.registerBuyer(input);
+      callbacks.onAuthenticated(session);
     } catch {
       showFieldError(root, "inviteCode", INVITE_ERROR);
       if (status) status.textContent = REGISTER_ERROR;
@@ -275,7 +278,7 @@ export function renderOnboarding(
     root
       .querySelector<HTMLButtonElement>("[data-show-login]")
       ?.addEventListener("click", () => renderView("login"));
-    if (view === "register") bindRegistration(root, service);
+    if (view === "register") bindRegistration(root, service, callbacks);
     else bindLogin(root, service);
   };
 

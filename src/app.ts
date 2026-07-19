@@ -39,7 +39,7 @@ export function createApp(
       root,
       {
         onRegister: () => showOnboarding(false, "register"),
-        onLogin: () => showOnboarding(false, "login"),
+        onLogin: () => showOnboarding(false, "register"),
         onDemo: () => showDiagnosis(),
       },
       { mode: options.isLive ? "live" : "demo" },

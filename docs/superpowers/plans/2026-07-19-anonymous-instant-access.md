@@ -24,11 +24,13 @@
 ### Task 1: Atomic anonymous reader activation
 
 **Files:**
+
 - Create: `supabase/migrations/202607190009_anonymous_reader_activation.sql`
 - Modify: `supabase/tests/database/rls.test.sql`
 - Modify: `tests/pgtap-contract.test.ts`
 
 **Interfaces:**
+
 - Consumes: `invite_codes`, `profiles`, `stores`, `consent_events`, and `auth.users.is_anonymous`.
 - Produces: `public.activate_anonymous_reader(uuid, text, text, text, text, text, boolean, boolean) returns uuid`.
 
@@ -164,11 +166,13 @@ git commit -m "feat: activate anonymous ebook readers atomically"
 ### Task 2: Authenticated Edge activation
 
 **Files:**
+
 - Modify: `supabase/config.toml`
 - Modify: `supabase/functions/redeem-invite/index.ts`
 - Modify: `tests/invite-edge-contract.test.mjs`
 
 **Interfaces:**
+
 - Consumes: an anonymous bearer token and `activate_anonymous_reader(...)` from Task 1.
 - Produces: `{ active: true }` without calling email Auth.
 
@@ -256,6 +260,7 @@ git commit -m "feat: activate readers without email confirmation"
 ### Task 3: Immediate browser session and onboarding UI
 
 **Files:**
+
 - Modify: `src/services/contracts.ts`
 - Modify: `src/services/supabase-service.ts`
 - Modify: `src/ui/onboarding.ts`
@@ -267,6 +272,7 @@ git commit -m "feat: activate readers without email confirmation"
 - Modify: other AppService test fakes reported by TypeScript.
 
 **Interfaces:**
+
 - Changes: `registerBuyer(input: BuyerRegistration): Promise<AppSession>`.
 - Preserves: `getSession`, `signOut`, assessment, action, and legacy callback methods.
 
@@ -280,7 +286,10 @@ test("creates an anonymous session and returns the active profile", async () => 
     data: { user: { id: "anonymous-1", is_anonymous: true } },
     error: null,
   }));
-  mocked.client.functions.invoke = vi.fn(async () => ({ data: { active: true }, error: null }));
+  mocked.client.functions.invoke = vi.fn(async () => ({
+    data: { active: true },
+    error: null,
+  }));
   const service = createSupabaseService("https://example.supabase.co", "anon");
   await expect(service.registerBuyer(registration)).resolves.toMatchObject({
     mode: "live",
@@ -363,9 +372,11 @@ git commit -m "feat: start diagnosis immediately after access"
 ### Task 4: Full verification and production rollout
 
 **Files:**
+
 - Verify: all source, tests, migrations, functions, and deployment configuration.
 
 **Interfaces:**
+
 - Consumes: Tasks 1–3.
 - Produces: enabled anonymous Auth, migration 009, deployed Edge Function, GitHub checks, and Vercel production alias.
 

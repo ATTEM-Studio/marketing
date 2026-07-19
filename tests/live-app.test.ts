@@ -14,7 +14,10 @@ function liveService(signOut = vi.fn(async () => undefined)): AppService {
         businessName: "구매자 식당",
       },
     })),
-    registerBuyer: vi.fn(async () => undefined),
+    registerBuyer: vi.fn(async () => ({
+      mode: "live" as const,
+      profile: null,
+    })),
     sendLoginLink: vi.fn(async () => undefined),
     finalizeRegistration: vi.fn(async () => ({
       mode: "live" as const,

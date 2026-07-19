@@ -416,7 +416,10 @@ test("saves the result action through AppService with its assessment date", asyn
   }));
   const fake: AppService = {
     getSession: vi.fn(async () => ({ mode: "demo" as const, profile: null })),
-    registerBuyer: vi.fn(async () => undefined),
+    registerBuyer: vi.fn(async () => ({
+      mode: "live" as const,
+      profile: null,
+    })),
     sendLoginLink: vi.fn(async () => undefined),
     finalizeRegistration: vi.fn(async () => ({
       mode: "demo" as const,

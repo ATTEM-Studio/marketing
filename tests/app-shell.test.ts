@@ -20,7 +20,7 @@ describe("app shell", () => {
     ).toContain("내 가게 진단 시작하기");
   });
 
-  test("exposes both buyer entry choices on the live landing", () => {
+  test("exposes one clear buyer entry choice on the live landing", () => {
     const root = document.querySelector<HTMLElement>("#app");
     if (!root) throw new Error("missing test root");
     const onRegister = vi.fn();
@@ -32,9 +32,9 @@ describe("app shell", () => {
     );
 
     root.querySelector<HTMLButtonElement>("[data-start-registration]")?.click();
-    root.querySelector<HTMLButtonElement>("[data-start-login]")?.click();
 
     expect(onRegister).toHaveBeenCalledTimes(1);
-    expect(onLogin).toHaveBeenCalledTimes(1);
+    expect(onLogin).not.toHaveBeenCalled();
+    expect(root.querySelector("[data-start-login]")).toBeNull();
   });
 });

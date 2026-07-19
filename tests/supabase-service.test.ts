@@ -1,7 +1,17 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
+type MockClient = {
+  auth: Record<
+    "getUser" | "signInAnonymously" | "signOut",
+    ReturnType<typeof vi.fn>
+  >;
+  functions: Record<"invoke", ReturnType<typeof vi.fn>>;
+  rpc: ReturnType<typeof vi.fn>;
+  from: ReturnType<typeof vi.fn>;
+};
+
 const mocked = vi.hoisted(() => ({
-  client: {} as Record<string, unknown>,
+  client: {} as MockClient,
   createClient: vi.fn(),
 }));
 
@@ -32,6 +42,11 @@ const plans = {
   order: vi.fn(),
   limit: vi.fn(),
 };
+const profiles = {
+  select: vi.fn(),
+  eq: vi.fn(),
+  maybeSingle: vi.fn(),
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -59,22 +74,101 @@ beforeEach(() => {
   plans.eq.mockReturnValue(plans);
   plans.order.mockReturnValue(plans);
   plans.limit.mockReturnValue(plans);
+  profiles.select.mockReturnValue(profiles);
+  profiles.eq.mockReturnValue(profiles);
+  profiles.maybeSingle.mockResolvedValue({
+    data: {
+      id: "user-1",
+      name: "Buyer",
+      email: "buyer@example.com",
+      region: "Seoul",
+      business_name: "Buyer Store",
+    },
+    error: null,
+  });
   mocked.client = {
     auth: {
       getUser: vi.fn(async () => ({
-        data: { user: { id: "user-1" } },
+        data: { user: { id: "user-1", is_anonymous: true } },
         error: null,
       })),
+      signInAnonymously: vi.fn(async () => ({
+        data: { user: { id: "user-1", is_anonymous: true } },
+        error: null,
+      })),
+      signOut: vi.fn(async () => ({ error: null })),
     },
-    functions: { invoke: vi.fn() },
+    functions: {
+      invoke: vi.fn(async () => ({ data: { active: true }, error: null })),
+    },
     rpc: vi.fn(async () => ({ error: null })),
     from: vi.fn((table: string) => {
+      if (table === "profiles") return profiles;
       if (table === "stores") return stores;
       if (table === "action_plans") return plans;
       return assessment;
     }),
   };
   mocked.createClient.mockReturnValue(mocked.client);
+});
+
+test("creates an anonymous session, activates the invite, and returns the live profile", async () => {
+  mocked.client.auth.getUser = vi
+    .fn()
+    .mockResolvedValueOnce({ data: { user: null }, error: null })
+    .mockResolvedValue({
+      data: { user: { id: "user-1", is_anonymous: true } },
+      error: null,
+    });
+  const service = createSupabaseService("https://example.supabase.co", "anon");
+
+  await expect(
+    service.registerBuyer({
+      name: "Buyer",
+      email: "buyer@example.com",
+      region: "Seoul",
+      businessName: "Buyer Store",
+      inviteCode: "DOITNOW",
+      serviceConsent: true,
+      marketingConsent: false,
+    }),
+  ).resolves.toMatchObject({
+    mode: "live",
+    profile: { id: "user-1", email: "buyer@example.com" },
+  });
+
+  expect(mocked.client.auth.signInAnonymously).toHaveBeenCalledTimes(1);
+  expect(mocked.client.functions.invoke).toHaveBeenCalledWith(
+    "redeem-invite",
+    expect.objectContaining({
+      body: expect.objectContaining({ inviteCode: "DOITNOW" }),
+    }),
+  );
+});
+
+test("clears the anonymous session when invite activation fails", async () => {
+  mocked.client.auth.getUser = vi.fn(async () => ({
+    data: { user: null },
+    error: null,
+  }));
+  mocked.client.functions.invoke = vi.fn(async () => ({
+    data: null,
+    error: new Error("invalid"),
+  }));
+  const service = createSupabaseService("https://example.supabase.co", "anon");
+
+  await expect(
+    service.registerBuyer({
+      name: "Buyer",
+      email: "buyer@example.com",
+      region: "Seoul",
+      businessName: "Buyer Store",
+      inviteCode: "WRONG",
+      serviceConsent: true,
+      marketingConsent: false,
+    }),
+  ).rejects.toThrow();
+  expect(mocked.client.auth.signOut).toHaveBeenCalledTimes(1);
 });
 
 test("maps the latest related check-in when action plans are loaded again", async () => {

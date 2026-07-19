@@ -46,7 +46,7 @@ export interface ActionPlanRecord extends ActionPlanDraft {
 
 export interface AppService {
   getSession(): Promise<AppSession>;
-  registerBuyer(input: BuyerRegistration): Promise<void>;
+  registerBuyer(input: BuyerRegistration): Promise<AppSession>;
   sendLoginLink(email: string): Promise<void>;
   finalizeRegistration(): Promise<AppSession>;
   signOut(): Promise<void>;
