@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 
 const databaseTest = readFileSync(
@@ -6,7 +6,7 @@ const databaseTest = readFileSync(
   "utf8",
 );
 const reusableAccessMigration = readFileSync(
-  "supabase/migrations/202607190007_reusable_access_code.sql",
+  "supabase/migrations/202607190008_reusable_access_code.sql",
   "utf8",
 );
 
@@ -43,5 +43,12 @@ describe("pgTAP database contract", () => {
   test("uses Supabase's pgcrypto extension schema explicitly", () => {
     expect(reusableAccessMigration).toContain("extensions.digest(");
     expect(databaseTest).toContain("extensions.digest(");
+  });
+
+  test("keeps every Supabase migration version unique", () => {
+    const versions = readdirSync("supabase/migrations")
+      .filter((name) => name.endsWith(".sql"))
+      .map((name) => name.split("_")[0]);
+    expect(new Set(versions).size).toBe(versions.length);
   });
 });

@@ -24,7 +24,7 @@
 
 **Files:**
 
-- Create: `supabase/migrations/202607190007_reusable_access_code.sql`
+- Create: `supabase/migrations/202607190008_reusable_access_code.sql`
 - Modify: `supabase/tests/database/rls.test.sql`
 - Modify: `tests/pgtap-contract.test.ts`
 
@@ -79,7 +79,7 @@ Run:
 & '.\node_modules\.bin\vitest.cmd' run tests/pgtap-contract.test.ts
 ```
 
-Expected: FAIL because migration `202607190007_reusable_access_code.sql` and reusable assertions do not exist.
+Expected: FAIL because migration `202607190008_reusable_access_code.sql` and reusable assertions do not exist.
 
 - [ ] **Step 3: Add the reusable migration**
 
@@ -120,7 +120,7 @@ Run the same Vitest command. Expected: PASS.
 - [ ] **Step 5: Commit the database unit**
 
 ```powershell
-git add supabase/migrations/202607190007_reusable_access_code.sql supabase/tests/database/rls.test.sql tests/pgtap-contract.test.ts
+git add supabase/migrations/202607190008_reusable_access_code.sql supabase/tests/database/rls.test.sql tests/pgtap-contract.test.ts
 git commit -m "feat: add reusable ebook access code"
 ```
 
@@ -321,7 +321,7 @@ Expected: formatting, typecheck, all Vitest files, security scan, and Vite build
 & '.\node_modules\.bin\supabase.cmd' functions deploy finalize-registration --project-ref ezicpacjcvofzlugflwa
 ```
 
-Expected: migration `202607190007` applied and both functions deployed without errors.
+Expected: migration `202607190008` applied and both functions deployed without errors.
 
 - [ ] **Step 3: Push the existing PR branch**
 
