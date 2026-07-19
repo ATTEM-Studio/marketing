@@ -10,6 +10,10 @@ const finalizeRegistration = readFileSync(
   resolve(process.cwd(), "supabase/functions/finalize-registration/index.ts"),
   "utf8",
 );
+const http = readFileSync(
+  resolve(process.cwd(), "supabase/functions/_shared/http.ts"),
+  "utf8",
+);
 
 describe("invite edge security contract", () => {
   test("fails closed when the deployment-guaranteed client IP header is absent", () => {
@@ -27,5 +31,16 @@ describe("invite edge security contract", () => {
     expect(finalizeRegistration).toContain(
       "must not send this flag or finalize registration automatically",
     );
+  });
+
+  test("allows the Supabase SDK browser preflight headers", () => {
+    for (const header of [
+      "x-supabase-client-platform",
+      "x-supabase-client-platform-version",
+      "x-supabase-client-runtime",
+      "x-supabase-client-runtime-version",
+    ]) {
+      expect(http).toContain(header);
+    }
   });
 });

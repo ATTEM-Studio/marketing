@@ -35,7 +35,7 @@ select like((select prosrc from pg_proc where oid = 'public.save_assessment_with
 select like((select with_check from pg_policies where schemaname = 'public' and tablename = 'assessments' and policyname = 'assessment_owner_insert'), '%access_status = ''active''%', 'assessment INSERT RLS requires an active profile');
 select ok(exists (select 1 from pg_extension where extname = 'pg_cron'), 'pg_cron is installed for scheduled cleanup');
 select ok(exists (select 1 from cron.job where jobname = 'cleanup-expired-buyer-registrations'), 'expired registration cleanup is scheduled');
-select like(obj_description('public.cleanup_expired_buyer_registrations()'::regprocedure, 'pg_proc'), '%30 minutes%', 'cleanup retention contract documents the reservation lifetime');
+select like(obj_description('public.cleanup_expired_buyer_registrations()'::regprocedure, 'pg_proc'), '%35 minutes%', 'cleanup retention contract includes the cron delay');
 select like(obj_description('public.finalize_buyer_registration(uuid, text)'::regprocedure, 'pg_proc'), '%explicit user confirmation%', 'finalization contract prohibits automatic callback completion');
 
 insert into public.invite_attempts (ip_hash, attempted_at)

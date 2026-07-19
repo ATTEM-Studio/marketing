@@ -296,7 +296,7 @@ end;
 $$;
 
 comment on function public.cleanup_expired_buyer_registrations() is
-  'Runs every five minutes. Pending-registration PII and reserved_email are retained for no more than the 30-minute reservation lifetime, then deleted or cleared.';
+  'Runs every five minutes. Pending-registration PII and reserved_email are retained for approximately 35 minutes at most: the 30-minute reservation lifetime plus up to one scheduler interval, then deleted or cleared.';
 
 do $$
 begin
