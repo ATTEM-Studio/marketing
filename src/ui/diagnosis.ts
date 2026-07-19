@@ -163,10 +163,18 @@ function numberField(name: string, label: string, required = true): string {
   const requiredText = required
     ? '<span aria-hidden="true">필수</span>'
     : "선택";
+  const unit = name.toLowerCase().includes("day")
+    ? "일"
+    : name.toLowerCase().includes("rate")
+      ? "%"
+      : name.toLowerCase().includes("count") ||
+          name.toLowerCase().includes("customer")
+        ? "명"
+        : "원";
   return `
     <div class="field">
       <label for="${name}">${label} <small>${requiredText}</small></label>
-      <input id="${name}" name="${name}" inputmode="numeric" aria-describedby="${name}-error" />
+      <div class="input-with-unit"><input id="${name}" name="${name}" inputmode="numeric" aria-describedby="${name}-error" /><span class="field-unit" aria-hidden="true">${unit}</span></div>
       ${renderError(name)}
     </div>`;
 }
@@ -194,7 +202,7 @@ function advertisingFields(): string {
 }
 
 function choice(name: string, value: string, label: string): string {
-  return `<label class="choice"><input type="radio" name="${name}" value="${value}" aria-describedby="${name}-error" /> ${label}</label>`;
+  return `<label class="choice choice-card"><input type="radio" name="${name}" value="${value}" aria-describedby="${name}-error" /><span>${label}</span></label>`;
 }
 
 function choiceGroup(
@@ -217,6 +225,10 @@ function showStep(root: HTMLElement, step: Step): void {
   root.querySelectorAll<HTMLElement>("[data-step]").forEach((panel) => {
     panel.hidden = Number(panel.dataset.step) !== step;
   });
+  const label = root.querySelector<HTMLElement>("[data-step-label]");
+  const progress = root.querySelector<HTMLElement>("[data-progress]");
+  if (label) label.textContent = `${step} / 3`;
+  if (progress) progress.style.width = `${Math.round((step / 3) * 100)}%`;
   root.querySelector<HTMLElement>(`[data-step='${step}'] input`)?.focus();
 }
 
@@ -402,21 +414,31 @@ export function renderDiagnosis(
   options: RenderOptions,
 ): void {
   root.innerHTML = `
-    <header class="site-header"><strong>장사 방향 코치</strong></header>
+    <header class="work-header">
+      <a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>
+      <div class="progress-area">
+        <div class="progress-copy"><span>매장 진단</span><strong data-step-label>1 / 3</strong></div>
+        <div class="progress-track" aria-hidden="true"><span data-progress style="width: 33%"></span></div>
+      </div>
+    </header>
     <main id="main" class="diagnosis-shell">
-      <p class="eyebrow">3단계 목표 진단</p>
-      <h1>숫자를 차례로 확인해 볼게요.</h1>
-      <p>모르는 값은 모른다고 선택해 주세요. 모르는 값을 추정해 단정하지 않습니다.</p>
+      <p class="eyebrow">내 가게 숫자 점검</p>
+      <h1>아는 수치부터 차례로 확인해 볼게요.</h1>
+      <p class="page-description">모르는 값은 편하게 모른다고 선택해 주세요. 확인되지 않은 값은 추정해 단정하지 않습니다.</p>
       <form data-diagnosis-form novalidate>
-        <fieldset data-step="1"><legend>1. 매출 목표</legend>
-          ${numberField("averageMonthlyRevenue", "최근 월평균 매출")}
-          ${numberField("targetMonthlyRevenue", "목표 월매출")}
-          ${numberField("averageOrderValue", "평균 객단가")}
-          ${numberField("operatingDays", "월 영업일")}
+        <fieldset class="step-panel" data-step="1"><legend><span>1단계</span> 매출 목표</legend>
+          <p class="step-description">현재 위치와 목표를 입력하면 필요한 고객 수의 기준을 계산합니다.</p>
+          <div class="question-grid">
+            ${numberField("averageMonthlyRevenue", "최근 월평균 매출")}
+            ${numberField("targetMonthlyRevenue", "목표 월매출")}
+            ${numberField("averageOrderValue", "평균 객단가")}
+            ${numberField("operatingDays", "월 영업일")}
+          </div>
           ${allocationFields()}
-          <button type="button" data-next-step>다음</button>
+          <div class="form-actions form-actions-end"><button type="button" data-next-step>고객 상황 확인하기</button></div>
         </fieldset>
-        <fieldset data-step="2" hidden><legend>2. 현재 고객 상황</legend>
+        <fieldset class="step-panel" data-step="2" hidden><legend><span>2단계</span> 현재 고객 상황</legend>
+          <p class="step-description">알고 있는 고객 수와 지금 가장 궁금한 지점을 선택해 주세요.</p>
           ${choiceGroup(
             "monthlyCustomerCountStatus",
             "월 고객 수를 알고 있나요?",
@@ -433,9 +455,10 @@ export function renderDiagnosis(
             ["returning", "재방문"],
             ["unknown", "모르겠어요"],
           ])}
-          <div class="button-row"><button type="button" data-prev-step>이전</button><button type="button" data-next-step>다음</button></div>
+          <div class="form-actions"><button type="button" class="secondary-action" data-prev-step>이전</button><button type="button" data-next-step>실행 조건 확인하기</button></div>
         </fieldset>
-        <fieldset data-step="3" hidden><legend>3. 실행 조건</legend>
+        <fieldset class="step-panel" data-step="3" hidden><legend><span>3단계</span> 실행 조건</legend>
+          <p class="step-description">지금 실제로 바꿀 수 있는 범위를 확인해 실행 가능한 행동을 고릅니다.</p>
           ${choiceGroup("capacity", "추가 고객을 받을 여력이 있나요?", [
             ["yes", "있어요"],
             ["sometimes", "시간대에 따라 달라요"],
@@ -444,7 +467,7 @@ export function renderDiagnosis(
           ${choiceGroup("returningDataStatus", "재방문 데이터 상태", [
             ["known", "연결된 방문 이력으로 확인했어요"],
             ["sampled", "일부만 확인했어요"],
-            ["unknown", "모르겠어요"],
+            ["unknown", "잘 모르겠어요 — 신규 고객 기준으로 계산할게요"],
           ])}
           ${choiceGroup(
             "hasConsentDb",
@@ -474,7 +497,7 @@ export function renderDiagnosis(
           <details><summary>비교할 수치가 있으면 더 입력하기 (선택)</summary>
             ${detailsFields("exposure", "노출")}${detailsFields("click", "클릭")}${detailsFields("visit", "방문")}${detailsFields("averageOrderValueMetric", "객단가")}${detailsFields("returning", "재방문")}
           </details>
-          <div class="button-row"><button type="button" data-prev-step>이전</button><button type="submit" data-submit-diagnosis>결과 보기</button></div>
+          <div class="form-actions"><button type="button" class="secondary-action" data-prev-step>이전</button><button type="submit" data-submit-diagnosis>내 가게 결과 보기</button></div>
           <p data-save-status class="form-status" role="status" aria-live="polite"></p>
         </fieldset>
       </form>

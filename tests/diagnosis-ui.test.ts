@@ -46,6 +46,40 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>';
 });
 
+test("shows a readable three-step progress indicator", async () => {
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing test root");
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+
+  expect(root.querySelector("[data-step-label]")?.textContent).toBe("1 / 3");
+  expect(root.querySelector<HTMLElement>("[data-progress]")?.style.width).toBe(
+    "33%",
+  );
+
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "25,000");
+  setValue("operatingDays", "20");
+  click("[data-next-step]");
+
+  expect(root.querySelector("[data-step-label]")?.textContent).toBe("2 / 3");
+  expect(root.querySelector<HTMLElement>("[data-progress]")?.style.width).toBe(
+    "67%",
+  );
+});
+
+test("treats unknown returning data as a normal selectable card", async () => {
+  const root = await openStepThree();
+  const unknown = root.querySelector<HTMLInputElement>(
+    "[name='returningDataStatus'][value='unknown']",
+  );
+
+  expect(unknown?.closest(".choice-card")?.textContent).toContain(
+    "잘 모르겠어요",
+  );
+});
+
 test("completes the three-step all-new-customer ceiling flow", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing test root");
