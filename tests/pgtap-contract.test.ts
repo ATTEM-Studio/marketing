@@ -9,6 +9,10 @@ const reusableAccessMigration = readFileSync(
   "supabase/migrations/202607190008_reusable_access_code.sql",
   "utf8",
 );
+const anonymousActivationMigration = readFileSync(
+  "supabase/migrations/202607190009_anonymous_reader_activation.sql",
+  "utf8",
+);
 
 describe("pgTAP database contract", () => {
   test("uses unambiguous schema table assertions", () => {
@@ -55,6 +59,17 @@ describe("pgTAP database contract", () => {
   test("uses the unambiguous four-argument pgTAP column assertion", () => {
     expect(databaseTest).toMatch(
       /has_column\(\s*'public'::name,\s*'invite_codes'::name,\s*'is_reusable'::name,\s*'invite codes support reusable access'\s*\)/s,
+    );
+  });
+
+  test("activates anonymous readers without treating lead email as identity", () => {
+    expect(anonymousActivationMigration).toContain("activate_anonymous_reader");
+    expect(anonymousActivationMigration).toContain("is_anonymous");
+    expect(anonymousActivationMigration).toContain(
+      "drop constraint profiles_email_key",
+    );
+    expect(databaseTest).toContain(
+      "duplicate lead emails remain isolated by auth user id",
     );
   });
 });

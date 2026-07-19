@@ -1,6 +1,6 @@
 begin;
 
-select plan(103);
+select plan(111);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
@@ -19,6 +19,7 @@ select has_function('public', 'reserve_buyer_registration', array['text', 'text'
 select has_function('public', 'consume_invite_attempt', array['text']);
 select has_function('public', 'cleanup_expired_buyer_registrations', array[]::text[]);
 select has_function('public', 'complete_action_plan', array['uuid', 'text', 'text', 'text']);
+select has_function('public', 'activate_anonymous_reader', array['uuid', 'text', 'text', 'text', 'text', 'text', 'boolean', 'boolean']);
 select policies_are('public', 'assessments', array['assessment_owner_select']);
 select policies_are('public', 'goals', array['goal_owner_select']);
 select policies_are('public', 'action_plans', array['action_owner_select', 'action_owner_insert', 'action_owner_update']);
@@ -53,12 +54,15 @@ select ok(not has_table_privilege('authenticated', 'public.goals', 'delete'), 'a
 select ok(not has_function_privilege('authenticated', 'public.finalize_buyer_registration(uuid, text)', 'execute'), 'only server can finalize registration');
 select ok(not has_function_privilege('authenticated', 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)', 'execute'), 'only server can reserve an invite');
 select ok(not has_function_privilege('authenticated', 'public.cleanup_expired_buyer_registrations()', 'execute'), 'only server can clean expired PII');
+select ok(not has_function_privilege('authenticated', 'public.activate_anonymous_reader(uuid, text, text, text, text, text, boolean, boolean)', 'execute'), 'only the server activates an anonymous reader');
 select ok(has_function_privilege('authenticated', 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)', 'execute'), 'active authenticated buyers can save an assessment through the RPC');
 select is((select prosecdef from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), true, 'finalizer is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'reservation is security definer');
+select is((select prosecdef from pg_proc where oid = 'public.activate_anonymous_reader(uuid, text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'anonymous activation is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), true, 'action completion is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), true, 'assessment save is security definer');
 select alike((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%search_path=public%', 'finalizer pins search path');
+select alike((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.activate_anonymous_reader(uuid, text, text, text, text, text, boolean, boolean)'::regprocedure), '%search_path=public%', 'anonymous activation pins search path');
 select alike((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.complete_action_plan(uuid, text, text, text)'::regprocedure), '%search_path=public%', 'action completion pins search path');
 select alike((select array_to_string(proconfig, ',') from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%search_path=public%', 'assessment save pins search path');
 select alike((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%for update%', 'reservation locks its rows atomically');
@@ -76,6 +80,14 @@ select alike(obj_description('public.cleanup_expired_buyer_registrations()'::reg
 select alike(obj_description('public.finalize_buyer_registration(uuid, text)'::regprocedure, 'pg_proc'), '%explicit user confirmation%', 'finalization contract prohibits automatic callback completion');
 select alike((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.is_reusable%', 'registration supports reusable access codes');
 select alike((select prosrc from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), '%if not v_invite.is_reusable then%', 'finalization does not redeem reusable access codes');
+select ok(not exists (
+  select 1 from pg_constraint
+  where conrelid = 'public.profiles'::regclass
+    and contype = 'u'
+    and pg_get_constraintdef(oid) = 'UNIQUE (email)'
+), 'lead email is not an authentication key');
+select alike((select prosrc from pg_proc where oid = 'public.activate_anonymous_reader(uuid, text, text, text, text, text, boolean, boolean)'::regprocedure), '%is_anonymous%', 'activation requires an anonymous auth user');
+select alike((select prosrc from pg_proc where oid = 'public.activate_anonymous_reader(uuid, text, text, text, text, text, boolean, boolean)'::regprocedure), '%if not v_invite.is_reusable then%', 'activation consumes only single-use codes');
 select is((select count(*) from public.invite_codes where is_reusable and code_hash = encode(extensions.digest('DOITNOW', 'sha256'), 'hex')), 1::bigint, 'DOITNOW is seeded once as a reusable normalized hash');
 select ok(
   public.reserve_buyer_registration(encode(extensions.digest('DOITNOW', 'sha256'), 'hex'), 'reader-one@example.test', 'reader one', 'seoul', 'store one', true, false),
@@ -90,6 +102,14 @@ select is(
   'available',
   'the reusable code remains available after multiple reservations'
 );
+
+insert into auth.users (id, is_anonymous)
+values
+  ('88888888-8888-8888-8888-888888888888', true),
+  ('99999999-9999-9999-9999-999999999999', true);
+select public.activate_anonymous_reader('88888888-8888-8888-8888-888888888888', encode(extensions.digest('DOITNOW', 'sha256'), 'hex'), 'reader one', 'shared@example.test', 'seoul', 'store one', true, false);
+select public.activate_anonymous_reader('99999999-9999-9999-9999-999999999999', encode(extensions.digest('DOITNOW', 'sha256'), 'hex'), 'reader two', 'shared@example.test', 'busan', 'store two', true, false);
+select is((select count(*) from public.profiles where email = 'shared@example.test'), 2::bigint, 'duplicate lead emails remain isolated by auth user id');
 
 insert into public.invite_attempts (ip_hash, attempted_at)
 select repeat('a', 64), now() - interval '14 minutes 59 seconds'
