@@ -13,8 +13,16 @@ const serverSecretNames = [
   "SUPABASE_DB_PASSWORD",
   "SUPABASE_JWT_SECRET",
 ];
+const serverSecretIndicators = [
+  "OPENAI_API_KEY",
+  "SERVICE_ROLE",
+  "INVITE_HASH_PEPPER",
+  "SUPABASE_ACCESS_TOKEN",
+  "SUPABASE_DB_PASSWORD",
+  "SUPABASE_JWT_SECRET",
+];
 const disallowedViteSecret = new RegExp(
-  `\\bVITE_(?:${serverSecretNames.join("|")})\\b`,
+  `\\bVITE_[A-Z0-9_]*(?:${serverSecretIndicators.join("|")})[A-Z0-9_]*\\b`,
 );
 const serverSecretAssignment = new RegExp(
   `(?:"|')?\\b(?:${serverSecretNames.join("|")})\\b(?:"|')?[\\t ]*(?:=|:)[\\t ]*(?:"([^"]*)"|'([^']*)'|([^\\s,;#]+))`,

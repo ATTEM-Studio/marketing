@@ -138,4 +138,45 @@ describe("security scan", () => {
       ),
     ).toHaveLength(2);
   });
+
+  test("rejects renamed Vite variables that retain server-secret indicators", () => {
+    const backupOpenAiName = ["VITE", "BACKUP", "OPENAI", "API", "KEY"].join(
+      "_",
+    );
+    const internalServiceRoleName = [
+      "VITE",
+      "INTERNAL",
+      "SERVICE",
+      "ROLE",
+      "TOKEN",
+    ].join("_");
+    const findings = securityScan.findSecretExposures([
+      { file: "backup.env", source: `${backupOpenAiName}=placeholder` },
+      {
+        file: "internal.env",
+        source: `${internalServiceRoleName}=placeholder`,
+      },
+    ]);
+
+    expect(
+      findings.filter((finding) =>
+        finding.includes("Vite secret variable name"),
+      ),
+    ).toHaveLength(2);
+  });
+
+  test("allows the documented public Vite variables", () => {
+    const findings = securityScan.findSecretExposures([
+      {
+        file: ".env.example",
+        source: [
+          "VITE_APP_MODE=live",
+          "VITE_SUPABASE_URL=https://example.supabase.co",
+          "VITE_SUPABASE_ANON_KEY=publishable-placeholder",
+        ].join("\n"),
+      },
+    ]);
+
+    expect(findings).toEqual([]);
+  });
 });

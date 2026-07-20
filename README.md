@@ -93,6 +93,14 @@ values ('<paste-local-sha256-hash>', 'available', now() + interval '30 days');
 
 ### Vercel 환경 변수와 배포 범위
 
+라이브 브라우저 빌드에는 다음 세 공개 변수가 필요합니다. 세 변수 모두 Vercel의 **Preview**와 **Production** 범위에 설정하고, `VITE_APP_MODE` 값은 `live`로 둡니다.
+
+- `VITE_APP_MODE=live`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+아래 네 변수는 공개 변수와 분리된 서버 전용 설정입니다.
+
 서버 함수에는 다음 네 변수가 필요합니다. 값은 Vercel 환경 변수에만 저장하고 저장소, 브라우저 번들, 빌드 로그에 남기지 않습니다.
 
 - `SUPABASE_URL`
@@ -100,7 +108,7 @@ values ('<paste-local-sha256-hash>', 'available', now() + interval '30 days');
 - `OPENAI_API_KEY`
 - `OPENAI_COACHING_MODEL`
 
-네 변수 모두 Vercel의 **Preview**와 **Production** 범위에 각각 존재해야 합니다. Preview에는 가능하면 별도 테스트 데이터 경계를 사용합니다. 브라우저에 공개할 수 있는 설정은 기존 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`뿐이며, 서비스 역할 키나 OpenAI 키 이름에 `VITE_` 접두사를 붙이지 않습니다. 변수를 추가하거나 바꾸면 기존 배포에는 반영되지 않으므로 새 Preview를 만든 뒤 검증하고, 같은 검증된 아티팩트를 Production으로 승격합니다.
+서버 전용 네 변수도 Vercel의 **Preview**와 **Production** 범위에 각각 존재해야 합니다. Preview에는 가능하면 별도 테스트 데이터 경계를 사용합니다. 브라우저에 공개할 수 있는 설정은 위의 `VITE_APP_MODE`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`뿐이며, 서비스 역할 키나 OpenAI 키 이름에 `VITE_` 접두사를 붙이지 않습니다. 변수를 추가하거나 바꾸면 기존 배포에는 반영되지 않으므로 새 Preview를 만든 뒤 검증하고, 같은 검증된 아티팩트를 Production으로 승격합니다.
 
 ### 사용 제한과 안전한 응답
 
