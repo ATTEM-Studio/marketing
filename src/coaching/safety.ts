@@ -6,6 +6,8 @@ export interface SafetyResult {
 }
 
 const phonePattern = /(?:\+?82[-.\s]?)?0?1[016789](?:[-.\s]?\d{3,4}){2}/giu;
+const businessPhonePattern =
+  /(?:\+?82[-.\s]?)?0(?:2|[3-6][1-5]|70|80)(?:[-.\s]?\d{3,4}){2}/giu;
 const emailPattern =
   /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+/giu;
 const namedOwnerPattern = /[가-힣]{1,4}(?:사장님?|대표님?)/gu;
@@ -20,6 +22,7 @@ const labeledOwnerNamePattern =
 const sourceLinePattern =
   /(?:^|\n)\s*(?:전자책\s*원문|출처|source|file|파일)\s*[:：][^\n]*/gimu;
 const sourceLabelPattern = /(?:출처|source|file|파일)\s*[:：][^\n]*/gimu;
+const ebookSourcePattern = /전자책\s*원문\s*[:：][^\n]*/gu;
 const ebookPhrasePattern = /전자책\s*원문/gu;
 
 function normalized(question: string): string {
@@ -29,10 +32,12 @@ function normalized(question: string): string {
 export function sanitizeQuestion(question: string): string {
   return question
     .replace(sourceLinePattern, "\n")
+    .replace(ebookSourcePattern, "")
     .replace(sourceLabelPattern, "")
     .replace(ebookPhrasePattern, "")
     .replace(emailPattern, "")
     .replace(phonePattern, "")
+    .replace(businessPhonePattern, "")
     .replace(namedOwnerPattern, "")
     .replace(ownerNamePattern, "")
     .replace(labeledOwnerNamePattern, "$1")
