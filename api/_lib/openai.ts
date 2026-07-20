@@ -64,6 +64,42 @@ export interface ComposeCoachingInput {
   context: CoachingContext;
 }
 
+export const coachingNarrativeTemplates = {
+  situation: {
+    action_ready: "현재 진단에서 바로 실행할 수 있는 행동을 선택했습니다.",
+    measurement_gap:
+      "현재 기록만으로 단정하지 않고 먼저 측정이 필요한 상황입니다.",
+    focused_experiment:
+      "저장된 진단을 바탕으로 한 가지 행동을 작게 시험할 상황입니다.",
+  },
+  stage: {
+    discovery: "발견 단계",
+    selection: "선택 단계",
+    confidence: "신뢰 단계",
+    visit: "방문 단계",
+    returning: "재방문 단계",
+    profit: "수익 단계",
+    unknown: "확인 단계",
+  },
+  disclaimer: {
+    none: null,
+    test_and_measure: "작게 실행한 뒤 저장된 지표로 결과를 확인하세요.",
+    no_guarantee: "결과를 보장하지 않으며 실제 기록으로 확인해야 합니다.",
+  },
+} as const;
+
+type SituationKey = keyof typeof coachingNarrativeTemplates.situation;
+type StageKey = keyof typeof coachingNarrativeTemplates.stage;
+type DisclaimerKey = keyof typeof coachingNarrativeTemplates.disclaimer;
+
+const situationKeys = Object.keys(
+  coachingNarrativeTemplates.situation,
+) as SituationKey[];
+const stageKeys = Object.keys(coachingNarrativeTemplates.stage) as StageKey[];
+const disclaimerKeys = Object.keys(
+  coachingNarrativeTemplates.disclaimer,
+) as DisclaimerKey[];
+
 const intents: readonly CoachingIntent[] = [
   "discovery",
   "selection",
@@ -120,11 +156,11 @@ const coachingResponseSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    situation: { type: "string" },
-    stage: { type: "string" },
-    disclaimer: { type: ["string", "null"] },
+    situationKey: { type: "string", enum: situationKeys },
+    stageKey: { type: "string", enum: stageKeys },
+    disclaimerKey: { type: "string", enum: disclaimerKeys },
   },
-  required: ["situation", "stage", "disclaimer"],
+  required: ["situationKey", "stageKey", "disclaimerKey"],
 } as const;
 
 const signalPatterns: readonly [ProviderQuestionSignal, RegExp][] = [
@@ -298,47 +334,35 @@ function validateIntentResult(value: unknown): IntentResult {
   };
 }
 
-function containsProviderAuthority(value: string): boolean {
-  return (
-    /\d/gu.test(value) ||
-    /(?:한|두|세|네|열)\s*(?:배|개|명|원|퍼센트)/gu.test(value) ||
-    /보장|guarantee|100\s*%|확실(?:히|하게)|반드시.{0,16}(?:증가|상승|개선)/iu.test(
-      value,
-    )
-  );
-}
-
 function validateCoachingResponse(
   value: unknown,
   input: ComposeCoachingInput,
 ): CoachingResponse {
-  const keys = ["situation", "stage", "disclaimer"] as const;
+  const keys = ["situationKey", "stageKey", "disclaimerKey"] as const;
   if (
     !isRecord(value) ||
     !hasOnlyKeys(value, keys) ||
-    typeof value.situation !== "string" ||
-    typeof value.stage !== "string" ||
-    (value.disclaimer !== undefined &&
-      value.disclaimer !== null &&
-      typeof value.disclaimer !== "string") ||
-    [value.situation, value.stage, value.disclaimer]
-      .filter((item): item is string => typeof item === "string")
-      .some(containsProviderAuthority)
+    !situationKeys.includes(value.situationKey as SituationKey) ||
+    !stageKeys.includes(value.stageKey as StageKey) ||
+    !disclaimerKeys.includes(value.disclaimerKey as DisclaimerKey)
   ) {
     throw new Error("INVALID_COACHING_RESPONSE");
   }
 
+  const situationKey = value.situationKey as SituationKey;
+  const stageKey = value.stageKey as StageKey;
+  const disclaimerKey = value.disclaimerKey as DisclaimerKey;
+  const disclaimer = coachingNarrativeTemplates.disclaimer[disclaimerKey];
+
   return {
-    situation: value.situation,
-    stage: value.stage,
+    situation: coachingNarrativeTemplates.situation[situationKey],
+    stage: coachingNarrativeTemplates.stage[stageKey],
     evidence: [...input.evidence],
     actionTitle: input.action.title,
     steps: [...input.action.steps],
     metric: input.action.metric,
     avoid: input.action.avoid,
-    ...(typeof value.disclaimer === "string"
-      ? { disclaimer: value.disclaimer }
-      : {}),
+    ...(disclaimer ? { disclaimer } : {}),
   };
 }
 
@@ -368,6 +392,11 @@ export async function composeCoachingResponse(
 ): Promise<CoachingResponse> {
   const approvedPrompt = {
     questionSignals: input.questionSignals,
+    candidateKeys: {
+      situation: situationKeys,
+      stage: stageKeys,
+      disclaimer: disclaimerKeys,
+    },
     action: {
       title: input.action.title,
       intent: input.action.intent,
@@ -384,7 +413,7 @@ export async function composeCoachingResponse(
       {
         role: "system",
         content:
-          "승인된 행동과 근거를 짧고 자연스러운 한국어로만 구성하세요. 새 행동, 새 수치, 보장 표현을 만들지 마세요.",
+          "문장을 작성하지 말고 제공된 후보 키만 선택하세요. 다른 키나 텍스트를 만들지 마세요.",
       },
       { role: "user", content: JSON.stringify(approvedPrompt) },
     ],

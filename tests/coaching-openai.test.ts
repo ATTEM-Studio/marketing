@@ -4,6 +4,7 @@ import type { CoachingContext } from "../src/coaching/types";
 import {
   buildProviderQuestionSignals,
   classifyQuestion,
+  coachingNarrativeTemplates,
   composeCoachingResponse,
   type ComposeCoachingInput,
 } from "../api/_lib/openai";
@@ -24,9 +25,9 @@ const context: CoachingContext = {
   completedActionKeys: [],
 };
 const validNarrative = {
-  situation: "현재 진단에서 검색 노출을 먼저 확인할 필요가 있습니다.",
-  stage: "발견 단계",
-  disclaimer: null,
+  situationKey: "action_ready",
+  stageKey: "discovery",
+  disclaimerKey: "none",
 };
 const questionSignals = {
   concernKey: "not_visible" as const,
@@ -107,10 +108,13 @@ describe("OpenAI coaching adapter authority", () => {
     expect(body.text.format.type).toBe("json_schema");
     expect(body.text.format.strict).toBe(true);
     expect(Object.keys(body.text.format.schema.properties).sort()).toEqual([
-      "disclaimer",
-      "situation",
-      "stage",
+      "disclaimerKey",
+      "situationKey",
+      "stageKey",
     ]);
+    expect(body.text.format.schema.properties.situationKey.enum).toEqual(
+      Object.keys(coachingNarrativeTemplates.situation),
+    );
   });
 
   it("constructs every authoritative field from approved server data", async () => {
@@ -122,8 +126,8 @@ describe("OpenAI coaching adapter authority", () => {
     });
 
     expect(result).toEqual({
-      situation: validNarrative.situation,
-      stage: validNarrative.stage,
+      situation: coachingNarrativeTemplates.situation.action_ready,
+      stage: coachingNarrativeTemplates.stage.discovery,
       evidence: input.evidence,
       actionTitle: action.title,
       steps: action.steps,
@@ -133,13 +137,17 @@ describe("OpenAI coaching adapter authority", () => {
   });
 
   it.each([
-    ["evidence", ["AI가 만든 근거"]],
-    ["actionTitle", "AI가 만든 행동"],
-    ["steps", ["AI가 만든 단계"]],
-    ["metric", "AI가 만든 지표"],
-    ["avoid", "AI가 만든 금지 행동"],
+    ["situationKey", "다섯 배"],
+    ["situationKey", "may double"],
+    ["stageKey", "확정"],
+    ["disclaimerKey", "will definitely improve"],
+    ["evidence", ["provider evidence"]],
+    ["actionTitle", "provider action"],
+    ["steps", ["provider step"]],
+    ["metric", "provider metric"],
+    ["avoid", "provider avoid"],
   ])(
-    "rejects a provider-authored %s field even without numbers",
+    "rejects provider-authored text or authority in %s",
     async (key, value) => {
       const fetcher = vi
         .fn()
@@ -151,36 +159,28 @@ describe("OpenAI coaching adapter authority", () => {
     },
   );
 
-  it.each(["situation", "stage", "disclaimer"] as const)(
-    "rejects a guaranteed-result claim in provider-writable %s",
-    async (key) => {
-      const fetcher = vi.fn().mockResolvedValue(
-        okResponse({
-          ...validNarrative,
-          [key]: "매출 상승을 반드시 보장합니다.",
-        }),
-      );
+  it("maps every returned narrative string from the closed server templates", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      okResponse({
+        situationKey: "measurement_gap",
+        stageKey: "visit",
+        disclaimerKey: "test_and_measure",
+      }),
+    );
 
-      await expect(
-        composeCoachingResponse(input, { fetcher, apiKey: "test-key" }),
-      ).rejects.toThrow("INVALID_COACHING_RESPONSE");
-    },
-  );
+    const result = await composeCoachingResponse(input, {
+      fetcher,
+      apiKey: "test-key",
+    });
 
-  it.each(["situation", "stage", "disclaimer"] as const)(
-    "rejects provider-authored numbers in %s",
-    async (key) => {
-      const fetcher = vi
-        .fn()
-        .mockResolvedValue(
-          okResponse({ ...validNarrative, [key]: "매출이 10배 늘어납니다." }),
-        );
-
-      await expect(
-        composeCoachingResponse(input, { fetcher, apiKey: "test-key" }),
-      ).rejects.toThrow("INVALID_COACHING_RESPONSE");
-    },
-  );
+    expect(result.situation).toBe(
+      coachingNarrativeTemplates.situation.measurement_gap,
+    );
+    expect(result.stage).toBe(coachingNarrativeTemplates.stage.visit);
+    expect(result.disclaimer).toBe(
+      coachingNarrativeTemplates.disclaimer.test_and_measure,
+    );
+  });
 });
 
 describe("fail-closed provider question signals", () => {

@@ -37,6 +37,77 @@ describe("coaching admin atomic RPC interface", () => {
     );
   });
 
+  it("maps the exact pending key, answer payload, context, and answers to consume", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    const admin = createSupabaseAdmin({ rpc } as never);
+    const context = { assessmentId: "assessment-1" } as never;
+    const answers = { customer_consent: "yes" };
+    const answerPayload = {
+      kind: "follow_up_answer",
+      answer: { questionKey: "customer_consent", value: "yes" },
+    };
+
+    await expect(
+      admin.consumeFollowUp({
+        userId: "user-1",
+        sessionId: "session-1",
+        questionKey: "customer_consent",
+        answerPayload,
+        context,
+        answers,
+      }),
+    ).resolves.toBe(true);
+    expect(rpc).toHaveBeenCalledWith("consume_coaching_follow_up", {
+      p_user_id: "user-1",
+      p_session_id: "session-1",
+      p_question_key: "customer_consent",
+      p_answer_payload: answerPayload,
+      p_context: context,
+      p_answers: answers,
+    });
+  });
+
+  it("maps every authoritative recommendation and response field to finalization", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        recommendationId: "recommendation-1",
+        response: coachingResponse,
+        created: true,
+      },
+      error: null,
+    });
+    const admin = createSupabaseAdmin({ rpc } as never);
+    const context = { assessmentId: "assessment-1" } as never;
+    const answers = { customer_consent: "yes" };
+    const metricSnapshot = { targetRevenue: 10_000_000 };
+
+    await admin.finalizeSession({
+      userId: "user-1",
+      sessionId: "session-1",
+      actionKey: "local-discovery",
+      actionVersion: 3,
+      evidenceKeys: ["targetRevenue"],
+      metricSnapshot,
+      response: coachingResponse,
+      context,
+      answers,
+      answeredAt: "2026-07-21T00:00:00.000Z",
+    });
+
+    expect(rpc).toHaveBeenCalledWith("finalize_coaching_session", {
+      p_user_id: "user-1",
+      p_session_id: "session-1",
+      p_action_key: "local-discovery",
+      p_action_version: 3,
+      p_evidence_keys: ["targetRevenue"],
+      p_metric_snapshot: metricSnapshot,
+      p_response: coachingResponse,
+      p_context: context,
+      p_answers: answers,
+      p_answered_at: "2026-07-21T00:00:00.000Z",
+    });
+  });
+
   it("treats a partial finalization RPC result as a failed CAS", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: { recommendationId: "recommendation-1" },

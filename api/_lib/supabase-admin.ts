@@ -1,6 +1,29 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { calculateRevenueMetrics } from "../../src/domain/revenue";
-import type { RevenueInputs } from "../../src/domain/types";
+import { selectBottleneck } from "../../src/domain/bottleneck";
+import { selectAction } from "../../src/domain/recommendation";
+import {
+  analyzeRestaurantOperations,
+  resolveEffectiveCapacity,
+  validateRestaurantOperations,
+} from "../../src/domain/restaurant";
+import {
+  allocationNewCustomerTarget,
+  calculateAdvertisingMetrics,
+  calculateRevenueMetrics,
+  validateAdvertisingInputs,
+  validateGoalAllocation,
+} from "../../src/domain/revenue";
+import type {
+  AdvertisingInputs,
+  BottleneckInputs,
+  Capacity,
+  GoalAllocation,
+  GoalAllocationInput,
+  PrimaryConcern,
+  RestaurantOperationsInput,
+  ReturningDataStatus,
+  RevenueInputs,
+} from "../../src/domain/types";
 import type {
   CoachingAssessmentRecord,
   CoachingContextSource,
@@ -163,6 +186,38 @@ function comparableMetric(value: unknown): boolean {
   );
 }
 
+function jsonEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => jsonEqual(value, right[index]))
+    );
+  }
+  if (
+    left === null ||
+    right === null ||
+    typeof left !== "object" ||
+    typeof right !== "object"
+  ) {
+    return false;
+  }
+  const leftRecord = left as Row;
+  const rightRecord = right as Row;
+  const leftKeys = Object.keys(leftRecord).sort();
+  const rightKeys = Object.keys(rightRecord).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key, index) =>
+        key === rightKeys[index] &&
+        jsonEqual(leftRecord[key], rightRecord[key]),
+    )
+  );
+}
+
 export function isCompletedPersistedAssessment(
   row: Row,
   goalValue?: Row | null,
@@ -200,7 +255,7 @@ export function isCompletedPersistedAssessment(
         allocation.returningCustomerRevenue,
         allocation.averageOrderValueRevenue,
       ].every((value) => finite(value) && (value as number) >= 0));
-  return (
+  const shapeValid =
     [
       revenue.averageMonthlyRevenue,
       revenue.targetMonthlyRevenue,
@@ -346,7 +401,80 @@ export function isCompletedPersistedAssessment(
     oneOf(diagnosisBottleneck.status, ["known", "stable", "insufficient"]) &&
     nullableFinite(diagnosisBottleneck.changeRate) &&
     typeof diagnosisBottleneck.reason === "string" &&
-    oneOf(diagnosis.effectiveCapacity, ["yes", "sometimes", "no"])
+    oneOf(diagnosis.effectiveCapacity, ["yes", "sometimes", "no"]);
+  if (!shapeValid) return false;
+
+  const typedRevenue = revenue as unknown as RevenueInputs;
+  const typedAdvertising = advertisingInput as unknown as AdvertisingInputs;
+  const typedBottleneck = bottleneckInput as unknown as BottleneckInputs;
+  const typedRestaurant =
+    restaurantInput as unknown as RestaurantOperationsInput;
+  const typedAllocation: GoalAllocation | Record<string, never> =
+    Object.keys(allocation).length === 0
+      ? {}
+      : (allocation as unknown as GoalAllocation);
+  const allocationForValidation: GoalAllocationInput =
+    Object.keys(typedAllocation).length === 0
+      ? {
+          newCustomerRevenue: null,
+          returningCustomerRevenue: null,
+          averageOrderValueRevenue: null,
+        }
+      : (typedAllocation as GoalAllocation);
+  if (
+    validateGoalAllocation(
+      allocationForValidation,
+      expectedRevenueMetrics.shortfallRevenue,
+    ).length > 0 ||
+    validateAdvertisingInputs(typedAdvertising).length > 0 ||
+    validateRestaurantOperations(typedRestaurant).length > 0 ||
+    input.returningDataStatus !== bottleneckInput.returningDataStatus
+  ) {
+    return false;
+  }
+
+  const expectedNewCustomerTarget = allocationNewCustomerTarget(
+    expectedRevenueMetrics.maxNewCustomers,
+    typedRevenue.averageOrderValue,
+    typedAllocation,
+  );
+  const expectedAdvertising = calculateAdvertisingMetrics(
+    expectedNewCustomerTarget,
+    typedAdvertising,
+  );
+  const expectedBottleneck = selectBottleneck(typedBottleneck);
+  const expectedRestaurant = analyzeRestaurantOperations(
+    typedRestaurant,
+    expectedRevenueMetrics.maxNewCustomersPerDay,
+  );
+  const expectedCapacity = resolveEffectiveCapacity(
+    input.capacity as Capacity,
+    expectedRestaurant.status,
+  );
+  const expectedAction = selectAction({
+    metrics: expectedRevenueMetrics,
+    bottleneck: expectedBottleneck,
+    primaryConcern: input.primaryConcern as PrimaryConcern,
+    capacity: expectedCapacity,
+    returningDataStatus: input.returningDataStatus as ReturningDataStatus,
+    hasConsentDb: input.hasConsentDb as boolean,
+    canChangeMenu: input.canChangeMenu as boolean,
+    adsRunning: input.adsRunning as boolean,
+    adAttributionKnown: input.adAttributionKnown as boolean,
+  });
+
+  return (
+    jsonEqual(metrics, {
+      ...expectedRevenueMetrics,
+      newCustomerTarget: expectedNewCustomerTarget,
+      advertising: expectedAdvertising,
+      restaurant: expectedRestaurant,
+    }) &&
+    jsonEqual(diagnosis, {
+      bottleneck: expectedBottleneck,
+      actionKey: expectedAction.key,
+      effectiveCapacity: expectedCapacity,
+    })
   );
 }
 
