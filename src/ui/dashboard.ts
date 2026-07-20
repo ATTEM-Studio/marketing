@@ -4,6 +4,7 @@ import type {
   AppSession,
   AssessmentSnapshot,
 } from "../services/contracts";
+import { isCompletedPersistedAssessment } from "../coaching/completion";
 
 const number = new Intl.NumberFormat("ko-KR");
 
@@ -22,23 +23,16 @@ function dataObject(value: unknown): Record<string, unknown> {
     : {};
 }
 
-const completedActionKeys = new Set([
-  "profit-review",
-  "average-order-value",
-  "measure-acquisition-source",
-  "returning-message",
-  "off-peak-offer",
-  "local-discovery",
-]);
-
 function isCompletedAssessment(assessment: AssessmentSnapshot | null): boolean {
   if (!assessment || !assessment.id) return false;
-  const diagnosis = dataObject(assessment.diagnosis);
-  const bottleneck = dataObject(diagnosis.bottleneck);
-  return (
-    completedActionKeys.has(text(diagnosis.actionKey)) &&
-    ["yes", "sometimes", "no"].includes(text(diagnosis.effectiveCapacity)) &&
-    ["known", "stable", "insufficient"].includes(text(bottleneck.status))
+  const revenue = dataObject(dataObject(assessment.inputs).revenue);
+  return isCompletedPersistedAssessment(
+    {
+      input_data: assessment.inputs,
+      calculated_metrics: assessment.metrics,
+      diagnosis: assessment.diagnosis,
+    },
+    { target_revenue: revenue.targetMonthlyRevenue },
   );
 }
 

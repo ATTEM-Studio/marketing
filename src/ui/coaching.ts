@@ -168,6 +168,7 @@ export function renderCoaching(
   let lastRequest: CoachingTurnRequest | null = null;
   let busy = false;
   let active = true;
+  let returning = false;
 
   const render = (status = "") => {
     let content: string;
@@ -266,8 +267,11 @@ export function renderCoaching(
   function bind(): void {
     root
       .querySelector<HTMLButtonElement>("[data-coaching-back]")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", (event) => {
+        if (returning || !active) return;
+        returning = true;
         active = false;
+        (event.currentTarget as HTMLButtonElement).disabled = true;
         onBack();
       });
 

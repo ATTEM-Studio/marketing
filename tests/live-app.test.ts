@@ -1,23 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
 import type { AppService } from "../src/services/contracts";
-
-const completedAssessment = {
-  id: "completed-assessment",
-  inputs: { revenue: { targetMonthlyRevenue: 40_000_000 } },
-  metrics: { maxNewCustomers: 400 },
-  diagnosis: {
-    actionKey: "local-discovery",
-    effectiveCapacity: "yes",
-    bottleneck: {
-      key: null,
-      status: "insufficient",
-      changeRate: null,
-      reason: "not enough data",
-    },
-  },
-  createdAt: "2026-07-20T00:00:00.000Z",
-};
+import { createAuthenticAssessment } from "./fixtures/authentic-assessment";
 
 function liveService(signOut = vi.fn(async () => undefined)): AppService {
   return {
@@ -64,7 +48,7 @@ test("returns from coaching to a freshly loaded dashboard", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing root");
   const service = liveService();
-  service.getLatestAssessment = vi.fn(async () => completedAssessment);
+  service.getLatestAssessment = vi.fn(async () => createAuthenticAssessment());
 
   await createApp(root, service, { isLive: true }).start();
   root.querySelector<HTMLButtonElement>("[data-start-coaching]")?.click();
@@ -75,6 +59,62 @@ test("returns from coaching to a freshly loaded dashboard", async () => {
     expect(root.querySelector(".dashboard-shell")).not.toBeNull();
   });
   expect(service.getLatestAssessment).toHaveBeenCalledTimes(2);
+});
+
+test("starts only one dashboard reload after rapid coaching back attempts", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const service = liveService();
+  let resolveReload:
+    | ((value: Awaited<ReturnType<AppService["getSession"]>>) => void)
+    | undefined;
+  const reload = new Promise<Awaited<ReturnType<AppService["getSession"]>>>(
+    (resolve) => {
+      resolveReload = resolve;
+    },
+  );
+  let sessionCalls = 0;
+  service.getSession = vi.fn(async () => {
+    sessionCalls += 1;
+    if (sessionCalls <= 2) {
+      return {
+        mode: "live" as const,
+        profile: {
+          id: "buyer-1",
+          name: "buyer",
+          email: "buyer@example.com",
+          region: "서울",
+          businessName: "buyer restaurant",
+        },
+      };
+    }
+    return reload;
+  });
+  service.getLatestAssessment = vi.fn(async () => createAuthenticAssessment());
+
+  await createApp(root, service, { isLive: true }).start();
+  root.querySelector<HTMLButtonElement>("[data-start-coaching]")?.click();
+  const coachingBack = root.querySelector<HTMLButtonElement>("[data-coaching-back]");
+  coachingBack?.click();
+  coachingBack?.click();
+
+  expect(service.getSession).toHaveBeenCalledTimes(3);
+  expect(coachingBack?.disabled).toBe(true);
+
+  resolveReload?.({
+    mode: "live",
+    profile: {
+      id: "buyer-1",
+      name: "buyer",
+      email: "buyer@example.com",
+      region: "서울",
+      businessName: "buyer restaurant",
+    },
+  });
+  await vi.waitFor(() => {
+    expect(root.querySelector(".dashboard-shell")).not.toBeNull();
+  });
 });
 
 test("shows the landing page before onboarding for a signed-out live visitor", async () => {
