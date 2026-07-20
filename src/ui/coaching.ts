@@ -50,7 +50,7 @@ function shell(content: string, busy: boolean, status: string): string {
         </div>
       </header>
       ${content}
-      <p class="${busy ? "coaching-loading" : "sr-only"}" role="status" aria-live="polite" aria-atomic="true" data-coaching-status>${escapeHtml(status)}</p>
+      <p class="${busy ? "coaching-loading" : "sr-only"}" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" data-coaching-status>${escapeHtml(status)}</p>
     </main>`;
 }
 
@@ -145,13 +145,13 @@ function answerContent(
     </article>`;
 }
 
-function errorContent(): string {
+function errorContent(busy: boolean): string {
   return `
     <section class="coaching-error" data-coaching-error role="alert" aria-labelledby="coaching-error-title">
       <p class="eyebrow">연결 상태 확인</p>
       <h2 id="coaching-error-title">답변을 불러오지 못했습니다.</h2>
       <p>입력한 고민은 그대로 기억하고 있어요. 잠시 후 다시 시도해 주세요.</p>
-      <button type="button" data-retry-coaching>다시 시도하기</button>
+      <button type="button" data-retry-coaching aria-disabled="${busy}"${busy ? " disabled" : ""}>다시 시도하기</button>
     </section>`;
 }
 
@@ -176,7 +176,7 @@ export function renderCoaching(
     } else if (state === "answer" && currentResponse?.kind === "answer") {
       content = answerContent(currentResponse);
     } else if (state === "error") {
-      content = errorContent();
+      content = errorContent(busy);
     } else {
       content = initialContent(question, busy, validationMessage);
     }
@@ -201,6 +201,7 @@ export function renderCoaching(
     busy = true;
     lastRequest = request;
     render("답변을 준비하고 있습니다.");
+    root.querySelector<HTMLElement>("[data-coaching-status]")?.focus();
     try {
       const response = await service.askCoach(request);
       if (!active) return;
@@ -277,6 +278,11 @@ export function renderCoaching(
           button.addEventListener("click", () => {
             const concernKey = button.dataset.concern as CoachingConcernKey;
             void submitRequest({ assessmentId, concernKey });
+          });
+          button.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            button.click();
           });
         });
       const input = root.querySelector<HTMLTextAreaElement>(

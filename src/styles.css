@@ -1177,6 +1177,13 @@ details > summary {
   font-size: clamp(2rem, 5vw, 3.25rem);
 }
 
+.coaching-shell h1,
+.coaching-shell h2,
+.coaching-shell h3 {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
 .coaching-header {
   display: grid;
   gap: 1.5rem;

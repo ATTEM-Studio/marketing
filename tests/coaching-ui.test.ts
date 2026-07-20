@@ -132,6 +132,7 @@ describe("instant coaching UI", () => {
     const loadingStatus = root().querySelector("[data-coaching-status]");
     expect(loadingStatus?.textContent).toContain("답변을 준비하고 있습니다");
     expect(loadingStatus?.classList.contains("coaching-loading")).toBe(true);
+    expect(document.activeElement).toBe(loadingStatus);
 
     resolveTurn?.(followUpResponse);
     await flushPromises();
@@ -141,6 +142,24 @@ describe("instant coaching UI", () => {
     expect(document.activeElement).toBe(
       root().querySelector("[data-follow-up-heading]"),
     );
+  });
+
+  it("activates a focused concern once with the Enter key", () => {
+    const askCoach = vi.fn(
+      () => new Promise<CoachingTurnResponse>(() => undefined),
+    );
+    renderCoaching(root(), "a1", serviceWith(askCoach), vi.fn());
+    const concern = root().querySelector<HTMLButtonElement>(
+      '[data-concern="not_visible"]',
+    );
+    if (!concern) throw new Error("missing concern");
+    concern.focus();
+
+    concern.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+
+    expect(askCoach).toHaveBeenCalledOnce();
   });
 
   it("submits one follow-up choice and renders seven answer sections", async () => {
@@ -194,10 +213,16 @@ describe("instant coaching UI", () => {
   });
 
   it("announces a recoverable error and retries the same request", async () => {
+    let resolveRetry: ((value: CoachingTurnResponse) => void) | undefined;
     const askCoach = vi
       .fn<AppService["askCoach"]>()
       .mockRejectedValueOnce(new Error("offline"))
-      .mockResolvedValueOnce(followUpResponse);
+      .mockImplementationOnce(
+        () =>
+          new Promise<CoachingTurnResponse>((resolve) => {
+            resolveRetry = resolve;
+          }),
+      );
     const service = serviceWith(askCoach);
 
     renderCoaching(root(), "a1", service, vi.fn());
@@ -212,10 +237,20 @@ describe("instant coaching UI", () => {
     );
 
     click("[data-retry-coaching]");
-    await flushPromises();
 
     expect(askCoach).toHaveBeenCalledTimes(2);
     expect(askCoach.mock.calls[1]).toEqual(askCoach.mock.calls[0]);
+    expect(root().querySelector("main")?.getAttribute("aria-busy")).toBe(
+      "true",
+    );
+    const pendingRetry = root().querySelector<HTMLButtonElement>(
+      "[data-retry-coaching]",
+    );
+    expect(pendingRetry?.disabled).toBe(true);
+    expect(pendingRetry?.getAttribute("aria-disabled")).toBe("true");
+
+    resolveRetry?.(followUpResponse);
+    await flushPromises();
     expect(root().querySelectorAll("[data-follow-up]")).toHaveLength(1);
   });
 

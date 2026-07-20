@@ -36,6 +36,12 @@ test("keeps Korean words intact while long machine tokens remain safe", () => {
   expect(css).toMatch(/\.long-token,[^{]+\{[^}]*overflow-wrap:\s*anywhere/s);
 });
 
+test("keeps coaching headings readable while allowing long service strings to wrap", () => {
+  expect(css).toMatch(
+    /\.coaching-shell h1,\s*\.coaching-shell h2,\s*\.coaching-shell h3\s*\{[^}]*word-break:\s*keep-all[^}]*overflow-wrap:\s*(?:break-word|anywhere)/s,
+  );
+});
+
 test("never lets grid declarations override hidden diagnosis content", () => {
   expect(css).toMatch(
     /\.step-panel\[hidden\],[^{]*\.question-card\[hidden\]\s*\{[^}]*display:\s*none\s*!important/,
