@@ -30,19 +30,19 @@ export interface CoachingContext {
   advertisingConversionKnown: boolean;
   tableCount: number | null;
   dailyTurnover: number | null;
-  completedActionKeys: string[];
+  completedActionKeys: readonly string[];
 }
 
 export interface CoachingActionDefinition {
   key: string;
   intent: CoachingIntent;
   title: string;
-  triggerKeys: string[];
-  blockerKeys: string[];
-  requiredEvidence: string[];
-  followUpQuestions: string[];
+  triggerKeys: readonly string[];
+  blockerKeys: readonly string[];
+  requiredEvidence: readonly string[];
+  followUpQuestions: readonly string[];
   reasonTemplate: string;
-  steps: string[];
+  steps: readonly string[];
   metric: string;
   avoid: string;
   evidenceLevel: EvidenceLevel;
@@ -54,9 +54,9 @@ export interface CoachingActionDefinition {
 export interface CoachingResponse {
   situation: string;
   stage: string;
-  evidence: string[];
+  evidence: readonly string[];
   actionTitle: string;
-  steps: string[];
+  steps: readonly string[];
   metric: string;
   avoid: string;
   disclaimer?: string;
@@ -65,7 +65,7 @@ export interface CoachingResponse {
 export interface CoachingFollowUp {
   key: string;
   prompt: string;
-  options: string[];
+  options: readonly string[];
 }
 
 export interface CoachingTurnRequest {

@@ -41,22 +41,6 @@ const concernIntent: Record<CoachingConcernKey, CoachingIntent> = {
   unknown: "unknown",
 };
 
-const followUps: Record<
-  "average_order_value" | "table_count",
-  CoachingFollowUp
-> = {
-  average_order_value: {
-    key: "average_order_value",
-    prompt: "현재 평균 객단가를 알려주세요.",
-    options: ["모름", "직접 입력"],
-  },
-  table_count: {
-    key: "table_count",
-    prompt: "운영 가능한 테이블 또는 좌석 수를 알려주세요.",
-    options: ["모름", "직접 입력"],
-  },
-};
-
 function isExpiredOfficial(
   action: CoachingActionDefinition,
   now: Date,
@@ -117,15 +101,22 @@ function scoreAction(
   return score;
 }
 
-export function selectAction(
-  input: SelectActionInput,
-): CoachingActionDefinition {
+function eligibleActions(input: SelectActionInput): {
+  action: CoachingActionDefinition;
+  index: number;
+}[] {
   const now = input.now === undefined ? new Date() : new Date(input.now);
   const clock = Number.isNaN(now.getTime()) ? new Date() : now;
-  const eligible = coachingActions
+  return coachingActions
     .map((action, index) => ({ action, index }))
     .filter(({ action }) => !isExpiredOfficial(action, clock))
     .filter(({ action }) => !isBlocked(action, input.context, input.answers));
+}
+
+export function selectAction(
+  input: SelectActionInput,
+): CoachingActionDefinition {
+  const eligible = eligibleActions(input);
   const matching = eligible.filter(
     ({ action }) => action.intent === input.intent,
   );
@@ -144,7 +135,9 @@ export function selectAction(
           ? alternatives
           : eligible;
 
-  if (candidates.length === 0) return coachingActions[0]!;
+  if (candidates.length === 0) {
+    throw new Error("No eligible coaching action is available");
+  }
 
   return candidates.reduce((best, candidate) => {
     const candidateScore = scoreAction(candidate.action, input);
@@ -156,30 +149,24 @@ export function selectAction(
   }).action;
 }
 
-function requiredFollowUp(
-  input: ChooseNextTurnInput,
-  intent: CoachingIntent,
-): CoachingFollowUp | null {
-  if (intent !== "profit") return null;
-  if (
-    input.context.averageOrderValue === null &&
-    input.answers.average_order_value === undefined
-  ) {
-    return followUps.average_order_value;
-  }
-  if (
-    input.context.tableCount === null &&
-    input.answers.table_count === undefined
-  ) {
-    return followUps.table_count;
-  }
-  return null;
-}
-
-function actionByKey(key: string): CoachingActionDefinition {
-  return (
-    coachingActions.find((action) => action.key === key) ?? coachingActions[0]!
+function safeAlternativeAction(
+  input: Pick<SelectActionInput, "context" | "answers" | "now">,
+  preferredKey: string,
+): CoachingActionDefinition {
+  const eligible = eligibleActions({ ...input, intent: "unknown" });
+  const incomplete = eligible.filter(
+    ({ action }) => !input.context.completedActionKeys.includes(action.key),
   );
+  const candidates = incomplete.length > 0 ? incomplete : eligible;
+  const action =
+    candidates.find(({ action }) => action.key === preferredKey)?.action ??
+    candidates.find(({ action }) => action.evidenceLevel !== "official")
+      ?.action ??
+    candidates[0]?.action;
+  if (action === undefined) {
+    throw new Error("No eligible safe coaching action is available");
+  }
+  return action;
 }
 
 export function chooseNextTurn(input: ChooseNextTurnInput): RuleDecision {
@@ -190,7 +177,8 @@ export function chooseNextTurn(input: ChooseNextTurnInput): RuleDecision {
   if (safety.blocked) {
     return {
       kind: "blocked",
-      action: actionByKey(
+      action: safeAlternativeAction(
+        input,
         safety.alternativeActionKey ?? "complete_visit_information",
       ),
       reason: safety.reason ?? "fake_review",
@@ -201,11 +189,6 @@ export function chooseNextTurn(input: ChooseNextTurnInput): RuleDecision {
     input.concernKey === undefined
       ? (input.classifiedIntent ?? input.intent ?? "unknown")
       : concernIntent[input.concernKey];
-  const followUp = requiredFollowUp(input, intent);
-  if (followUp !== null && (input.followUpsAsked ?? 0) < 2) {
-    return { kind: "follow_up", question: followUp };
-  }
-
   const action = selectAction({ ...input, intent });
   return {
     kind: "action",

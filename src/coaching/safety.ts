@@ -5,12 +5,22 @@ export interface SafetyResult {
   alternativeActionKey?: string;
 }
 
-const phonePattern = /(?:\+?82[-\s]?)?0?1[016789](?:[-\s]?\d{3,4}){2}/giu;
+const phonePattern = /(?:\+?82[-.\s]?)?0?1[016789](?:[-.\s]?\d{3,4}){2}/giu;
 const emailPattern =
   /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+/giu;
 const namedOwnerPattern = /[가-힣]{1,4}(?:사장님?|대표님?)/gu;
 const inviteCodePattern =
   /((?:초대\s*코드|invite\s*code)\s*[:：]?\s*)[a-z0-9-]{4,}/giu;
+
+const accessCodePattern =
+  /((?:(?:invite|access)(?:\s|-)?code|초대\s*코드|접속\s*코드|인증\s*코드)\s*[:：]?\s*)[a-z0-9-]{4,}/giu;
+const ownerNamePattern = /(?:[가-힣]{1,4}\s*)?(?:사장님?|대표님?)/gu;
+const labeledOwnerNamePattern =
+  /((?:이름|성명|owner\s*name|name)\s*[:：]\s*)(?:[가-힣]{2,4}|[a-z]{2,}(?:\s+[a-z]{2,})?)/giu;
+const sourceLinePattern =
+  /(?:^|\n)\s*(?:전자책\s*원문|출처|source|file|파일)\s*[:：][^\n]*/gimu;
+const sourceLabelPattern = /(?:출처|source|file|파일)\s*[:：][^\n]*/gimu;
+const ebookPhrasePattern = /전자책\s*원문/gu;
 
 function normalized(question: string): string {
   return question.toLocaleLowerCase("en-US").replace(/\s+/gu, " ").trim();
@@ -18,14 +28,21 @@ function normalized(question: string): string {
 
 export function sanitizeQuestion(question: string): string {
   return question
+    .replace(sourceLinePattern, "\n")
+    .replace(sourceLabelPattern, "")
+    .replace(ebookPhrasePattern, "")
     .replace(emailPattern, "")
     .replace(phonePattern, "")
     .replace(namedOwnerPattern, "")
+    .replace(ownerNamePattern, "")
+    .replace(labeledOwnerNamePattern, "$1")
     .replace(inviteCodePattern, "$1")
+    .replace(accessCodePattern, "$1")
     .replace(/\s+([,.!?])/gu, "$1")
     .replace(/\s{2,}/gu, " ")
     .trim()
-    .replace(/[,;]\s*[,;]+/gu, ",");
+    .replace(/[,;]\s*[,;]+/gu, ",")
+    .slice(0, 500);
 }
 
 export function detectProhibitedRequest(question: string): SafetyResult {

@@ -98,30 +98,24 @@ describe("deterministic coaching rules", () => {
     expect(result.key).toBe("track_ad_to_visit_path");
   });
 
-  it("asks for missing AOV only when it changes the profit action", () => {
+  it("does not ask for missing AOV when no answer-dependent action is modeled", () => {
     const result = chooseNextTurn({
       intent: "profit",
       context: { ...context, averageOrderValue: null },
       answers: {},
     });
 
-    expect(result).toMatchObject({
-      kind: "follow_up",
-      question: { key: "average_order_value" },
-    });
+    expect(result.kind).toBe("action");
   });
 
-  it("asks for missing table count before a capacity-dependent profit action", () => {
+  it("does not ask for missing table count when no answer-dependent action is modeled", () => {
     const result = chooseNextTurn({
       intent: "profit",
       context: { ...context, tableCount: null },
       answers: { average_order_value: "20000" },
     });
 
-    expect(result).toMatchObject({
-      kind: "follow_up",
-      question: { key: "table_count" },
-    });
+    expect(result.kind).toBe("action");
   });
 
   it("removes expired official evidence actions", () => {
