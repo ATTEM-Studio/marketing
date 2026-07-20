@@ -6,6 +6,12 @@ import type {
   AssessmentSnapshot,
   BuyerRegistration,
 } from "./contracts";
+import { coachingActions } from "../coaching/content";
+import type {
+  CoachingFeedback,
+  CoachingTurnRequest,
+  CoachingTurnResponse,
+} from "../coaching/types";
 
 const DEMO_PRIVACY_ERROR = "데모에서는 개인정보를 저장하지 않습니다.";
 const DEMO_ASSESSMENT_ID = "demo-assessment";
@@ -20,6 +26,30 @@ const DEMO_PROFILE = {
 
 function clone<Value>(value: Value): Value {
   return structuredClone(value);
+}
+
+function sampleCoachingResponse(
+  request: CoachingTurnRequest,
+): CoachingTurnResponse {
+  const action =
+    coachingActions.find((item) =>
+      item.triggerKeys.includes(request.concernKey ?? "unknown"),
+    ) ?? coachingActions[0]!;
+  return {
+    kind: "answer",
+    sessionId: "demo-sample-session",
+    recommendationId: `demo-sample-recommendation-${action.key}`,
+    response: {
+      situation: `샘플 코칭: ${action.reasonTemplate}`,
+      stage: action.intent,
+      evidence: ["데모용 샘플 데이터입니다."],
+      actionTitle: action.title,
+      steps: [...action.steps],
+      metric: action.metric,
+      avoid: action.avoid,
+      disclaimer: "데모용 샘플 코칭입니다. 실제 진단 결과와 다를 수 있습니다.",
+    },
+  };
 }
 
 export function createDemoService(): AppService {
@@ -103,6 +133,17 @@ export function createDemoService(): AppService {
       );
 
       return clone(completedActionPlan);
+    },
+
+    async askCoach(request: CoachingTurnRequest) {
+      return clone(sampleCoachingResponse(request));
+    },
+
+    async rateCoaching(
+      _recommendationId: string,
+      _feedback: CoachingFeedback,
+    ): Promise<void> {
+      // Demo feedback is deliberately transient and never leaves the browser.
     },
   };
 }

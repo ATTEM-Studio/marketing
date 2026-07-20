@@ -3,7 +3,7 @@ import { AuthSessionMissingError } from "@supabase/supabase-js";
 
 type MockClient = {
   auth: Record<
-    "getUser" | "signInAnonymously" | "signOut",
+    "getUser" | "getSession" | "signInAnonymously" | "signOut",
     ReturnType<typeof vi.fn>
   >;
   functions: Record<"invoke", ReturnType<typeof vi.fn>>;
@@ -91,6 +91,10 @@ beforeEach(() => {
     auth: {
       getUser: vi.fn(async () => ({
         data: { user: { id: "user-1", is_anonymous: true } },
+        error: null,
+      })),
+      getSession: vi.fn(async () => ({
+        data: { session: { access_token: "token" } },
         error: null,
       })),
       signInAnonymously: vi.fn(async () => ({
@@ -280,5 +284,87 @@ test("uses the Korea business month at a UTC month boundary", () => {
   ).toEqual({
     start: "2026-08-01",
     end: "2026-08-31",
+  });
+});
+
+test("posts a coaching turn with the current access token", async () => {
+  const fetcher = vi.fn<
+    (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+  >(
+    async () =>
+      new Response(
+        JSON.stringify({
+          kind: "answer",
+          sessionId: "session-1",
+          recommendationId: "recommendation-1",
+          response: {
+            situation: "sample",
+            stage: "discovery",
+            evidence: [],
+            actionTitle: "action",
+            steps: [],
+            metric: "calls",
+            avoid: "none",
+          },
+        }),
+        { status: 200 },
+      ),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const service = createSupabaseService("https://example.supabase.co", "anon");
+
+  await service.askCoach({ assessmentId: "a1", concernKey: "not_visible" });
+
+  expect(mocked.client.auth.getSession).toHaveBeenCalledTimes(1);
+  expect(fetcher).toHaveBeenCalledWith(
+    "/api/coaching",
+    expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ Authorization: "Bearer token" }),
+    }),
+  );
+  expect(
+    JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string),
+  ).toEqual({
+    kind: "turn",
+    assessmentId: "a1",
+    concernKey: "not_visible",
+  });
+});
+
+test("sends feedback through the protected endpoint", async () => {
+  const fetcher = vi.fn<
+    (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+  >(async () => new Response("{}", { status: 200 }));
+  vi.stubGlobal("fetch", fetcher);
+  const service = createSupabaseService("https://example.supabase.co", "anon");
+
+  await service.rateCoaching("r1", "helpful");
+
+  expect(mocked.client.auth.getSession).toHaveBeenCalledTimes(1);
+  expect(
+    JSON.parse((fetcher.mock.calls[0]![1] as RequestInit).body as string),
+  ).toEqual({
+    kind: "feedback",
+    recommendationId: "r1",
+    feedback: "helpful",
+  });
+});
+
+test("keeps a server error user-safe while preserving its status", async () => {
+  const fetcher = vi.fn<
+    (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+  >(
+    async () =>
+      new Response(JSON.stringify({ error: "RATE_LIMITED" }), { status: 429 }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const service = createSupabaseService("https://example.supabase.co", "anon");
+
+  await expect(
+    service.askCoach({ assessmentId: "a1", concernKey: "not_visible" }),
+  ).rejects.toMatchObject({
+    message: "코칭을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    status: 429,
   });
 });

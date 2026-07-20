@@ -1,3 +1,9 @@
+import type {
+  CoachingFeedback,
+  CoachingTurnRequest,
+  CoachingTurnResponse,
+} from "../coaching/types";
+
 export interface BuyerRegistration {
   name: string;
   email: string;
@@ -62,4 +68,9 @@ export interface AppService {
     afterValue: string,
     note: string,
   ): Promise<ActionPlanRecord>;
+  askCoach(request: CoachingTurnRequest): Promise<CoachingTurnResponse>;
+  rateCoaching(
+    recommendationId: string,
+    feedback: CoachingFeedback,
+  ): Promise<void>;
 }

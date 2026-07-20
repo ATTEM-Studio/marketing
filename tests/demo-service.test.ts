@@ -40,4 +40,29 @@ describe("demo service", () => {
     expect(await service.listActionPlans()).toHaveLength(1);
     expect(localStorage.length).toBe(0);
   });
+
+  test("returns a deterministic catalog-backed coaching sample", async () => {
+    const service = createDemoService();
+
+    await expect(
+      service.askCoach({ assessmentId: "anything", concernKey: "not_visible" }),
+    ).resolves.toMatchObject({
+      kind: "answer",
+      sessionId: "demo-sample-session",
+      recommendationId: expect.stringMatching(/^demo-sample-recommendation-/),
+      response: {
+        situation: expect.stringContaining("샘플"),
+        actionTitle: expect.any(String),
+        steps: expect.any(Array),
+      },
+    });
+  });
+
+  test("accepts sample coaching feedback without network state", async () => {
+    const service = createDemoService();
+
+    await expect(
+      service.rateCoaching("demo-sample-recommendation-discovery", "helpful"),
+    ).resolves.toBeUndefined();
+  });
 });

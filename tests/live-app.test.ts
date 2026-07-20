@@ -35,6 +35,10 @@ function liveService(signOut = vi.fn(async () => undefined)): AppService {
     completeActionPlan: vi.fn(async () => {
       throw new Error("unused");
     }),
+    askCoach: vi.fn(async () => {
+      throw new Error("unused");
+    }),
+    rateCoaching: vi.fn(async () => undefined),
   };
 }
 

@@ -7,6 +7,11 @@ import type {
   BuyerProfile,
   BuyerRegistration,
 } from "./contracts";
+import type {
+  CoachingFeedback,
+  CoachingTurnRequest,
+  CoachingTurnResponse,
+} from "../coaching/types";
 import { isAuthSessionMissingError } from "@supabase/supabase-js";
 import {
   createSupabaseClient,
@@ -18,6 +23,17 @@ const INVITE_ERROR =
 const LOGIN_ERROR = "로그인을 진행하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 const DATA_ERROR = "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
 const SAVE_ERROR = "저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+const COACHING_ERROR =
+  "코칭을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+
+class CoachingRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 type Row = Record<string, unknown>;
 
@@ -167,6 +183,32 @@ async function currentStoreId(
   if (error || !data || typeof data.id !== "string")
     throw new Error(SAVE_ERROR);
   return data.id;
+}
+
+async function postCoaching(
+  client: BuyerSupabaseClient,
+  body: Record<string, unknown>,
+): Promise<unknown> {
+  const { data, error } = await client.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (error || !accessToken) throw new Error(LOGIN_ERROR);
+
+  let response: Response;
+  try {
+    response = await fetch("/api/coaching", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new CoachingRequestError(COACHING_ERROR, 0);
+  }
+  if (!response.ok)
+    throw new CoachingRequestError(COACHING_ERROR, response.status);
+  return response.json() as Promise<unknown>;
 }
 
 export function createSupabaseService(
@@ -349,6 +391,26 @@ export function createSupabaseService(
       });
       if (error || !data) throw new Error(SAVE_ERROR);
       return actionPlanFromRow(data as Row, asObject(data).check_in as Row);
+    },
+
+    async askCoach(
+      request: CoachingTurnRequest,
+    ): Promise<CoachingTurnResponse> {
+      return (await postCoaching(client, {
+        kind: "turn",
+        ...request,
+      })) as CoachingTurnResponse;
+    },
+
+    async rateCoaching(
+      recommendationId: string,
+      feedback: CoachingFeedback,
+    ): Promise<void> {
+      await postCoaching(client, {
+        kind: "feedback",
+        recommendationId,
+        feedback,
+      });
     },
   };
 }

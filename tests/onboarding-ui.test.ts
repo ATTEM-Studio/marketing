@@ -35,6 +35,10 @@ const service = (): AppService => ({
   completeActionPlan: vi.fn(async () => {
     throw new Error("unused");
   }),
+  askCoach: vi.fn(async () => {
+    throw new Error("unused");
+  }),
+  rateCoaching: vi.fn(async () => undefined),
 });
 
 const set = (name: string, value: string) => {

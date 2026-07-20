@@ -439,6 +439,10 @@ test("saves the result action through AppService with its assessment date", asyn
     completeActionPlan: vi.fn(async () => {
       throw new Error("unused");
     }),
+    askCoach: vi.fn(async () => {
+      throw new Error("unused");
+    }),
+    rateCoaching: vi.fn(async () => undefined),
   };
   await createApp(root, fake).start();
   root.querySelector<HTMLButtonElement>("[data-start-diagnosis]")?.click();
