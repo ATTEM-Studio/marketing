@@ -50,6 +50,24 @@ test("defines a focused diagnosis stage and mobile action layout", () => {
   expect(css).toMatch(/\.choice-card[^{]*\{[^}]*min-height:\s*44px/);
 });
 
+test("keeps diagnosis content flexible without stretching the action row", () => {
+  expect(css).toMatch(
+    /\.diagnosis-stage\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\)\s+auto\s+auto\s+auto/s,
+  );
+  expect(css).toMatch(
+    /\.diagnosis-stage\s*>\s*\.step-panel\s*\{[^}]*grid-row:\s*1/s,
+  );
+  expect(css).toMatch(
+    /\.diagnosis-stage\s*>\s*\.coaching-feedback\s*\{[^}]*grid-row:\s*2/s,
+  );
+  expect(css).toMatch(
+    /\.question-actions\s*\{[^}]*grid-row:\s*3[^}]*align-self:\s*end/s,
+  );
+  expect(css).toMatch(
+    /\.diagnosis-stage\s*>\s*\[data-save-status\]\s*\{[^}]*grid-row:\s*4/s,
+  );
+});
+
 test("removes question transitions when reduced motion is requested", () => {
   expect(css).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*\.question-card/);
 });
