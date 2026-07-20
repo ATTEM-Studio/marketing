@@ -38,11 +38,13 @@
 ### Task 1: Restaurant Operations Domain
 
 **Files:**
+
 - Create: `src/domain/restaurant.ts`
 - Modify: `src/domain/types.ts`
 - Test: `tests/restaurant.test.ts`
 
 **Interfaces:**
+
 - Produces: `RestaurantOperationsInput`, `RestaurantCapacityStatus`, `RestaurantOperationsInsight`, `validateRestaurantOperations(input)`, and `analyzeRestaurantOperations(input, requiredCustomersPerDay)`.
 - Consumes: only primitive values and `FieldError`; no DOM or service dependency.
 
@@ -127,22 +129,11 @@ Expected: FAIL because `src/domain/restaurant.ts` and the restaurant types do no
 - [ ] **Step 3: Add the shared types**
 
 ```ts
-export type PeakOccupancy =
-  | "spacious"
-  | "half"
-  | "almost_full"
-  | "waiting";
+export type PeakOccupancy = "spacious" | "half" | "almost_full" | "waiting";
 export type AverageStayBand =
-  | "under_30"
-  | "30_60"
-  | "60_90"
-  | "over_90"
-  | "unknown";
+  "under_30" | "30_60" | "60_90" | "over_90" | "unknown";
 export type RestaurantCapacityStatus =
-  | "available"
-  | "time_limited"
-  | "saturated"
-  | "insufficient";
+  "available" | "time_limited" | "saturated" | "insufficient";
 
 export interface RestaurantOperationsInput {
   seats: number | null;
@@ -194,8 +185,14 @@ export function validateRestaurantOperations(
   });
   const shares = Object.values(input.channelShares);
   shares.forEach((value) => {
-    if (value !== null && (!Number.isFinite(value) || value < 0 || value > 100)) {
-      errors.push({ field: "channelShares", message: "비중은 0~100 사이로 입력해주세요." });
+    if (
+      value !== null &&
+      (!Number.isFinite(value) || value < 0 || value > 100)
+    ) {
+      errors.push({
+        field: "channelShares",
+        message: "비중은 0~100 사이로 입력해주세요.",
+      });
     }
   });
   if (shares.every((value): value is number => value !== null)) {
@@ -254,10 +251,12 @@ Commit: `git add src/domain/types.ts src/domain/restaurant.ts tests/restaurant.t
 ### Task 2: One-Question Coaching Controller
 
 **Files:**
+
 - Modify: `src/ui/diagnosis.ts`
 - Test: `tests/diagnosis-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `validateRevenueInputs`, `validateGoalAllocation`, and form helpers.
 - Produces: `readDiagnosisForm(form).restaurant`, question-level navigation attributes, `data-question-label`, `data-chapter-title`, and `data-coaching-feedback`.
 
@@ -270,9 +269,15 @@ test("shows only the current chapter and current question", async () => {
   click("[data-start-diagnosis]");
 
   expect(root.querySelectorAll("[data-step]:not([hidden])")).toHaveLength(1);
-  expect(root.querySelectorAll("[data-question]:not([hidden])")).toHaveLength(1);
-  expect(root.querySelector("[data-chapter-title]")?.textContent).toBe("매출 목표");
-  expect(root.querySelector("[data-question-label]")?.textContent).toBe("질문 1 / 4");
+  expect(root.querySelectorAll("[data-question]:not([hidden])")).toHaveLength(
+    1,
+  );
+  expect(root.querySelector("[data-chapter-title]")?.textContent).toBe(
+    "매출 목표",
+  );
+  expect(root.querySelector("[data-question-label]")?.textContent).toBe(
+    "질문 1 / 4",
+  );
 });
 
 test("keeps a revenue answer when moving backward", async () => {
@@ -283,9 +288,13 @@ test("keeps a revenue answer when moving backward", async () => {
   click("[data-next-question]");
   click("[data-prev-question]");
 
-  expect(document.querySelector<HTMLInputElement>("[name='averageMonthlyRevenue']")?.value)
-    .toBe("30,000,000");
-  expect(root.querySelectorAll("[data-question]:not([hidden])")).toHaveLength(1);
+  expect(
+    document.querySelector<HTMLInputElement>("[name='averageMonthlyRevenue']")
+      ?.value,
+  ).toBe("30,000,000");
+  expect(root.querySelectorAll("[data-question]:not([hidden])")).toHaveLength(
+    1,
+  );
 });
 
 test("summarizes the gap immediately after the target revenue answer", async () => {
@@ -295,8 +304,9 @@ test("summarizes the gap immediately after the target revenue answer", async () 
   setValue("averageMonthlyRevenue", "30,000,000");
   click("[data-next-question]");
   setValue("targetMonthlyRevenue", "40,000,000");
-  expect(root.querySelector("[data-coaching-feedback]")?.textContent)
-    .toContain("목표까지 월 10,000,000원이 더 필요해요");
+  expect(root.querySelector("[data-coaching-feedback]")?.textContent).toContain(
+    "목표까지 월 10,000,000원이 더 필요해요",
+  );
 });
 ```
 
@@ -344,11 +354,16 @@ function showQuestion(root: HTMLElement, index: number): void {
   root.querySelectorAll<HTMLElement>("[data-question]").forEach((panel) => {
     panel.hidden = panel.dataset.question !== current.id;
   });
-  const chapterQuestions = questions.filter((item) => item.step === current.step);
-  const questionNumber = chapterQuestions.findIndex((item) => item.id === current.id) + 1;
+  const chapterQuestions = questions.filter(
+    (item) => item.step === current.step,
+  );
+  const questionNumber =
+    chapterQuestions.findIndex((item) => item.id === current.id) + 1;
   root.querySelector<HTMLElement>("[data-question-label]")!.textContent =
     `질문 ${questionNumber} / ${chapterQuestions.length}`;
-  root.querySelector<HTMLElement>(`[data-question='${current.id}'] h2`)?.focus();
+  root
+    .querySelector<HTMLElement>(`[data-question='${current.id}'] h2`)
+    ?.focus();
 }
 ```
 
@@ -360,12 +375,20 @@ Use this exact shape for every question; keep conditional fields such as known c
 <section class="question-card" data-question="averageMonthlyRevenue">
   <p class="question-number">질문 1</p>
   <h2 tabindex="-1">최근 한 달 평균 매출은 어느 정도인가요?</h2>
-  <p class="question-help">정확하지 않아도 괜찮아요. 가장 가까운 금액을 적어주세요.</p>
+  <p class="question-help">
+    정확하지 않아도 괜찮아요. 가장 가까운 금액을 적어주세요.
+  </p>
   <!-- existing number input and linked error -->
 </section>
-<aside class="coaching-feedback" data-coaching-feedback aria-live="polite"></aside>
+<aside
+  class="coaching-feedback"
+  data-coaching-feedback
+  aria-live="polite"
+></aside>
 <div class="question-actions">
-  <button type="button" class="secondary-action" data-prev-question>이전</button>
+  <button type="button" class="secondary-action" data-prev-question>
+    이전
+  </button>
   <button type="button" data-next-question>다음</button>
 </div>
 ```
@@ -377,7 +400,14 @@ Extract the existing validation branches into `validateQuestion(form, questionId
 ```ts
 function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
   clearErrors(form);
-  if (["averageMonthlyRevenue", "targetMonthlyRevenue", "averageOrderValue", "operatingDays"].includes(id)) {
+  if (
+    [
+      "averageMonthlyRevenue",
+      "targetMonthlyRevenue",
+      "averageOrderValue",
+      "operatingDays",
+    ].includes(id)
+  ) {
     const input = form.elements.namedItem(id);
     if (!(input instanceof HTMLInputElement) || input.value.trim() === "") {
       setError(form, id, "값을 입력해주세요.");
@@ -390,7 +420,18 @@ function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
       return false;
     }
   }
-  if (["monthlyCustomerCountStatus", "primaryConcern", "capacity", "returningDataStatus", "hasConsentDb", "canChangeMenu", "adsRunning"].includes(id) && !radioValue(form, id)) {
+  if (
+    [
+      "monthlyCustomerCountStatus",
+      "primaryConcern",
+      "capacity",
+      "returningDataStatus",
+      "hasConsentDb",
+      "canChangeMenu",
+      "adsRunning",
+    ].includes(id) &&
+    !radioValue(form, id)
+  ) {
     setError(form, id, "하나를 선택해주세요.");
     form.querySelector<HTMLInputElement>(`[name='${id}']`)?.focus();
     return false;
@@ -409,9 +450,10 @@ function updateCoachingFeedback(form: HTMLFormElement): void {
   if (!feedback) return;
   const current = numberValue(form, "averageMonthlyRevenue");
   const target = numberValue(form, "targetMonthlyRevenue");
-  feedback.textContent = current > 0 && target > current
-    ? `목표까지 월 ${new Intl.NumberFormat("ko-KR").format(target - current)}원이 더 필요해요.`
-    : "";
+  feedback.textContent =
+    current > 0 && target > current
+      ? `목표까지 월 ${new Intl.NumberFormat("ko-KR").format(target - current)}원이 더 필요해요.`
+      : "";
 }
 ```
 
@@ -430,10 +472,12 @@ Commit: `git add src/ui/diagnosis.ts tests/diagnosis-ui.test.ts && git commit -m
 ### Task 3: Optional Restaurant Detail Inputs
 
 **Files:**
+
 - Modify: `src/ui/diagnosis.ts`
 - Test: `tests/diagnosis-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: `RestaurantOperationsInput` and `validateRestaurantOperations`.
 - Produces: `DiagnosisInput.restaurant: RestaurantOperationsInput` and `[data-restaurant-details]` progressive disclosure.
 
@@ -450,18 +494,22 @@ test("completes diagnosis without opening restaurant details", async () => {
 
 test("reads only the restaurant details the owner knows", async () => {
   const root = await openStepThree();
-  const details = root.querySelector<HTMLDetailsElement>("[data-restaurant-details]")!;
+  const details = root.querySelector<HTMLDetailsElement>(
+    "[data-restaurant-details]",
+  )!;
   details.open = true;
   setValue("restaurantSeats", "32");
   setValue("restaurantAveragePartySize", "4");
   choose("restaurantPeakOccupancy", "half");
   const form = root.querySelector<HTMLFormElement>("[data-diagnosis-form]")!;
-  expect(readDiagnosisForm(form).restaurant).toEqual(expect.objectContaining({
-    seats: 32,
-    hallHours: null,
-    peakOccupancy: "half",
-    averagePartySize: 4,
-  }));
+  expect(readDiagnosisForm(form).restaurant).toEqual(
+    expect.objectContaining({
+      seats: 32,
+      hallHours: null,
+      peakOccupancy: "half",
+      averagePartySize: 4,
+    }),
+  );
 });
 ```
 
@@ -494,9 +542,15 @@ Use select cards for occupancy and stay bands; use numeric inputs for seats, hal
 const restaurant: RestaurantOperationsInput = {
   seats: nullableNumberValue(form, "restaurantSeats"),
   hallHours: nullableNumberValue(form, "restaurantHallHours"),
-  peakOccupancy: radioValue(form, "restaurantPeakOccupancy") as PeakOccupancy | null,
+  peakOccupancy: radioValue(
+    form,
+    "restaurantPeakOccupancy",
+  ) as PeakOccupancy | null,
   averagePartySize: nullableNumberValue(form, "restaurantAveragePartySize"),
-  averageStayBand: radioValue(form, "restaurantAverageStayBand") as AverageStayBand | null,
+  averageStayBand: radioValue(
+    form,
+    "restaurantAverageStayBand",
+  ) as AverageStayBand | null,
   channelShares: {
     dineIn: nullableNumberValue(form, "dineInShare"),
     takeout: nullableNumberValue(form, "takeoutShare"),
@@ -520,10 +574,12 @@ Commit: `git add src/ui/diagnosis.ts tests/diagnosis-ui.test.ts && git commit -m
 ### Task 4: Focused Responsive Presentation
 
 **Files:**
+
 - Modify: `src/styles.css`
 - Modify: `tests/responsive-styles.test.ts`
 
 **Interfaces:**
+
 - Consumes: `.step-panel`, `.question-card`, `.question-actions`, `.coaching-feedback`, and `.restaurant-details` markup.
 - Produces: one-visible-panel contract, centered desktop reading width, mobile single-column layout, touch-safe controls, and reduced-motion fallback.
 
@@ -531,7 +587,9 @@ Commit: `git add src/ui/diagnosis.ts tests/diagnosis-ui.test.ts && git commit -m
 
 ```ts
 test("never lets grid declarations override hidden diagnosis content", () => {
-  expect(css).toMatch(/\.step-panel\[hidden\],[^{]*\.question-card\[hidden\]\s*\{[^}]*display:\s*none\s*!important/s);
+  expect(css).toMatch(
+    /\.step-panel\[hidden\],[^{]*\.question-card\[hidden\]\s*\{[^}]*display:\s*none\s*!important/s,
+  );
 });
 
 test("defines a focused diagnosis stage and mobile action layout", () => {
@@ -543,7 +601,9 @@ test("defines a focused diagnosis stage and mobile action layout", () => {
 });
 
 test("removes question transitions when reduced motion is requested", () => {
-  expect(css).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*\.question-card/s);
+  expect(css).toMatch(
+    /prefers-reduced-motion:\s*reduce[\s\S]*\.question-card/s,
+  );
 });
 ```
 
@@ -645,12 +705,14 @@ Commit: `git add src/styles.css tests/responsive-styles.test.ts && git commit -m
 ### Task 5: Result Integration and Honest Capacity Guidance
 
 **Files:**
+
 - Modify: `src/app.ts`
 - Modify: `src/ui/result.ts`
 - Modify: `tests/diagnosis-ui.test.ts`
 - Modify: `tests/live-app.test.ts`
 
 **Interfaces:**
+
 - Consumes: `analyzeRestaurantOperations(input.restaurant, metrics.maxNewCustomersPerDay)`.
 - Produces: `ResultViewModel.restaurant?: RestaurantOperationsInsight` and a `[data-restaurant-insight]` result section.
 
@@ -659,7 +721,8 @@ Commit: `git add src/styles.css tests/responsive-styles.test.ts && git commit -m
 ```ts
 test("shows acquisition guidance when the restaurant reports spare peak capacity", async () => {
   const root = await openStepThree();
-  root.querySelector<HTMLDetailsElement>("[data-restaurant-details]")!.open = true;
+  root.querySelector<HTMLDetailsElement>("[data-restaurant-details]")!.open =
+    true;
   setValue("restaurantSeats", "32");
   setValue("restaurantHallHours", "8");
   setValue("restaurantAveragePartySize", "4");
@@ -669,10 +732,12 @@ test("shows acquisition guidance when the restaurant reports spare peak capacity
   click("[data-submit-diagnosis]");
   await Promise.resolve();
   await Promise.resolve();
-  expect(document.querySelector("[data-restaurant-insight]")?.textContent)
-    .toContain("하루 약 5팀이 더 필요해요");
-  expect(document.querySelector("[data-restaurant-insight]")?.textContent)
-    .toContain("신규 고객 확보가 먼저입니다");
+  expect(
+    document.querySelector("[data-restaurant-insight]")?.textContent,
+  ).toContain("하루 약 5팀이 더 필요해요");
+  expect(
+    document.querySelector("[data-restaurant-insight]")?.textContent,
+  ).toContain("신규 고객 확보가 먼저입니다");
 });
 
 test("does not claim numeric capacity from missing operations data", async () => {
@@ -681,7 +746,8 @@ test("does not claim numeric capacity from missing operations data", async () =>
   click("[data-submit-diagnosis]");
   await Promise.resolve();
   await Promise.resolve();
-  const copy = document.querySelector("[data-restaurant-insight]")?.textContent ?? "";
+  const copy =
+    document.querySelector("[data-restaurant-insight]")?.textContent ?? "";
   expect(copy).not.toMatch(/최대 .*명.*받을 수/);
 });
 
@@ -689,20 +755,23 @@ test("persists restaurant input and derived insight in assessment JSON", async (
   const service = createDemoService();
   const saveAssessment = vi.spyOn(service, "saveAssessment");
   const root = await openStepThree("unknown", service);
-  root.querySelector<HTMLDetailsElement>("[data-restaurant-details]")!.open = true;
+  root.querySelector<HTMLDetailsElement>("[data-restaurant-details]")!.open =
+    true;
   choose("restaurantPeakOccupancy", "half");
   choose("adsRunning", "false");
   click("[data-submit-diagnosis]");
   await Promise.resolve();
   await Promise.resolve();
-  expect(saveAssessment).toHaveBeenCalledWith(expect.objectContaining({
-    inputs: expect.objectContaining({
-      restaurant: expect.objectContaining({ peakOccupancy: "half" }),
+  expect(saveAssessment).toHaveBeenCalledWith(
+    expect.objectContaining({
+      inputs: expect.objectContaining({
+        restaurant: expect.objectContaining({ peakOccupancy: "half" }),
+      }),
+      metrics: expect.objectContaining({
+        restaurant: expect.objectContaining({ status: "available" }),
+      }),
     }),
-    metrics: expect.objectContaining({
-      restaurant: expect.objectContaining({ status: "available" }),
-    }),
-  }));
+  );
 });
 ```
 
@@ -733,14 +802,18 @@ const assessment = await service.saveAssessment({
   diagnosis: { bottleneck, actionKey: action.key },
 });
 
-renderResult(root, {
-  metrics,
-  allocation,
-  ...advertisingResult,
-  restaurant,
-  bottleneck,
-  action,
-}, callbacks);
+renderResult(
+  root,
+  {
+    metrics,
+    allocation,
+    ...advertisingResult,
+    restaurant,
+    bottleneck,
+    action,
+  },
+  callbacks,
+);
 ```
 
 - [ ] **Step 4: Render qualified restaurant guidance**
@@ -749,10 +822,14 @@ Add `restaurant?: RestaurantOperationsInsight` to `ResultViewModel`. Render noth
 
 ```ts
 const statusCopy = {
-  available: "가장 붐비는 시간에도 좌석 여유가 있어, 지금은 좌석 확대보다 신규 고객 확보가 먼저입니다.",
-  time_limited: "붐비는 시간에는 좌석이 거의 찹니다. 광고 확대와 함께 한산한 시간대 유입 또는 포장·배달 전환을 먼저 시험해보세요.",
-  saturated: "웨이팅이 발생하고 있어 고객을 더 모으기 전에 체류시간, 주문 처리 또는 포장·배달 구조를 먼저 점검해야 합니다.",
-  insufficient: "운영 정보가 충분하지 않아 매장 수용 여력은 단정하지 않았습니다.",
+  available:
+    "가장 붐비는 시간에도 좌석 여유가 있어, 지금은 좌석 확대보다 신규 고객 확보가 먼저입니다.",
+  time_limited:
+    "붐비는 시간에는 좌석이 거의 찹니다. 광고 확대와 함께 한산한 시간대 유입 또는 포장·배달 전환을 먼저 시험해보세요.",
+  saturated:
+    "웨이팅이 발생하고 있어 고객을 더 모으기 전에 체류시간, 주문 처리 또는 포장·배달 구조를 먼저 점검해야 합니다.",
+  insufficient:
+    "운영 정보가 충분하지 않아 매장 수용 여력은 단정하지 않았습니다.",
 } as const;
 ```
 
@@ -771,9 +848,11 @@ Commit: `git add src/app.ts src/ui/result.ts tests/diagnosis-ui.test.ts tests/li
 ### Task 6: Full Verification and Production Delivery
 
 **Files:**
+
 - Modify only if verification uncovers a regression in the files already listed above.
 
 **Interfaces:**
+
 - Consumes: the completed diagnosis, restaurant analysis, styles, existing live authentication, and assessment persistence.
 - Produces: a verified commit suitable for the existing Vercel production project.
 

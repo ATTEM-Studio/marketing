@@ -50,22 +50,11 @@ export interface FieldError {
   message: string;
 }
 
-export type PeakOccupancy =
-  | "spacious"
-  | "half"
-  | "almost_full"
-  | "waiting";
+export type PeakOccupancy = "spacious" | "half" | "almost_full" | "waiting";
 export type AverageStayBand =
-  | "under_30"
-  | "30_60"
-  | "60_90"
-  | "over_90"
-  | "unknown";
+  "under_30" | "30_60" | "60_90" | "over_90" | "unknown";
 export type RestaurantCapacityStatus =
-  | "available"
-  | "time_limited"
-  | "saturated"
-  | "insufficient";
+  "available" | "time_limited" | "saturated" | "insufficient";
 
 export interface RestaurantOperationsInput {
   seats: number | null;

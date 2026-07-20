@@ -48,7 +48,10 @@ export function validateRestaurantOperations(
   const channelFields = ["dineIn", "takeout", "delivery"] as const;
   channelFields.forEach((field) => {
     const value = input.channelShares[field];
-    if (value !== null && (!isFiniteNumber(value) || value < 0 || value > 100)) {
+    if (
+      value !== null &&
+      (!isFiniteNumber(value) || value < 0 || value > 100)
+    ) {
       errors.push({ field, message: shareMessage });
     }
   });
