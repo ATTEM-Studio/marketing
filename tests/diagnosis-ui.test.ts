@@ -207,6 +207,26 @@ test.each(["abc", "Infinity", "1e309"])(
   },
 );
 
+test("returns to the average order value question when chapter validation rejects zero", async () => {
+  const root = document.querySelector<HTMLElement>("#app")!;
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "0");
+  setValue("operatingDays", "20");
+  advanceQuestions(4);
+
+  const visibleQuestions = root.querySelectorAll<HTMLElement>(
+    "[data-question]:not([hidden])",
+  );
+  expect(visibleQuestions).toHaveLength(1);
+  expect(visibleQuestions[0]?.dataset.question).toBe("averageOrderValue");
+  expect(document.activeElement).toBe(
+    root.querySelector("[name='averageOrderValue']"),
+  );
+});
+
 test("does not use unconnected repeat data for a repeat recommendation", async () => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing test root");
@@ -288,6 +308,35 @@ test.each(["0", "-1"])(
     );
     expect(document.querySelector<HTMLElement>("[data-step='3']")?.hidden).toBe(
       true,
+    );
+  },
+);
+
+test.each(["", "0"])(
+  "returns to the customer-count question when a known count of %j is invalid",
+  async (customerCount) => {
+    const root = document.querySelector<HTMLElement>("#app")!;
+    await createApp(root, createDemoService()).start();
+    click("[data-start-diagnosis]");
+    setValue("averageMonthlyRevenue", "30,000,000");
+    setValue("targetMonthlyRevenue", "40,000,000");
+    setValue("averageOrderValue", "25,000");
+    setValue("operatingDays", "20");
+    advanceQuestions(4);
+    choose("monthlyCustomerCountStatus", "known");
+    setValue("monthlyCustomerCount", customerCount);
+    choose("primaryConcern", "unknown");
+    advanceQuestions(2);
+
+    const visibleQuestions = root.querySelectorAll<HTMLElement>(
+      "[data-question]:not([hidden])",
+    );
+    expect(visibleQuestions).toHaveLength(1);
+    expect(visibleQuestions[0]?.dataset.question).toBe(
+      "monthlyCustomerCountStatus",
+    );
+    expect(document.activeElement).toBe(
+      root.querySelector("[name='monthlyCustomerCount']"),
     );
   },
 );

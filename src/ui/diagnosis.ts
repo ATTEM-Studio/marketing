@@ -65,6 +65,29 @@ const chapterTitles: Record<Step, string> = {
   3: "실행 조건",
 };
 
+const questionByErrorField: Readonly<Record<string, QuestionId>> = {
+  averageMonthlyRevenue: "averageMonthlyRevenue",
+  targetMonthlyRevenue: "targetMonthlyRevenue",
+  averageOrderValue: "averageOrderValue",
+  operatingDays: "operatingDays",
+  newCustomerRevenue: "operatingDays",
+  returningCustomerRevenue: "operatingDays",
+  averageOrderValueRevenue: "operatingDays",
+  allocation: "operatingDays",
+  monthlyCustomerCountStatus: "monthlyCustomerCountStatus",
+  monthlyCustomerCount: "monthlyCustomerCountStatus",
+  primaryConcern: "primaryConcern",
+  capacity: "capacity",
+  returningDataStatus: "returningDataStatus",
+  hasConsentDb: "hasConsentDb",
+  canChangeMenu: "canChangeMenu",
+  adsRunning: "adsRunning",
+  visitConversionRate: "adsRunning",
+  costPerClick: "adsRunning",
+  actualAdNewCustomers: "adsRunning",
+  actualAdSpend: "adsRunning",
+};
+
 const numberValue = (form: HTMLFormElement, name: string): number => {
   const value = form.elements.namedItem(name);
   if (!(value instanceof HTMLInputElement)) return 0;
@@ -410,7 +433,11 @@ function syncAdvertisingFields(
   }
 }
 
-function validateStep(form: HTMLFormElement, step: Step): boolean {
+function validateStep(
+  form: HTMLFormElement,
+  step: Step,
+  revealErrorQuestion?: (field: string) => void,
+): boolean {
   clearErrors(form);
   const errors: { name: string; message: string }[] = [];
   if (step === 1) {
@@ -519,6 +546,7 @@ function validateStep(form: HTMLFormElement, step: Step): boolean {
   }
   errors.forEach((error) => setError(form, error.name, error.message));
   if (errors[0]) {
+    revealErrorQuestion?.(errors[0].name);
     const focusName =
       errors[0].name === "allocation" ? "newCustomerRevenue" : errors[0].name;
     form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
@@ -689,6 +717,15 @@ export function renderDiagnosis(
   if (!form) return;
   syncAdvertisingFields(form);
   let questionIndex = 0;
+  const revealErrorQuestion = (field: string) => {
+    const questionId = questionByErrorField[field];
+    const errorQuestionIndex = questions.findIndex(
+      (question) => question.id === questionId,
+    );
+    if (errorQuestionIndex < 0) return;
+    questionIndex = errorQuestionIndex;
+    showQuestion(root, questionIndex);
+  };
   showQuestion(root, questionIndex);
   form.addEventListener("input", () => {
     updateCoachingFeedback(form);
@@ -715,7 +752,7 @@ export function renderDiagnosis(
       if (!current || !validateQuestion(form, current.id)) return;
       if (
         (!next || next.step !== current.step) &&
-        !validateStep(form, current.step)
+        !validateStep(form, current.step, revealErrorQuestion)
       ) {
         return;
       }
@@ -730,9 +767,9 @@ export function renderDiagnosis(
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (
-      !validateStep(form, 1) ||
-      !validateStep(form, 2) ||
-      !validateStep(form, 3)
+      !validateStep(form, 1, revealErrorQuestion) ||
+      !validateStep(form, 2, revealErrorQuestion) ||
+      !validateStep(form, 3, revealErrorQuestion)
     ) {
       return;
     }
