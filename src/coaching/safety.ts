@@ -8,6 +8,8 @@ export interface SafetyResult {
 const phonePattern = /(?:\+?82[-.\s]?)?0?1[016789](?:[-.\s]?\d{3,4}){2}/giu;
 const businessPhonePattern =
   /(?:\+?82[-.\s]?)?0(?:2|[3-6][1-5]|70|80)(?:[-.\s]?\d{3,4}){2}/giu;
+const internationalBusinessPhonePattern =
+  /\+82[-.\s]?(?:2|[3-6][1-5]|70|80)(?:[-.\s]?\d{3,4}){2}/giu;
 const emailPattern =
   /[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+/giu;
 const namedOwnerPattern = /[가-힣]{1,4}(?:사장님?|대표님?)/gu;
@@ -38,6 +40,7 @@ export function sanitizeQuestion(question: string): string {
     .replace(emailPattern, "")
     .replace(phonePattern, "")
     .replace(businessPhonePattern, "")
+    .replace(internationalBusinessPhonePattern, "")
     .replace(namedOwnerPattern, "")
     .replace(ownerNamePattern, "")
     .replace(labeledOwnerNamePattern, "$1")
