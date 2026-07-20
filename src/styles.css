@@ -867,6 +867,18 @@ details > summary {
   font-weight: 800;
 }
 
+.restaurant-details > summary {
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.restaurant-details > summary > span {
+  flex: 0 0 auto;
+  color: var(--green-dark);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .detail-row {
   display: grid;
   gap: 0.75rem;

@@ -56,6 +56,15 @@ test("gives every disclosure summary a touch-safe interactive height", () => {
   );
 });
 
+test("keeps the restaurant detail badge separated from its mobile label", () => {
+  expect(css).toMatch(
+    /\.restaurant-details\s*>\s*summary\s*{[^}]*gap:\s*0\.5rem[^}]*justify-content:\s*space-between/s,
+  );
+  expect(css).toMatch(
+    /\.restaurant-details\s*>\s*summary\s*>\s*span\s*{[^}]*flex:\s*0\s+0\s+auto[^}]*white-space:\s*nowrap/s,
+  );
+});
+
 test("keeps diagnosis content flexible without stretching the action row", () => {
   expect(css).toMatch(
     /\.diagnosis-stage\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\)\s+auto\s+auto\s+auto/s,
