@@ -464,11 +464,15 @@ test("reads only the restaurant details the owner knows", async () => {
 
 test("validates restaurant details when leaving the capacity question", async () => {
   const root = await openStepThree();
+  const details = root.querySelector<HTMLDetailsElement>(
+    "[data-restaurant-details]",
+  )!;
   click("[data-prev-question]");
   click("[data-prev-question]");
   click("[data-prev-question]");
   click("[data-prev-question]");
   setValue("restaurantSeats", "0");
+  expect(details.open).toBe(false);
   click("[data-next-question]");
 
   const seats = root.querySelector<HTMLInputElement>(
@@ -477,15 +481,20 @@ test("validates restaurant details when leaving the capacity question", async ()
   expect(
     root.querySelector<HTMLElement>("[data-question='capacity']")?.hidden,
   ).toBe(false);
+  expect(details.open).toBe(true);
   expect(seats?.getAttribute("aria-invalid")).toBe("true");
   expect(document.activeElement).toBe(seats);
 });
 
 test("links a shared restaurant details channel error to all three inputs", async () => {
   const root = await openStepThree();
+  const details = root.querySelector<HTMLDetailsElement>(
+    "[data-restaurant-details]",
+  )!;
   setValue("dineInShare", "50");
   setValue("takeoutShare", "30");
   setValue("deliveryShare", "10");
+  expect(details.open).toBe(false);
   choose("adsRunning", "false");
   click("[data-submit-diagnosis]");
 
@@ -495,6 +504,7 @@ test("links a shared restaurant details channel error to all three inputs", asyn
   expect(
     root.querySelector<HTMLElement>("[data-question='capacity']")?.hidden,
   ).toBe(false);
+  expect(details.open).toBe(true);
   channelInputs.forEach((input) => {
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(input.getAttribute("aria-describedby")).toContain(

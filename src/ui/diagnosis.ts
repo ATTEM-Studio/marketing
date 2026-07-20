@@ -114,6 +114,8 @@ const restaurantErrorField: Readonly<Record<string, string>> = {
   channelShares: "channelShares",
 };
 
+const restaurantErrorNames = new Set(Object.values(restaurantErrorField));
+
 const numberValue = (form: HTMLFormElement, name: string): number => {
   const value = form.elements.namedItem(name);
   if (!(value instanceof HTMLInputElement)) return 0;
@@ -478,6 +480,32 @@ function clearErrors(form: HTMLFormElement): void {
     });
 }
 
+function presentValidationErrors(
+  form: HTMLFormElement,
+  errors: readonly { name: string; message: string }[],
+  revealErrorQuestion?: (field: string) => void,
+): boolean {
+  const firstError = errors[0];
+  if (!firstError) return true;
+
+  revealErrorQuestion?.(firstError.name);
+  if (restaurantErrorNames.has(firstError.name)) {
+    const details = form.querySelector<HTMLDetailsElement>(
+      "[data-restaurant-details]",
+    );
+    if (details) details.open = true;
+  }
+  errors.forEach((error) => setError(form, error.name, error.message));
+  const focusName =
+    firstError.name === "allocation"
+      ? "newCustomerRevenue"
+      : firstError.name === "channelShares"
+        ? "dineInShare"
+        : firstError.name;
+  form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
+  return false;
+}
+
 function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
   clearErrors(form);
   if (
@@ -518,13 +546,7 @@ function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
   }
   if (id === "capacity") {
     const errors = restaurantValidationErrors(form);
-    errors.forEach((error) => setError(form, error.name, error.message));
-    if (errors[0]) {
-      const focusName =
-        errors[0].name === "channelShares" ? "dineInShare" : errors[0].name;
-      form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
-      return false;
-    }
+    return presentValidationErrors(form, errors);
   }
   return true;
 }
@@ -673,19 +695,7 @@ function validateStep(
     }
     restaurantValidationErrors(form).forEach((error) => errors.push(error));
   }
-  errors.forEach((error) => setError(form, error.name, error.message));
-  if (errors[0]) {
-    revealErrorQuestion?.(errors[0].name);
-    const focusName =
-      errors[0].name === "allocation"
-        ? "newCustomerRevenue"
-        : errors[0].name === "channelShares"
-          ? "dineInShare"
-          : errors[0].name;
-    form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
-    return false;
-  }
-  return true;
+  return presentValidationErrors(form, errors, revealErrorQuestion);
 }
 
 export function renderDiagnosis(
