@@ -35,3 +35,21 @@ test("keeps Korean words intact while long machine tokens remain safe", () => {
   );
   expect(css).toMatch(/\.long-token,[^{]+\{[^}]*overflow-wrap:\s*anywhere/s);
 });
+
+test("never lets grid declarations override hidden diagnosis content", () => {
+  expect(css).toMatch(
+    /\.step-panel\[hidden\],[^{]*\.question-card\[hidden\]\s*\{[^}]*display:\s*none\s*!important/,
+  );
+});
+
+test("defines a focused diagnosis stage and mobile action layout", () => {
+  expect(css).toContain(".diagnosis-stage");
+  expect(css).toContain(".question-card");
+  expect(css).toContain(".question-actions");
+  expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*\.question-actions/);
+  expect(css).toMatch(/\.choice-card[^{]*\{[^}]*min-height:\s*44px/);
+});
+
+test("removes question transitions when reduced motion is requested", () => {
+  expect(css).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*\.question-card/);
+});

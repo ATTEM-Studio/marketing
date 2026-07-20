@@ -12,6 +12,7 @@
   --orange: #e8893a;
   --orange-soft: #fff0e2;
   --border: #dce3dc;
+  --line: var(--border);
   --focus: #1263d6;
   --danger: #a32929;
   --shadow: 0 18px 55px rgba(20, 42, 31, 0.1);
@@ -590,6 +591,51 @@ fieldset {
   border: 0;
 }
 
+.step-panel[hidden],
+.question-card[hidden] {
+  display: none !important;
+}
+
+.diagnosis-shell {
+  max-width: 820px;
+}
+
+.diagnosis-stage {
+  display: grid;
+  min-height: clamp(500px, 68vh, 720px);
+  grid-template-rows: auto 1fr auto;
+}
+
+.question-card {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  animation: question-enter 180ms ease-out both;
+}
+
+.question-card h2,
+.question-card p,
+.choice-card span {
+  word-break: keep-all;
+  text-wrap: pretty;
+}
+
+.coaching-feedback:empty {
+  display: none;
+}
+
+@keyframes question-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .step-panel > legend {
   margin-bottom: 0.35rem;
   padding: 0;
@@ -749,7 +795,7 @@ textarea {
 
 .choice-card {
   align-items: center;
-  min-height: 52px;
+  min-height: 44px;
   padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -779,6 +825,14 @@ textarea {
 
 .form-actions-end {
   justify-content: flex-end;
+}
+
+.question-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
 }
 
 .optional-details,
@@ -1167,6 +1221,27 @@ summary {
     border-radius: var(--radius-md);
   }
 
+  .diagnosis-shell {
+    width: min(calc(100% - 16px), var(--work-content));
+    padding: 1rem;
+  }
+
+  .diagnosis-stage {
+    min-height: calc(100svh - 150px);
+  }
+
+  .question-actions {
+    position: sticky;
+    bottom: 0;
+    padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
+    background: var(--panel);
+  }
+
+  .question-actions button {
+    flex: 1;
+    min-height: 48px;
+  }
+
   .form-card-heading,
   .action-heading,
   .metric-hero {
@@ -1213,6 +1288,10 @@ summary {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .question-card {
+    animation: none;
+  }
+
   *,
   *::before,
   *::after {
