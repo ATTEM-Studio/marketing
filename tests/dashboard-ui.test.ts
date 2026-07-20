@@ -66,6 +66,23 @@ test("does not show coaching for a tampered assessment", async () => {
   expect(root.querySelector("[data-start-coaching]")).toBeNull();
 });
 
+test("does not show coaching when the persisted goal differs", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const assessment = createAuthenticAssessment();
+  assessment.goalTargetRevenue = 20_000_000;
+  const service = {
+    getLatestAssessment: vi.fn(async () => assessment),
+    listActionPlans: vi.fn(async () => []),
+    signOut: vi.fn(),
+  } as unknown as AppService;
+
+  await renderDashboard(root, { mode: "demo", profile: null }, service, vi.fn());
+
+  expect(root.querySelector("[data-start-coaching]")).toBeNull();
+});
+
 test("shows the next action and saves before-after results", async () => {
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.querySelector<HTMLElement>("#app");

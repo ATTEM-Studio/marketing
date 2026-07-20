@@ -25,14 +25,13 @@ function dataObject(value: unknown): Record<string, unknown> {
 
 function isCompletedAssessment(assessment: AssessmentSnapshot | null): boolean {
   if (!assessment || !assessment.id) return false;
-  const revenue = dataObject(dataObject(assessment.inputs).revenue);
   return isCompletedPersistedAssessment(
     {
       input_data: assessment.inputs,
       calculated_metrics: assessment.metrics,
       diagnosis: assessment.diagnosis,
     },
-    { target_revenue: revenue.targetMonthlyRevenue },
+    { target_revenue: assessment.goalTargetRevenue },
   );
 }
 

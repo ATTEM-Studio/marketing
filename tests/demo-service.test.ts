@@ -41,6 +41,20 @@ describe("demo service", () => {
     expect(localStorage.length).toBe(0);
   });
 
+  test("keeps the saved goal target with the demo assessment", async () => {
+    const service = createDemoService();
+
+    await service.saveAssessment({
+      inputs: { revenue: { targetMonthlyRevenue: 10_000_000 } },
+      metrics: {},
+      diagnosis: {},
+    });
+
+    await expect(service.getLatestAssessment()).resolves.toMatchObject({
+      goalTargetRevenue: 10_000_000,
+    });
+  });
+
   test("returns a deterministic catalog-backed coaching sample", async () => {
     const service = createDemoService();
 

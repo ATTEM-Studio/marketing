@@ -272,6 +272,29 @@ test("saves the target revenue from the nested diagnosis revenue input", async (
   );
 });
 
+test("loads the actual goal target associated with the latest assessment", async () => {
+  assessment.maybeSingle.mockResolvedValueOnce({
+    data: {
+      id: "assessment-1",
+      input_data: {},
+      calculated_metrics: {},
+      diagnosis: {},
+      created_at: "2026-07-19T00:00:00.000Z",
+      goals: [{ target_revenue: "20000000" }],
+    },
+    error: null,
+  });
+  const service = createSupabaseService("https://example.supabase.co", "anon");
+
+  await expect(service.getLatestAssessment()).resolves.toMatchObject({
+    id: "assessment-1",
+    goalTargetRevenue: 20_000_000,
+  });
+  expect(assessment.select).toHaveBeenCalledWith(
+    "id, input_data, calculated_metrics, diagnosis, created_at, goals(target_revenue)",
+  );
+});
+
 test("uses the Korea business month at a UTC month boundary", () => {
   expect(
     koreaBusinessMonthPeriod(new Date("2026-07-31T14:59:59.999Z")),

@@ -29,6 +29,7 @@ export interface AppSession {
 
 export interface AssessmentSnapshot {
   id: string;
+  goalTargetRevenue: number | null;
   inputs: Record<string, unknown>;
   metrics: Record<string, unknown>;
   diagnosis: Record<string, unknown>;
@@ -57,7 +58,10 @@ export interface AppService {
   finalizeRegistration(): Promise<AppSession>;
   signOut(): Promise<void>;
   saveAssessment(
-    snapshot: Omit<AssessmentSnapshot, "id" | "createdAt">,
+    snapshot: Omit<
+      AssessmentSnapshot,
+      "id" | "createdAt" | "goalTargetRevenue"
+    >,
   ): Promise<AssessmentSnapshot>;
   getLatestAssessment(): Promise<AssessmentSnapshot | null>;
   saveActionPlan(draft: ActionPlanDraft): Promise<ActionPlanRecord>;

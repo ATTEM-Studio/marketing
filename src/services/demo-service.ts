@@ -28,6 +28,15 @@ function clone<Value>(value: Value): Value {
   return structuredClone(value);
 }
 
+function goalTargetRevenue(inputs: Record<string, unknown>): number | null {
+  const revenue = inputs.revenue;
+  const target =
+    revenue !== null && typeof revenue === "object" && !Array.isArray(revenue)
+      ? (revenue as Record<string, unknown>).targetMonthlyRevenue
+      : null;
+  return typeof target === "number" && Number.isFinite(target) ? target : null;
+}
+
 function sampleCoachingResponse(
   request: CoachingTurnRequest,
 ): CoachingTurnResponse {
@@ -87,6 +96,7 @@ export function createDemoService(): AppService {
       latestAssessment = {
         ...clone(snapshot),
         id: DEMO_ASSESSMENT_ID,
+        goalTargetRevenue: goalTargetRevenue(snapshot.inputs),
         createdAt: DEMO_ASSESSMENT_CREATED_AT,
       };
 

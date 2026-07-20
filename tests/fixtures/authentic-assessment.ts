@@ -87,6 +87,7 @@ export function createAuthenticAssessment(id = "completed-assessment") {
 
   return {
     id,
+    goalTargetRevenue: inputs.revenue.targetMonthlyRevenue,
     inputs: { ...inputs, allocation },
     metrics: {
       ...revenueMetrics,

@@ -47,6 +47,16 @@ function asValueText(value: unknown): string {
     : "";
 }
 
+function asFiniteNumber(value: unknown): number | null {
+  const number =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(number) ? number : null;
+}
+
 function asObject(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -64,8 +74,11 @@ function profileFromRow(row: Row): BuyerProfile {
 }
 
 function assessmentFromRow(row: Row): AssessmentSnapshot {
+  const goals = row.goals;
+  const goal = Array.isArray(goals) ? asObject(goals[0]) : asObject(goals);
   return {
     id: asText(row.id),
+    goalTargetRevenue: asFiniteNumber(goal.target_revenue),
     inputs: asObject(row.input_data),
     metrics: asObject(row.calculated_metrics),
     diagnosis: asObject(row.diagnosis),
@@ -323,7 +336,9 @@ export function createSupabaseService(
       if (!id) return null;
       const { data, error } = await client
         .from("assessments")
-        .select("id, input_data, calculated_metrics, diagnosis, created_at")
+        .select(
+          "id, input_data, calculated_metrics, diagnosis, created_at, goals(target_revenue)",
+        )
         .eq("user_id", id)
         .order("created_at", { ascending: false })
         .limit(1)
