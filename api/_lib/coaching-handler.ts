@@ -11,7 +11,12 @@ import type {
   CoachingTurnResponse,
 } from "../../src/coaching/types";
 import type { CoachingActionDefinition } from "../../src/coaching/types";
-import type { ComposeCoachingInput, IntentResult } from "./openai";
+import {
+  buildProviderQuestionSignals,
+  type ComposeCoachingInput,
+  type IntentResult,
+  type ProviderQuestionSignals,
+} from "./openai";
 import type {
   CoachingAdmin,
   CoachingSessionRecord,
@@ -38,7 +43,9 @@ export interface CoachingHttpResponse {
 
 export interface CoachingHandlerDependencies {
   admin: CoachingAdmin;
-  classifyQuestion(question: string): Promise<IntentResult>;
+  classifyQuestion(
+    questionSignals: ProviderQuestionSignals,
+  ): Promise<IntentResult>;
   composeCoachingResponse(
     input: ComposeCoachingInput,
   ): Promise<CoachingResponse>;
@@ -356,15 +363,35 @@ async function handleTurn(
   let concernKey: CoachingConcernKey;
   let answers: Record<string, string>;
   let sanitizedAnswer: TurnBody["answer"];
+  let providerQuestionSignals: ProviderQuestionSignals | null = null;
+  let answerAlreadyConsumed = false;
 
   if (body.sessionId) {
     currentSession = await deps.admin.getOwnedSession(userId, body.sessionId);
-    if (
-      !currentSession ||
-      currentSession.assessmentId !== body.assessmentId ||
-      currentSession.status !== "active"
-    ) {
+    if (!currentSession || currentSession.assessmentId !== body.assessmentId) {
       return error(404, "SESSION_NOT_FOUND");
+    }
+    if (currentSession.status === "answered") {
+      const retryValue = body.answer ? sanitizeQuestion(body.answer.value) : "";
+      if (
+        !body.answer ||
+        !retryValue ||
+        currentSession.answers[body.answer.questionKey] !== retryValue
+      ) {
+        return error(409, "FOLLOW_UP_MISMATCH");
+      }
+      const finalized = await deps.admin.getFinalizedResult(
+        userId,
+        currentSession.id,
+      );
+      return finalized
+        ? response(200, {
+            kind: "answer",
+            sessionId: currentSession.id,
+            recommendationId: finalized.recommendationId,
+            response: finalized.response,
+          })
+        : error(409, "SESSION_STATE_CHANGED");
     }
     intent = currentSession.intent;
     confidence = currentSession.confidence;
@@ -372,6 +399,15 @@ async function handleTurn(
     if (body.answer) {
       const value = sanitizeQuestion(body.answer.value);
       if (!value) return error(400, "INVALID_REQUEST");
+      answerAlreadyConsumed =
+        currentSession.pendingFollowUpKey === null &&
+        currentSession.answers[body.answer.questionKey] === value;
+      if (
+        currentSession.pendingFollowUpKey !== body.answer.questionKey &&
+        !answerAlreadyConsumed
+      ) {
+        return error(409, "FOLLOW_UP_MISMATCH");
+      }
       sanitizedAnswer = { questionKey: body.answer.questionKey, value };
     }
     answers = {
@@ -380,6 +416,24 @@ async function handleTurn(
         ? { [sanitizedAnswer.questionKey]: sanitizedAnswer.value }
         : {}),
     };
+    if (
+      sanitizedAnswer &&
+      !answerAlreadyConsumed &&
+      !(await deps.admin.consumeFollowUp({
+        userId,
+        sessionId: currentSession.id,
+        questionKey: sanitizedAnswer.questionKey,
+        answerPayload: { kind: "follow_up_answer", answer: sanitizedAnswer },
+        context,
+        answers,
+      }))
+    ) {
+      return error(409, "SESSION_STATE_CHANGED");
+    }
+    providerQuestionSignals = buildProviderQuestionSignals(
+      currentSession.initialQuestion,
+      concernKey,
+    );
   } else {
     question = body.question ? sanitizeQuestion(body.question) : undefined;
     if (body.question !== undefined && !question) {
@@ -388,10 +442,21 @@ async function handleTurn(
     concernKey = body.concernKey ?? "unknown";
     answers = {};
     if (question) {
+      providerQuestionSignals = buildProviderQuestionSignals(
+        question,
+        concernKey,
+      );
       try {
-        const classification = await deps.classifyQuestion(question);
+        if (!providerQuestionSignals) throw new Error("NO_SAFE_SIGNAL");
+        const classification = await deps.classifyQuestion(
+          providerQuestionSignals,
+        );
         intent = classification.intent;
         confidence = classification.confidence;
+        providerQuestionSignals = {
+          ...providerQuestionSignals,
+          requestedOutcome: classification.requestedOutcome ?? "unknown",
+        };
       } catch {
         intent = "unknown";
         confidence = 0;
@@ -399,6 +464,10 @@ async function handleTurn(
     } else {
       intent = concernIntent[concernKey];
       confidence = 1;
+      providerQuestionSignals = buildProviderQuestionSignals(
+        concernKey,
+        concernKey,
+      );
     }
     const inserted = await deps.admin.insertSession({
       id: deps.newId?.() ?? crypto.randomUUID(),
@@ -411,23 +480,24 @@ async function handleTurn(
       confidence,
       status: "active",
       followUpCount: 0,
+      pendingFollowUpKey: null,
       answers,
       context,
     });
     currentSession = inserted;
   }
 
-  const userPayload: Record<string, unknown> = sanitizedAnswer
-    ? { kind: "follow_up_answer", answer: sanitizedAnswer }
-    : question
-      ? { kind: "question", question }
-      : { kind: "concern", concernKey };
-  await deps.admin.insertMessage({
-    userId,
-    sessionId: currentSession.id,
-    role: "user",
-    payload: userPayload,
-  });
+  const userPayload: Record<string, unknown> = question
+    ? { kind: "question", question }
+    : { kind: "concern", concernKey };
+  if (!sanitizedAnswer) {
+    await deps.admin.insertMessage({
+      userId,
+      sessionId: currentSession.id,
+      role: "user",
+      payload: userPayload,
+    });
+  }
 
   const decision = chooseNextTurn({
     classifiedIntent: intent,
@@ -452,19 +522,16 @@ async function handleTurn(
           : null
       : null;
   if (nextFollowUp) {
-    const followUpCount = currentSession.followUpCount + 1;
-    await deps.admin.updateSession(userId, currentSession.id, {
-      context,
-      answers,
-      followUpCount,
-      status: "active",
-    });
-    await deps.admin.insertMessage({
+    const followUpCount = await deps.admin.issueFollowUp({
       userId,
       sessionId: currentSession.id,
-      role: "assistant",
-      payload: { kind: "follow_up", question: nextFollowUp },
+      expectedFollowUpCount: currentSession.followUpCount,
+      questionKey: nextFollowUp.key,
+      questionPayload: { kind: "follow_up", question: nextFollowUp },
+      context,
+      answers,
     });
+    if (followUpCount === null) return error(409, "SESSION_STATE_CHANGED");
     return response(200, {
       kind: "follow_up",
       sessionId: currentSession.id,
@@ -480,10 +547,10 @@ async function handleTurn(
       ...templateResponse(action, approvedEvidence),
       situation: `요청한 방식은 안내할 수 없습니다. 대신 ${action.reasonTemplate}`,
     };
-  } else {
+  } else if (providerQuestionSignals) {
     try {
       coachingResponse = await deps.composeCoachingResponse({
-        question: question ?? currentSession.initialQuestion,
+        questionSignals: providerQuestionSignals,
         action,
         evidence: approvedEvidence,
         context,
@@ -491,8 +558,10 @@ async function handleTurn(
     } catch {
       coachingResponse = templateResponse(action, approvedEvidence);
     }
+  } else {
+    coachingResponse = templateResponse(action, approvedEvidence);
   }
-  const recommendation = await deps.admin.insertRecommendation({
+  const finalized = await deps.admin.finalizeSession({
     userId,
     sessionId: currentSession.id,
     actionKey: action.key,
@@ -507,24 +576,17 @@ async function handleTurn(
       tableCount: context.tableCount,
       dailyTurnover: context.dailyTurnover,
     },
-  });
-  await deps.admin.insertMessage({
-    userId,
-    sessionId: currentSession.id,
-    role: "assistant",
-    payload: { kind: "answer", response: coachingResponse },
-  });
-  await deps.admin.updateSession(userId, currentSession.id, {
+    response: coachingResponse,
     context,
     answers,
-    status: "answered",
     answeredAt: (deps.now?.() ?? new Date()).toISOString(),
   });
+  if (!finalized) return error(409, "SESSION_STATE_CHANGED");
   return response(200, {
     kind: "answer",
     sessionId: currentSession.id,
-    recommendationId: recommendation.id,
-    response: coachingResponse,
+    recommendationId: finalized.recommendationId,
+    response: finalized.response,
   });
 }
 

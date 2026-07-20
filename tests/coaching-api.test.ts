@@ -86,11 +86,22 @@ function dependencies(): CoachingHandlerDependencies {
         confidence: 1,
         status: "active",
         followUpCount: 0,
+        pendingFollowUpKey: null,
         answers: {},
       }),
       insertMessage: vi.fn().mockResolvedValue(undefined),
-      insertRecommendation: vi.fn().mockResolvedValue({ id: recommendationId }),
-      updateSession: vi.fn().mockResolvedValue(undefined),
+      issueFollowUp: vi.fn().mockResolvedValue(1),
+      consumeFollowUp: vi.fn().mockResolvedValue(true),
+      finalizeSession: vi.fn().mockImplementation(async (input) => ({
+        recommendationId,
+        response: input.response,
+        created: true,
+      })),
+      getFinalizedResult: vi.fn().mockResolvedValue({
+        recommendationId,
+        response: providerAnswer,
+        created: false,
+      }),
       updateFeedback: vi.fn().mockResolvedValue(true),
     },
     classifyQuestion: vi.fn().mockResolvedValue({
@@ -171,8 +182,10 @@ describe("coaching server handler", () => {
       confidence: 1,
       status: "active",
       followUpCount: 1,
+      pendingFollowUpKey: "customer_choice_reason",
       answers: {},
     });
+    vi.mocked(deps.admin.issueFollowUp).mockResolvedValue(2);
 
     const result = await handleCoachingRequest(
       request(
@@ -189,10 +202,8 @@ describe("coaching server handler", () => {
       status: 200,
       body: { kind: "follow_up", sessionId, remaining: 0 },
     });
-    expect(deps.admin.updateSession).toHaveBeenCalledWith(
-      userId,
-      sessionId,
-      expect.objectContaining({ followUpCount: 2 }),
+    expect(deps.admin.issueFollowUp).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedFollowUpCount: 1 }),
     );
     expect(deps.composeCoachingResponse).not.toHaveBeenCalled();
   });
@@ -210,6 +221,7 @@ describe("coaching server handler", () => {
       confidence: 1,
       status: "active",
       followUpCount: 2,
+      pendingFollowUpKey: "return_reason_known",
       answers: {},
     });
 
@@ -253,8 +265,8 @@ describe("coaching server handler", () => {
         },
       },
     });
-    expect(deps.admin.insertRecommendation).toHaveBeenCalledOnce();
-    expect(deps.admin.insertMessage).toHaveBeenCalledTimes(2);
+    expect(deps.admin.finalizeSession).toHaveBeenCalledOnce();
+    expect(deps.admin.insertMessage).toHaveBeenCalledTimes(1);
   });
 
   it("hides feedback updates for a non-owner with 404", async () => {
@@ -294,13 +306,33 @@ describe("coaching server handler", () => {
       textDeps,
     );
     expect(textDeps.classifyQuestion).toHaveBeenCalledWith(
-      expect.not.stringMatching(/010-1234-5678|owner@example\.com/),
+      expect.objectContaining({ signals: expect.any(Array) }),
     );
     expect(textDeps.composeCoachingResponse).toHaveBeenCalledWith(
       expect.objectContaining({
-        question: expect.not.stringMatching(/010-1234-5678|owner@example\.com/),
+        questionSignals: expect.objectContaining({
+          signals: expect.any(Array),
+        }),
       }),
     );
+  });
+
+  it("uses the rule fallback without a provider when free text has no allowlisted signal", async () => {
+    const deps = dependencies();
+
+    const result = await handleCoachingRequest(
+      request(
+        turn({
+          concernKey: undefined,
+          question: "Kim owns Blue Shop at 12 River Road, @blue-secret",
+        }),
+      ),
+      deps,
+    );
+
+    expect(result.status).toBe(200);
+    expect(deps.classifyQuestion).not.toHaveBeenCalled();
+    expect(deps.composeCoachingResponse).not.toHaveBeenCalled();
   });
 
   it("sanitizes a follow-up answer before persisting it", async () => {
@@ -316,6 +348,7 @@ describe("coaching server handler", () => {
       confidence: 1,
       status: "active",
       followUpCount: 1,
+      pendingFollowUpKey: "customer_choice_reason",
       answers: {},
     });
 
@@ -334,8 +367,156 @@ describe("coaching server handler", () => {
     );
 
     expect(
-      JSON.stringify(vi.mocked(deps.admin.insertMessage).mock.calls[0]),
+      JSON.stringify(vi.mocked(deps.admin.consumeFollowUp).mock.calls[0]),
     ).not.toMatch(/010-1234-5678|owner@example\.com/);
+  });
+
+  it("rejects an answer that is not for the persisted pending follow-up", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.admin.getOwnedSession).mockResolvedValue({
+      id: sessionId,
+      userId,
+      storeId,
+      assessmentId,
+      concernKey: "low_returning",
+      initialQuestion: "returning customers",
+      intent: "returning",
+      confidence: 1,
+      status: "active",
+      followUpCount: 1,
+      pendingFollowUpKey: "customer_consent",
+      answers: {},
+    });
+
+    const result = await handleCoachingRequest(
+      request(
+        turn({
+          sessionId,
+          concernKey: undefined,
+          answer: {
+            questionKey: "customer_choice_reason",
+            value: "menu",
+          },
+        }),
+      ),
+      deps,
+    );
+
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: "FOLLOW_UP_MISMATCH" },
+    });
+    expect(deps.admin.consumeFollowUp).not.toHaveBeenCalled();
+  });
+
+  it("returns a conflict when atomic follow-up issuance loses its CAS", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.admin.issueFollowUp).mockResolvedValue(null);
+    vi.mocked(deps.admin.getOwnedSession).mockResolvedValue({
+      id: sessionId,
+      userId,
+      storeId,
+      assessmentId,
+      concernKey: "low_returning",
+      initialQuestion: "returning customers",
+      intent: "returning",
+      confidence: 1,
+      status: "active",
+      followUpCount: 1,
+      pendingFollowUpKey: "customer_choice_reason",
+      answers: {},
+    });
+
+    const result = await handleCoachingRequest(
+      request(
+        turn({
+          sessionId,
+          concernKey: undefined,
+          answer: { questionKey: "customer_choice_reason", value: "unknown" },
+        }),
+      ),
+      deps,
+    );
+
+    expect(result).toMatchObject({
+      status: 409,
+      body: { error: "SESSION_STATE_CHANGED" },
+    });
+  });
+
+  it("resumes finalization after an answer was atomically consumed before an interruption", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.admin.getOwnedSession).mockResolvedValue({
+      id: sessionId,
+      userId,
+      storeId,
+      assessmentId,
+      concernKey: "low_returning",
+      initialQuestion: "returning customers",
+      intent: "returning",
+      confidence: 1,
+      status: "active",
+      followUpCount: 2,
+      pendingFollowUpKey: null,
+      answers: { return_reason_known: "unknown" },
+    });
+
+    const result = await handleCoachingRequest(
+      request(
+        turn({
+          sessionId,
+          concernKey: undefined,
+          answer: { questionKey: "return_reason_known", value: "unknown" },
+        }),
+      ),
+      deps,
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: { kind: "answer", recommendationId },
+    });
+    expect(deps.admin.consumeFollowUp).not.toHaveBeenCalled();
+    expect(deps.admin.finalizeSession).toHaveBeenCalledOnce();
+  });
+
+  it("returns the stored answer on an idempotent answered-session retry", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.admin.getOwnedSession).mockResolvedValue({
+      id: sessionId,
+      userId,
+      storeId,
+      assessmentId,
+      concernKey: "low_returning",
+      initialQuestion: "returning customers",
+      intent: "returning",
+      confidence: 1,
+      status: "answered",
+      followUpCount: 1,
+      pendingFollowUpKey: null,
+      answers: { customer_consent: "yes" },
+    });
+
+    const result = await handleCoachingRequest(
+      request(
+        turn({
+          sessionId,
+          concernKey: undefined,
+          answer: { questionKey: "customer_consent", value: "yes" },
+        }),
+      ),
+      deps,
+    );
+
+    expect(result).toMatchObject({
+      status: 200,
+      body: { kind: "answer", recommendationId, response: providerAnswer },
+    });
+    expect(deps.admin.getFinalizedResult).toHaveBeenCalledWith(
+      userId,
+      sessionId,
+    );
+    expect(deps.composeCoachingResponse).not.toHaveBeenCalled();
   });
 
   it("rejects an answer for an unknown follow-up key", async () => {
