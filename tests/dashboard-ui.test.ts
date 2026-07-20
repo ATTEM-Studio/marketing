@@ -4,6 +4,65 @@ import { checkInDueDate, renderResult } from "../src/ui/result";
 import type { ActionPlanRecord, AppService } from "../src/services/contracts";
 import { renderDashboard } from "../src/ui/dashboard";
 
+const completedAssessment = {
+  id: "completed-assessment",
+  inputs: { revenue: { targetMonthlyRevenue: 40_000_000 } },
+  metrics: { maxNewCustomers: 400 },
+  diagnosis: {
+    actionKey: "local-discovery",
+    effectiveCapacity: "yes",
+    bottleneck: {
+      key: null,
+      status: "insufficient",
+      changeRate: null,
+      reason: "not enough data",
+    },
+  },
+  createdAt: "2026-07-20T00:00:00.000Z",
+};
+
+test("starts coaching with the latest completed assessment", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const onStartCoaching = vi.fn();
+  const service = {
+    getLatestAssessment: vi.fn(async () => completedAssessment),
+    listActionPlans: vi.fn(async () => []),
+    signOut: vi.fn(),
+  } as unknown as AppService;
+
+  await renderDashboard(
+    root,
+    { mode: "demo", profile: null },
+    service,
+    vi.fn(),
+    vi.fn(),
+    onStartCoaching,
+  );
+  root.querySelector<HTMLButtonElement>("[data-start-coaching]")?.click();
+
+  expect(onStartCoaching).toHaveBeenCalledWith(completedAssessment.id);
+});
+
+test("does not show coaching for an incomplete assessment", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const service = {
+    getLatestAssessment: vi.fn(async () => ({
+      ...completedAssessment,
+      diagnosis: {},
+    })),
+    listActionPlans: vi.fn(async () => []),
+    signOut: vi.fn(),
+  } as unknown as AppService;
+
+  await renderDashboard(root, { mode: "demo", profile: null }, service, vi.fn());
+
+  expect(root.querySelector("[data-start-coaching]")).toBeNull();
+});
+
 test("shows the next action and saves before-after results", async () => {
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.querySelector<HTMLElement>("#app");

@@ -2,6 +2,23 @@ import { expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
 import type { AppService } from "../src/services/contracts";
 
+const completedAssessment = {
+  id: "completed-assessment",
+  inputs: { revenue: { targetMonthlyRevenue: 40_000_000 } },
+  metrics: { maxNewCustomers: 400 },
+  diagnosis: {
+    actionKey: "local-discovery",
+    effectiveCapacity: "yes",
+    bottleneck: {
+      key: null,
+      status: "insufficient",
+      changeRate: null,
+      reason: "not enough data",
+    },
+  },
+  createdAt: "2026-07-20T00:00:00.000Z",
+};
+
 function liveService(signOut = vi.fn(async () => undefined)): AppService {
   return {
     getSession: vi.fn(async () => ({
@@ -41,6 +58,24 @@ function liveService(signOut = vi.fn(async () => undefined)): AppService {
     rateCoaching: vi.fn(async () => undefined),
   };
 }
+
+test("returns from coaching to a freshly loaded dashboard", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const service = liveService();
+  service.getLatestAssessment = vi.fn(async () => completedAssessment);
+
+  await createApp(root, service, { isLive: true }).start();
+  root.querySelector<HTMLButtonElement>("[data-start-coaching]")?.click();
+
+  expect(root.querySelector(".coaching-shell")).not.toBeNull();
+  root.querySelector<HTMLButtonElement>("[data-coaching-back]")?.click();
+  await vi.waitFor(() => {
+    expect(root.querySelector(".dashboard-shell")).not.toBeNull();
+  });
+  expect(service.getLatestAssessment).toHaveBeenCalledTimes(2);
+});
 
 test("shows the landing page before onboarding for a signed-out live visitor", async () => {
   document.body.innerHTML = '<div id="app"></div>';

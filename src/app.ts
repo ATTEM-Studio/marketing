@@ -17,6 +17,7 @@ import {
   type DiagnosisInput,
 } from "./ui/diagnosis";
 import { checkInDueDate, renderResult } from "./ui/result";
+import { renderCoaching } from "./ui/coaching";
 import { renderDashboard } from "./ui/dashboard";
 import { renderOnboarding } from "./ui/onboarding";
 import type { OnboardingView } from "./ui/onboarding";
@@ -60,7 +61,14 @@ export function createApp(
         showDiagnosis(session.mode === "live");
       },
       showLanding,
+      showCoaching,
     );
+  };
+
+  const showCoaching = (assessmentId: string) => {
+    renderCoaching(root, assessmentId, service, () => {
+      void showDashboard();
+    });
   };
 
   const showDiagnosis = (liveSession = false) => {

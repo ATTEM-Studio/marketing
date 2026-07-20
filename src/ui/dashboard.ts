@@ -22,6 +22,26 @@ function dataObject(value: unknown): Record<string, unknown> {
     : {};
 }
 
+const completedActionKeys = new Set([
+  "profit-review",
+  "average-order-value",
+  "measure-acquisition-source",
+  "returning-message",
+  "off-peak-offer",
+  "local-discovery",
+]);
+
+function isCompletedAssessment(assessment: AssessmentSnapshot | null): boolean {
+  if (!assessment || !assessment.id) return false;
+  const diagnosis = dataObject(assessment.diagnosis);
+  const bottleneck = dataObject(diagnosis.bottleneck);
+  return (
+    completedActionKeys.has(text(diagnosis.actionKey)) &&
+    ["yes", "sometimes", "no"].includes(text(diagnosis.effectiveCapacity)) &&
+    ["known", "stable", "insufficient"].includes(text(bottleneck.status))
+  );
+}
+
 function latestTarget(assessment: AssessmentSnapshot): number | null {
   const inputs = dataObject(assessment.inputs);
   return (
@@ -98,6 +118,9 @@ function dashboardMarkup(
   const upcoming = planned.slice(1);
   const target = assessment ? latestTarget(assessment) : null;
   const ceiling = assessment ? maximumNewCustomers(assessment) : null;
+  const coachingEntry = isCompletedAssessment(assessment)
+    ? '<button type="button" class="secondary-action" data-start-coaching>지금 고민 해결하기</button>'
+    : "";
 
   const assessmentSummary = assessment
     ? `<section class="dashboard-summary" aria-label="최근 진단 요약">
@@ -131,7 +154,7 @@ function dashboardMarkup(
       ${checkInForm(activePlan, checkInValues)}
       ${upcomingPlans}
       ${completedPlans}
-      <div class="dashboard-actions"><button type="button" class="secondary-action" data-start-diagnosis>오늘 할 행동 찾기</button></div>
+      <div class="dashboard-actions"><button type="button" class="secondary-action" data-start-diagnosis>오늘 할 행동 찾기</button>${coachingEntry}</div>
       <p class="form-status" role="status" aria-live="polite" data-dashboard-status>${escapeHtml(status)}</p>
     </main>`;
 }
@@ -158,6 +181,7 @@ export async function renderDashboard(
   service: AppService,
   onStartDiagnosis: () => void,
   onSignedOut: () => void = onStartDiagnosis,
+  onStartCoaching: (assessmentId: string) => void = () => undefined,
 ): Promise<void> {
   const signOut = async (button: HTMLButtonElement) => {
     button.disabled = true;
@@ -203,6 +227,8 @@ export async function renderDashboard(
   };
   let status = "";
   let saving = false;
+  const coachingAssessmentId =
+    assessment && isCompletedAssessment(assessment) ? assessment.id : null;
 
   const render = () => {
     root.innerHTML = dashboardMarkup(
@@ -216,6 +242,11 @@ export async function renderDashboard(
     root
       .querySelector<HTMLButtonElement>("[data-start-diagnosis]")
       ?.addEventListener("click", onStartDiagnosis);
+    if (coachingAssessmentId) {
+      root
+        .querySelector<HTMLButtonElement>("[data-start-coaching]")
+        ?.addEventListener("click", () => onStartCoaching(coachingAssessmentId));
+    }
     root
       .querySelector<HTMLButtonElement>("[data-complete-plan]")
       ?.addEventListener("click", () => {
