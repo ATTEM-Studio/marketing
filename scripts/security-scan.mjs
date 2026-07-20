@@ -3,16 +3,19 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
-const disallowedViteSecret =
-  /VITE_[A-Z0-9_]*(?:SERVICE_ROLE|INVITE_HASH_PEPPER)[A-Z0-9_]*/;
 const exposedSupabaseSecret = /sb_secret_[A-Za-z0-9_-]{20,}/;
+const exposedOpenAiKey = /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/;
 const serverSecretNames = [
   "SUPABASE_SERVICE_ROLE_KEY",
+  "OPENAI_API_KEY",
   "INVITE_HASH_PEPPER",
   "SUPABASE_ACCESS_TOKEN",
   "SUPABASE_DB_PASSWORD",
   "SUPABASE_JWT_SECRET",
 ];
+const disallowedViteSecret = new RegExp(
+  `\\bVITE_(?:${serverSecretNames.join("|")})\\b`,
+);
 const serverSecretAssignment = new RegExp(
   `(?:"|')?\\b(?:${serverSecretNames.join("|")})\\b(?:"|')?[\\t ]*(?:=|:)[\\t ]*(?:"([^"]*)"|'([^']*)'|([^\\s,;#]+))`,
   "g",
@@ -63,6 +66,8 @@ export function findSecretExposures(files) {
       findings.push(`${file}: Vite secret variable name`);
     if (exposedSupabaseSecret.test(source))
       findings.push(`${file}: Supabase secret token pattern`);
+    if (exposedOpenAiKey.test(source))
+      findings.push(`${file}: OpenAI API key pattern`);
 
     serverSecretAssignment.lastIndex = 0;
     for (const match of source.matchAll(serverSecretAssignment)) {
@@ -100,7 +105,7 @@ function run() {
   }
 
   console.log(
-    "Security scan passed: no server-secret assignments or Supabase secret tokens found.",
+    "Security scan passed: no server-secret assignments, OpenAI API keys, or Supabase secret tokens found.",
   );
 }
 

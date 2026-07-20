@@ -73,6 +73,17 @@ describe("security scan", () => {
     ).toBe(true);
   });
 
+  test("rejects committed OpenAI API key values", () => {
+    const openAiKey = ["sk", "proj", "a".repeat(48)].join("-");
+    const findings = securityScan.findSecretExposures([
+      { file: "notes.txt", source: openAiKey },
+    ]);
+
+    expect(findings.some((finding) => finding.includes("OpenAI API key"))).toBe(
+      true,
+    );
+  });
+
   test("allows secret-name documentation, environment reads, and placeholders", () => {
     const findings = securityScan.findSecretExposures([
       {
@@ -108,13 +119,23 @@ describe("security scan", () => {
   });
 
   test("rejects server-secret names exposed through Vite", () => {
-    const viteName = ["VITE", serviceRoleName].join("_");
+    const viteServiceRoleName = ["VITE", serviceRoleName].join("_");
+    const viteOpenAiName = ["VITE", "OPENAI", "API", "KEY"].join("_");
     const findings = securityScan.findSecretExposures([
-      { file: ".env.example", source: `${viteName}=placeholder` },
+      {
+        file: "service-role.env",
+        source: `${viteServiceRoleName}=placeholder`,
+      },
+      {
+        file: "openai.env",
+        source: `${viteOpenAiName}=placeholder`,
+      },
     ]);
 
     expect(
-      findings.some((finding) => finding.includes("Vite secret variable name")),
-    ).toBe(true);
+      findings.filter((finding) =>
+        finding.includes("Vite secret variable name"),
+      ),
+    ).toHaveLength(2);
   });
 });

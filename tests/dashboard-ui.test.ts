@@ -44,7 +44,12 @@ test("does not show coaching for an incomplete assessment", async () => {
     signOut: vi.fn(),
   } as unknown as AppService;
 
-  await renderDashboard(root, { mode: "demo", profile: null }, service, vi.fn());
+  await renderDashboard(
+    root,
+    { mode: "demo", profile: null },
+    service,
+    vi.fn(),
+  );
 
   expect(root.querySelector("[data-start-coaching]")).toBeNull();
 });
@@ -61,7 +66,12 @@ test("does not show coaching for a tampered assessment", async () => {
     signOut: vi.fn(),
   } as unknown as AppService;
 
-  await renderDashboard(root, { mode: "demo", profile: null }, service, vi.fn());
+  await renderDashboard(
+    root,
+    { mode: "demo", profile: null },
+    service,
+    vi.fn(),
+  );
 
   expect(root.querySelector("[data-start-coaching]")).toBeNull();
 });
@@ -78,7 +88,12 @@ test("does not show coaching when the persisted goal differs", async () => {
     signOut: vi.fn(),
   } as unknown as AppService;
 
-  await renderDashboard(root, { mode: "demo", profile: null }, service, vi.fn());
+  await renderDashboard(
+    root,
+    { mode: "demo", profile: null },
+    service,
+    vi.fn(),
+  );
 
   expect(root.querySelector("[data-start-coaching]")).toBeNull();
 });

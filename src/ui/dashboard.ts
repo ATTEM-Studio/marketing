@@ -238,7 +238,9 @@ export async function renderDashboard(
     if (coachingAssessmentId) {
       root
         .querySelector<HTMLButtonElement>("[data-start-coaching]")
-        ?.addEventListener("click", () => onStartCoaching(coachingAssessmentId));
+        ?.addEventListener("click", () =>
+          onStartCoaching(coachingAssessmentId),
+        );
     }
     root
       .querySelector<HTMLButtonElement>("[data-complete-plan]")

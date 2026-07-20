@@ -95,7 +95,9 @@ test("starts only one dashboard reload after rapid coaching back attempts", asyn
 
   await createApp(root, service, { isLive: true }).start();
   root.querySelector<HTMLButtonElement>("[data-start-coaching]")?.click();
-  const coachingBack = root.querySelector<HTMLButtonElement>("[data-coaching-back]");
+  const coachingBack = root.querySelector<HTMLButtonElement>(
+    "[data-coaching-back]",
+  );
   coachingBack?.click();
   coachingBack?.click();
 
