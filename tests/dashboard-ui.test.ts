@@ -93,6 +93,7 @@ test("schedules the one result action seven calendar days after assessment", asy
   renderResult(
     root,
     {
+      effectiveCapacity: "yes",
       metrics: {
         shortfallRevenue: 10_000_000,
         maxNewCustomers: 400,
@@ -135,6 +136,7 @@ test("puts the customer target before the recommended action", () => {
   renderResult(
     root,
     {
+      effectiveCapacity: "yes",
       metrics: {
         shortfallRevenue: 10_000_000,
         maxNewCustomers: 400,

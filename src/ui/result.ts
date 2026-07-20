@@ -3,6 +3,7 @@ import type {
   AdvertisingInputs,
   AdvertisingMetrics,
   BottleneckResult,
+  Capacity,
   GoalAllocation,
   RecommendedAction,
   RestaurantOperationsInsight,
@@ -10,6 +11,7 @@ import type {
 } from "../domain/types";
 
 export interface ResultViewModel {
+  effectiveCapacity: Capacity;
   metrics: RevenueMetrics;
   allocation?: GoalAllocation | Record<string, never>;
   advertising?: AdvertisingMetrics;
@@ -47,16 +49,36 @@ const coachingSummary: Record<string, string> = {
     "채널마다 역할을 하나씩 정하고, 같은 기간의 숫자로 비교하세요.",
 };
 
-const restaurantStatusCopy = {
-  available:
-    "가장 붐비는 시간에도 좌석 여유가 있어, 지금은 좌석 확대보다 신규 고객 확보가 먼저입니다.",
-  time_limited:
-    "붐비는 시간에는 좌석이 거의 찹니다. 광고 확대와 함께 한산한 시간대 유입 또는 포장·배달 전환을 먼저 시험해보세요.",
-  saturated:
-    "웨이팅이 발생하고 있어 고객을 더 모으기 전에 체류시간, 주문 처리 또는 포장·배달 구조를 먼저 점검해야 합니다.",
-  insufficient:
-    "운영 정보가 충분하지 않아 매장 수용 여력은 단정하지 않았습니다.",
+const constrainedCapacityCopy = {
+  no: "대표님은 추가 고객을 받기 어려운 운영 제약이 있다고 답했습니다. 신규 고객을 늘리기 전에 그 제약을 먼저 해결하세요.",
+  sometimes:
+    "대표님은 시간대에 따른 운영 제약이 있다고 답했습니다. 한산한 시간대처럼 받을 수 있는 범위에서만 제한적으로 시험해보세요.",
 } as const;
+
+function restaurantGuidance(
+  status: RestaurantOperationsInsight["status"],
+  effectiveCapacity: Capacity,
+): string {
+  if (status === "saturated") {
+    return "웨이팅이 발생하고 있어 고객을 더 모으기 전에 체류시간, 주문 처리 또는 포장·배달 구조를 먼저 점검해야 합니다.";
+  }
+  if (status === "available") {
+    if (effectiveCapacity === "no" || effectiveCapacity === "sometimes") {
+      return `좌석만 보면 여유가 있어 보이지만, ${constrainedCapacityCopy[effectiveCapacity]}`;
+    }
+    return "가장 붐비는 시간에도 좌석 여유가 있어, 지금은 좌석 확대보다 신규 고객 확보가 먼저입니다.";
+  }
+  if (status === "time_limited") {
+    if (effectiveCapacity === "no") {
+      return "붐비는 시간에는 좌석이 거의 차고, 대표님도 추가 고객을 받기 어려운 운영 제약이 있다고 답했습니다. 광고 확대보다 혼잡 시간대 운영과 포장·배달 구조를 먼저 정리하세요.";
+    }
+    return "붐비는 시간에는 좌석이 거의 찹니다. 광고 확대보다 혼잡 시간대 운영을 먼저 정리하고, 한산한 시간대 유입이나 포장·배달 전환을 제한적으로 시험해보세요.";
+  }
+  if (effectiveCapacity === "no" || effectiveCapacity === "sometimes") {
+    return constrainedCapacityCopy[effectiveCapacity];
+  }
+  return "운영 정보가 충분하지 않아 매장 수용 여력은 단정하지 않았습니다.";
+}
 
 function bottleneckCopy(bottleneck: BottleneckResult): string {
   if (bottleneck.status === "insufficient") {
@@ -117,6 +139,7 @@ function advertisingMarkup(
 
 function restaurantMarkup(
   restaurant: RestaurantOperationsInsight | undefined,
+  effectiveCapacity: Capacity,
 ): string {
   if (!restaurant) return "";
   const requiredParties =
@@ -130,7 +153,7 @@ function restaurantMarkup(
   return `<section data-restaurant-insight class="restaurant-insight" aria-label="매장 운영 여력 안내">
     <h2>매장 운영 여력 참고</h2>
     ${requiredParties}
-    <p>${restaurantStatusCopy[restaurant.status]}</p>
+    <p>${restaurantGuidance(restaurant.status, effectiveCapacity)}</p>
     ${theoreticalTurns}
   </section>`;
 }
@@ -181,7 +204,7 @@ export function renderResult(
       <p class="calculation-note">재방문과 객단가 개선이 포함되면 실제 필요한 신규 고객 수는 줄어듭니다.</p>
       ${allocationMarkup(model.allocation)}
       ${advertisingMarkup(model.advertising, model.advertisingInputs)}
-      ${restaurantMarkup(model.restaurant)}
+      ${restaurantMarkup(model.restaurant, model.effectiveCapacity)}
       <section data-recommended-action class="recommended-action action-card" aria-labelledby="action-title">
         <div class="action-heading"><div><p class="eyebrow">오늘의 행동 한 가지</p><h2 id="action-title">${model.action.title}</h2></div><span class="time-badge">약 ${model.action.minutes}분</span></div>
         <div class="action-reason"><h3>왜 이 행동인가요?</h3><p>${model.bottleneck.status === "insufficient" ? "목표 크기, 고객 수용 여력, 지금 실행할 수 있는 조건을 기준으로 골랐습니다." : model.action.reason}</p><p>${bottleneckCopy(model.bottleneck)}</p></div>

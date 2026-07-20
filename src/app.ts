@@ -139,6 +139,7 @@ export function createApp(
           renderResult(
             root,
             {
+              effectiveCapacity,
               metrics,
               allocation,
               ...advertisingResult,

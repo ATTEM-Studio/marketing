@@ -551,6 +551,29 @@ test("shows acquisition guidance when the restaurant reports spare peak capacity
   ).toContain("신규 고객 확보가 먼저입니다");
 });
 
+test.each([
+  ["no", "추가 고객을 받기 어려운 운영 제약", "그 제약을 먼저 해결"],
+  ["sometimes", "시간대에 따른 운영 제약", "제한적으로 시험"],
+] as const)(
+  "does not let available seats upgrade owner-declared %s capacity",
+  async (declaredCapacity, constraintCopy, priorityCopy) => {
+    await openStepThree();
+    choose("capacity", declaredCapacity);
+    choose("restaurantPeakOccupancy", "half");
+    choose("adsRunning", "false");
+    click("[data-submit-diagnosis]");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const insight =
+      document.querySelector("[data-restaurant-insight]")?.textContent ?? "";
+    expect(insight).toContain("좌석만 보면 여유가 있어 보이지만");
+    expect(insight).toContain(constraintCopy);
+    expect(insight).toContain(priorityCopy);
+    expect(insight).not.toContain("신규 고객 확보가 먼저입니다");
+  },
+);
+
 test("does not claim numeric capacity from missing operations data", async () => {
   await openStepThree();
   choose("adsRunning", "false");
