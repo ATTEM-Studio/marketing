@@ -11,7 +11,8 @@ describe("deployment configuration", () => {
 
   test("never exposes service role configuration to Vite", () => {
     const envExample = readFileSync(".env.example", "utf8");
-    expect(envExample).not.toContain("SERVICE_ROLE");
-    expect(envExample).not.toContain("INVITE_HASH_PEPPER");
+    expect(envExample).not.toMatch(
+      /^VITE_[A-Z0-9_]*(?:SERVICE_ROLE|INVITE_HASH_PEPPER)/mu,
+    );
   });
 });

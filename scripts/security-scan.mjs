@@ -14,7 +14,7 @@ const serverSecretNames = [
   "SUPABASE_JWT_SECRET",
 ];
 const serverSecretAssignment = new RegExp(
-  `(?:"|')?\\b(?:${serverSecretNames.join("|")})\\b(?:"|')?\\s*(?:=|:)\\s*(?:"([^"]*)"|'([^']*)'|([^\\s,;#]+))`,
+  `(?:"|')?\\b(?:${serverSecretNames.join("|")})\\b(?:"|')?[\\t ]*(?:=|:)[\\t ]*(?:"([^"]*)"|'([^']*)'|([^\\s,;#]+))`,
   "g",
 );
 const jwtLikeToken = /eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;

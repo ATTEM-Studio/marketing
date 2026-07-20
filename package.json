@@ -16,6 +16,8 @@
     "@supabase/supabase-js": "2.110.7"
   },
   "devDependencies": {
+    "@types/node": "24.3.0",
+    "@vercel/node": "5.3.26",
     "happy-dom": "20.10.6",
     "prettier": "3.9.5",
     "supabase": "2.109.1",

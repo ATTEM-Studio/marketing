@@ -96,6 +96,17 @@ describe("security scan", () => {
     expect(findings).toEqual([]);
   });
 
+  test("allows an empty documented server variable before another variable", () => {
+    const findings = securityScan.findSecretExposures([
+      {
+        file: ".env.example",
+        source: `${serviceRoleName}=\nOPENAI_API_KEY=\n`,
+      },
+    ]);
+
+    expect(findings).toEqual([]);
+  });
+
   test("rejects server-secret names exposed through Vite", () => {
     const viteName = ["VITE", serviceRoleName].join("_");
     const findings = securityScan.findSecretExposures([
