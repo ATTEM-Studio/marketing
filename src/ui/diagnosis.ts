@@ -3,10 +3,14 @@ import type {
   BottleneckInputs,
   Capacity,
   GoalAllocationInput,
+  AverageStayBand,
+  PeakOccupancy,
   PrimaryConcern,
+  RestaurantOperationsInput,
   ReturningDataStatus,
   RevenueInputs,
 } from "../domain/types";
+import { validateRestaurantOperations } from "../domain/restaurant";
 import {
   calculateRevenueMetrics,
   validateAdvertisingInputs,
@@ -19,6 +23,7 @@ export interface DiagnosisInput {
   allocation: GoalAllocationInput;
   advertising: AdvertisingInputs;
   bottleneck: BottleneckInputs;
+  restaurant: RestaurantOperationsInput;
   primaryConcern: PrimaryConcern;
   capacity: Capacity;
   returningDataStatus: ReturningDataStatus;
@@ -86,6 +91,27 @@ const questionByErrorField: Readonly<Record<string, QuestionId>> = {
   costPerClick: "adsRunning",
   actualAdNewCustomers: "adsRunning",
   actualAdSpend: "adsRunning",
+  restaurantSeats: "capacity",
+  restaurantHallHours: "capacity",
+  restaurantPeakOccupancy: "capacity",
+  restaurantAveragePartySize: "capacity",
+  restaurantAverageStayBand: "capacity",
+  dineInShare: "capacity",
+  takeoutShare: "capacity",
+  deliveryShare: "capacity",
+  channelShares: "capacity",
+};
+
+const restaurantErrorField: Readonly<Record<string, string>> = {
+  seats: "restaurantSeats",
+  hallHours: "restaurantHallHours",
+  peakOccupancy: "restaurantPeakOccupancy",
+  averagePartySize: "restaurantAveragePartySize",
+  averageStayBand: "restaurantAverageStayBand",
+  dineIn: "dineInShare",
+  takeout: "takeoutShare",
+  delivery: "deliveryShare",
+  channelShares: "channelShares",
 };
 
 const numberValue = (form: HTMLFormElement, name: string): number => {
@@ -183,11 +209,30 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
     advertising.costPerClick !== null &&
     advertising.actualAdNewCustomers !== null &&
     advertising.actualAdSpend !== null;
+  const restaurant: RestaurantOperationsInput = {
+    seats: nullableNumberValue(form, "restaurantSeats"),
+    hallHours: nullableNumberValue(form, "restaurantHallHours"),
+    peakOccupancy: radioValue(
+      form,
+      "restaurantPeakOccupancy",
+    ) as PeakOccupancy | null,
+    averagePartySize: nullableNumberValue(form, "restaurantAveragePartySize"),
+    averageStayBand: radioValue(
+      form,
+      "restaurantAverageStayBand",
+    ) as AverageStayBand | null,
+    channelShares: {
+      dineIn: nullableNumberValue(form, "dineInShare"),
+      takeout: nullableNumberValue(form, "takeoutShare"),
+      delivery: nullableNumberValue(form, "deliveryShare"),
+    },
+  };
 
   return {
     revenue,
     allocation,
     advertising,
+    restaurant,
     bottleneck: {
       exposure: comparable(form, "exposure"),
       click: comparable(form, "click"),
@@ -256,6 +301,52 @@ function advertisingFields(): string {
   </section>`;
 }
 
+function restaurantNumberField(
+  name: string,
+  label: string,
+  unit: string,
+  sharedErrorName?: string,
+): string {
+  const describedBy = [
+    `${name}-error`,
+    sharedErrorName && `${sharedErrorName}-error`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return `<div class="field">
+    <label for="${name}">${label} <small>선택</small></label>
+    <div class="input-with-unit"><input id="${name}" name="${name}" inputmode="decimal" aria-describedby="${describedBy}" /><span class="field-unit" aria-hidden="true">${unit}</span></div>
+    ${renderError(name)}
+  </div>`;
+}
+
+function restaurantDetails(): string {
+  return `<details class="optional-details restaurant-details" data-restaurant-details>
+    <summary>우리 가게 운영 정보로 더 정확히 계산하기 <span>선택</span></summary>
+    <p>알고 있는 내용만 입력해도 괜찮아요. 비워두면 기본 결과를 볼 수 있습니다.</p>
+    ${restaurantNumberField("restaurantSeats", "좌석 수", "석")}
+    ${restaurantNumberField("restaurantHallHours", "하루 홀 운영 시간", "시간")}
+    ${choiceGroup("restaurantPeakOccupancy", "가장 붐비는 시간의 좌석 상황", [
+      ["spacious", "여유 있어요"],
+      ["half", "절반 정도 차요"],
+      ["almost_full", "거의 차요"],
+      ["waiting", "대기가 생겨요"],
+    ])}
+    ${restaurantNumberField("restaurantAveragePartySize", "평균 일행 수", "명")}
+    ${choiceGroup("restaurantAverageStayBand", "평균 체류 시간", [
+      ["under_30", "30분 미만"],
+      ["30_60", "30~60분"],
+      ["60_90", "60~90분"],
+      ["over_90", "90분 이상"],
+      ["unknown", "잘 모르겠어요"],
+    ])}
+    ${restaurantNumberField("dineInShare", "매장 식사 비중", "%", "channelShares")}
+    ${restaurantNumberField("takeoutShare", "포장 비중", "%", "channelShares")}
+    ${restaurantNumberField("deliveryShare", "배달 비중", "%", "channelShares")}
+    <p id="channelShares-error" class="field-error" role="alert"></p>
+  </details>`;
+}
+
 function choice(name: string, value: string, label: string): string {
   return `<label class="choice choice-card"><input type="radio" name="${name}" value="${value}" aria-describedby="${name}-error" /><span>${label}</span></label>`;
 }
@@ -321,6 +412,31 @@ function showQuestion(root: HTMLElement, index: number): void {
     ?.focus();
 }
 
+function restaurantValidationErrors(form: HTMLFormElement) {
+  const errors: { name: string; message: string }[] = [];
+  [
+    "restaurantSeats",
+    "restaurantHallHours",
+    "restaurantAveragePartySize",
+    "dineInShare",
+    "takeoutShare",
+    "deliveryShare",
+  ].forEach((name) => {
+    if (hasInvalidNumber(form, name)) {
+      errors.push({ name, message: "숫자만 입력해주세요." });
+    }
+  });
+  validateRestaurantOperations(readDiagnosisForm(form).restaurant).forEach(
+    (error) => {
+      errors.push({
+        name: restaurantErrorField[error.field] ?? error.field,
+        message: error.message,
+      });
+    },
+  );
+  return errors;
+}
+
 function setError(form: HTMLFormElement, name: string, message: string): void {
   const error = form.querySelector<HTMLElement>(`#${name}-error`);
   if (error) error.textContent = message;
@@ -331,7 +447,9 @@ function setError(form: HTMLFormElement, name: string, message: string): void {
           "returningCustomerRevenue",
           "averageOrderValueRevenue",
         ]
-      : [name];
+      : name === "channelShares"
+        ? ["dineInShare", "takeoutShare", "deliveryShare"]
+        : [name];
   controlNames.forEach((controlName) => {
     form
       .querySelectorAll<HTMLInputElement>(`[name='${controlName}']`)
@@ -397,6 +515,16 @@ function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
     setError(form, id, "하나를 선택해주세요.");
     form.querySelector<HTMLInputElement>(`[name='${id}']`)?.focus();
     return false;
+  }
+  if (id === "capacity") {
+    const errors = restaurantValidationErrors(form);
+    errors.forEach((error) => setError(form, error.name, error.message));
+    if (errors[0]) {
+      const focusName =
+        errors[0].name === "channelShares" ? "dineInShare" : errors[0].name;
+      form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
+      return false;
+    }
   }
   return true;
 }
@@ -543,12 +671,17 @@ function validateStep(
         },
       );
     }
+    restaurantValidationErrors(form).forEach((error) => errors.push(error));
   }
   errors.forEach((error) => setError(form, error.name, error.message));
   if (errors[0]) {
     revealErrorQuestion?.(errors[0].name);
     const focusName =
-      errors[0].name === "allocation" ? "newCustomerRevenue" : errors[0].name;
+      errors[0].name === "allocation"
+        ? "newCustomerRevenue"
+        : errors[0].name === "channelShares"
+          ? "dineInShare"
+          : errors[0].name;
     form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
     return false;
   }
@@ -644,6 +777,7 @@ export function renderDiagnosis(
               ["sometimes", "시간대에 따라 달라요"],
               ["no", "지금은 어려워요"],
             ])}
+            ${restaurantDetails()}
           </section>
           <section class="question-card" data-question="returningDataStatus" hidden>
             <p class="question-number">질문 2</p>

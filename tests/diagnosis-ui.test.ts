@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { createApp } from "../src/app";
+import { createApp, readDiagnosisForm } from "../src/app";
 import { createDemoService } from "../src/services/demo-service";
 
 const text = () => document.body.textContent ?? "";
@@ -430,6 +430,95 @@ test("only enables and reads advertising details while ads are running", async (
   );
   expect(text()).not.toContain("광고 비용은 아직 계산하지 않았어요");
   expect(text()).not.toContain("7일 동안 신규 고객의 방문 경로를 기록하세요");
+});
+
+test("completes diagnosis without opening restaurant details", async () => {
+  await openStepThree();
+  choose("adsRunning", "false");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+
+  expect(document.querySelector("[data-recommended-action]")).not.toBeNull();
+});
+
+test("reads only the restaurant details the owner knows", async () => {
+  const root = await openStepThree();
+  const details = root.querySelector<HTMLDetailsElement>(
+    "[data-restaurant-details]",
+  )!;
+  details.open = true;
+  setValue("restaurantSeats", "32");
+  setValue("restaurantAveragePartySize", "4");
+  choose("restaurantPeakOccupancy", "half");
+  const form = root.querySelector<HTMLFormElement>("[data-diagnosis-form]")!;
+
+  expect(readDiagnosisForm(form).restaurant).toEqual(
+    expect.objectContaining({
+      seats: 32,
+      hallHours: null,
+      peakOccupancy: "half",
+      averagePartySize: 4,
+    }),
+  );
+});
+
+test("validates restaurant details when leaving the capacity question", async () => {
+  const root = await openStepThree();
+  click("[data-prev-question]");
+  click("[data-prev-question]");
+  click("[data-prev-question]");
+  click("[data-prev-question]");
+  setValue("restaurantSeats", "0");
+  click("[data-next-question]");
+
+  const seats = root.querySelector<HTMLInputElement>(
+    "[name='restaurantSeats']",
+  );
+  expect(
+    root.querySelector<HTMLElement>("[data-question='capacity']")?.hidden,
+  ).toBe(false);
+  expect(seats?.getAttribute("aria-invalid")).toBe("true");
+  expect(document.activeElement).toBe(seats);
+});
+
+test("links a shared restaurant details channel error to all three inputs", async () => {
+  const root = await openStepThree();
+  setValue("dineInShare", "50");
+  setValue("takeoutShare", "30");
+  setValue("deliveryShare", "10");
+  choose("adsRunning", "false");
+  click("[data-submit-diagnosis]");
+
+  const channelInputs = ["dineInShare", "takeoutShare", "deliveryShare"].map(
+    (name) => root.querySelector<HTMLInputElement>(`[name='${name}']`)!,
+  );
+  expect(
+    root.querySelector<HTMLElement>("[data-question='capacity']")?.hidden,
+  ).toBe(false);
+  channelInputs.forEach((input) => {
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toContain(
+      "channelShares-error",
+    );
+  });
+  expect(root.querySelector("#channelShares-error")?.textContent).not.toBe("");
+  expect(document.activeElement).toBe(channelInputs[0]);
+});
+
+test("rejects malformed optional restaurant details on submit", async () => {
+  const root = await openStepThree();
+  setValue("restaurantHallHours", "abc");
+  choose("adsRunning", "false");
+  click("[data-submit-diagnosis]");
+
+  const hallHours = root.querySelector<HTMLInputElement>(
+    "[name='restaurantHallHours']",
+  );
+  expect(
+    root.querySelector<HTMLElement>("[data-question='capacity']")?.hidden,
+  ).toBe(false);
+  expect(hallHours?.getAttribute("aria-invalid")).toBe("true");
+  expect(document.activeElement).toBe(hallHours);
 });
 
 test("uses exactly one measurement action for partial live advertising data", async () => {
