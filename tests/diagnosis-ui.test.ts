@@ -27,10 +27,13 @@ const choose = (name: string, value: string) => {
   input.click();
 };
 
-const openStepThree = async (primaryConcern = "unknown") => {
+const openStepThree = async (
+  primaryConcern = "unknown",
+  service = createDemoService(),
+) => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing test root");
-  await createApp(root, createDemoService()).start();
+  await createApp(root, service).start();
   click("[data-start-diagnosis]");
   setValue("averageMonthlyRevenue", "30,000,000");
   setValue("targetMonthlyRevenue", "40,000,000");
@@ -439,6 +442,64 @@ test("completes diagnosis without opening restaurant details", async () => {
   await Promise.resolve();
 
   expect(document.querySelector("[data-recommended-action]")).not.toBeNull();
+});
+
+test("shows acquisition guidance when the restaurant reports spare peak capacity", async () => {
+  const root = await openStepThree();
+  root.querySelector<HTMLDetailsElement>("[data-restaurant-details]")!.open =
+    true;
+  setValue("restaurantSeats", "32");
+  setValue("restaurantHallHours", "8");
+  setValue("restaurantAveragePartySize", "4");
+  choose("restaurantPeakOccupancy", "half");
+  choose("restaurantAverageStayBand", "60_90");
+  choose("adsRunning", "false");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(
+    document.querySelector("[data-restaurant-insight]")?.textContent,
+  ).toContain("하루 약 5팀이 더 필요해요");
+  expect(
+    document.querySelector("[data-restaurant-insight]")?.textContent,
+  ).toContain("신규 고객 확보가 먼저입니다");
+});
+
+test("does not claim numeric capacity from missing operations data", async () => {
+  await openStepThree();
+  choose("adsRunning", "false");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  const copy =
+    document.querySelector("[data-restaurant-insight]")?.textContent ?? "";
+  expect(copy).not.toMatch(/최대 .*명.*받을 수/);
+});
+
+test("persists restaurant input and derived insight in assessment JSON", async () => {
+  const service = createDemoService();
+  const saveAssessment = vi.spyOn(service, "saveAssessment");
+  const root = await openStepThree("unknown", service);
+  root.querySelector<HTMLDetailsElement>("[data-restaurant-details]")!.open =
+    true;
+  choose("restaurantPeakOccupancy", "half");
+  choose("adsRunning", "false");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(saveAssessment).toHaveBeenCalledWith(
+    expect.objectContaining({
+      inputs: expect.objectContaining({
+        restaurant: expect.objectContaining({ peakOccupancy: "half" }),
+      }),
+      metrics: expect.objectContaining({
+        restaurant: expect.objectContaining({ status: "available" }),
+      }),
+    }),
+  );
 });
 
 test("reads only the restaurant details the owner knows", async () => {

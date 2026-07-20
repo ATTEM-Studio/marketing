@@ -1,5 +1,6 @@
 import { selectBottleneck } from "./domain/bottleneck";
 import { selectAction } from "./domain/recommendation";
+import { analyzeRestaurantOperations } from "./domain/restaurant";
 import {
   allocationNewCustomerTarget,
   calculateAdvertisingMetrics,
@@ -85,6 +86,20 @@ export function createApp(
             : {};
         const bottleneck = selectBottleneck(input.bottleneck);
         const action = selectAction({ ...input, metrics, bottleneck });
+        const restaurant = analyzeRestaurantOperations(
+          input.restaurant,
+          metrics.maxNewCustomersPerDay,
+        );
+        const hasRestaurantInputs = [
+          input.restaurant.seats,
+          input.restaurant.hallHours,
+          input.restaurant.peakOccupancy,
+          input.restaurant.averagePartySize,
+          input.restaurant.averageStayBand,
+          input.restaurant.channelShares.dineIn,
+          input.restaurant.channelShares.takeout,
+          input.restaurant.channelShares.delivery,
+        ].some((value) => value !== null);
         const submit = root.querySelector<HTMLButtonElement>(
           "[data-submit-diagnosis]",
         );
@@ -101,6 +116,7 @@ export function createApp(
               ...metrics,
               newCustomerTarget,
               advertising,
+              restaurant,
             } as unknown as Record<string, unknown>,
             diagnosis: { bottleneck, actionKey: action.key },
           });
@@ -110,6 +126,7 @@ export function createApp(
               metrics,
               allocation,
               ...advertisingResult,
+              ...(hasRestaurantInputs ? { restaurant } : {}),
               bottleneck,
               action,
             },

@@ -5,6 +5,7 @@ import type {
   BottleneckResult,
   GoalAllocation,
   RecommendedAction,
+  RestaurantOperationsInsight,
   RevenueMetrics,
 } from "../domain/types";
 
@@ -13,6 +14,7 @@ export interface ResultViewModel {
   allocation?: GoalAllocation | Record<string, never>;
   advertising?: AdvertisingMetrics;
   advertisingInputs?: AdvertisingInputs;
+  restaurant?: RestaurantOperationsInsight;
   bottleneck: BottleneckResult;
   action: RecommendedAction;
 }
@@ -44,6 +46,17 @@ const coachingSummary: Record<string, string> = {
   "channel-has-a-role":
     "채널마다 역할을 하나씩 정하고, 같은 기간의 숫자로 비교하세요.",
 };
+
+const restaurantStatusCopy = {
+  available:
+    "가장 붐비는 시간에도 좌석 여유가 있어, 지금은 좌석 확대보다 신규 고객 확보가 먼저입니다.",
+  time_limited:
+    "붐비는 시간에는 좌석이 거의 찹니다. 광고 확대와 함께 한산한 시간대 유입 또는 포장·배달 전환을 먼저 시험해보세요.",
+  saturated:
+    "웨이팅이 발생하고 있어 고객을 더 모으기 전에 체류시간, 주문 처리 또는 포장·배달 구조를 먼저 점검해야 합니다.",
+  insufficient:
+    "운영 정보가 충분하지 않아 매장 수용 여력은 단정하지 않았습니다.",
+} as const;
 
 function bottleneckCopy(bottleneck: BottleneckResult): string {
   if (bottleneck.status === "insufficient") {
@@ -102,6 +115,26 @@ function advertisingMarkup(
   </section>`;
 }
 
+function restaurantMarkup(
+  restaurant: RestaurantOperationsInsight | undefined,
+): string {
+  if (!restaurant) return "";
+  const requiredParties =
+    restaurant.requiredPartiesPerDay === null
+      ? ""
+      : `<p>목표 달성에는 하루 약 ${won.format(restaurant.requiredPartiesPerDay)}팀이 더 필요해요.</p>`;
+  const theoreticalTurns = restaurant.theoreticalTurns
+    ? `<p>이론상 좌석 회전 참고 범위: 하루 ${won.format(restaurant.theoreticalTurns.min)}~${won.format(restaurant.theoreticalTurns.max)}회</p>
+       <p>실제 고객 수 예측이나 매출 보장이 아닙니다.</p>`
+    : "";
+  return `<section data-restaurant-insight class="restaurant-insight" aria-label="매장 운영 여력 안내">
+    <h2>매장 운영 여력 참고</h2>
+    ${requiredParties}
+    <p>${restaurantStatusCopy[restaurant.status]}</p>
+    ${theoreticalTurns}
+  </section>`;
+}
+
 export function checkInDueDate(assessmentCreatedAt: string): string {
   const assessmentDate = new Date(assessmentCreatedAt);
   if (Number.isNaN(assessmentDate.getTime())) {
@@ -144,6 +177,7 @@ export function renderResult(
       <p class="calculation-note">재방문과 객단가 개선이 포함되면 실제 필요한 신규 고객 수는 줄어듭니다.</p>
       ${allocationMarkup(model.allocation)}
       ${advertisingMarkup(model.advertising, model.advertisingInputs)}
+      ${restaurantMarkup(model.restaurant)}
       <section data-recommended-action class="recommended-action action-card" aria-labelledby="action-title">
         <div class="action-heading"><div><p class="eyebrow">오늘의 행동 한 가지</p><h2 id="action-title">${model.action.title}</h2></div><span class="time-badge">약 ${model.action.minutes}분</span></div>
         <div class="action-reason"><h3>왜 이 행동인가요?</h3><p>${model.bottleneck.status === "insufficient" ? "목표 크기, 고객 수용 여력, 지금 실행할 수 있는 조건을 기준으로 골랐습니다." : model.action.reason}</p><p>${bottleneckCopy(model.bottleneck)}</p></div>
