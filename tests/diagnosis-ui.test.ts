@@ -27,10 +27,7 @@ const choose = (name: string, value: string) => {
   input.click();
 };
 
-const openStepThree = async (
-  primaryConcern = "unknown",
-  service = createDemoService(),
-) => {
+const openCustomerCountQuestion = async (service = createDemoService()) => {
   const root = document.querySelector<HTMLElement>("#app");
   if (!root) throw new Error("missing test root");
   await createApp(root, service).start();
@@ -40,7 +37,20 @@ const openStepThree = async (
   setValue("averageOrderValue", "25,000");
   setValue("operatingDays", "20");
   advanceQuestions(4);
-  choose("monthlyCustomerCountStatus", "unknown");
+  return root;
+};
+
+const openStepThree = async (
+  primaryConcern = "unknown",
+  service = createDemoService(),
+  monthlyCustomerCountStatus = "unknown",
+  monthlyCustomerCount?: string,
+) => {
+  const root = await openCustomerCountQuestion(service);
+  choose("monthlyCustomerCountStatus", monthlyCustomerCountStatus);
+  if (monthlyCustomerCount !== undefined) {
+    setValue("monthlyCustomerCount", monthlyCustomerCount);
+  }
   choose("primaryConcern", primaryConcern);
   advanceQuestions(2);
   choose("capacity", "yes");
@@ -97,9 +107,84 @@ test("summarizes the gap immediately after the target revenue answer", async () 
   click("[data-next-question]");
   setValue("targetMonthlyRevenue", "40,000,000");
 
-  expect(root.querySelector("[data-coaching-feedback]")?.textContent).toContain(
-    "목표까지 월 10,000,000원이 더 필요해요",
+  const feedback = root.querySelector("[data-coaching-feedback]")?.textContent;
+  expect(feedback).toContain("목표까지 월 10,000,000원이 더 필요해요.");
+  expect(feedback).not.toContain("추가 고객");
+});
+
+test("adds the daily customer need when all revenue inputs are valid", async () => {
+  const root = document.querySelector<HTMLElement>("#app")!;
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "25,000");
+  setValue("operatingDays", "20");
+
+  const feedback = root.querySelector("[data-coaching-feedback]")?.textContent;
+  expect(feedback).toContain("목표까지 월 10,000,000원이 더 필요해요.");
+  expect(feedback).toContain(
+    "현재 객단가라면 하루 약 20명의 추가 고객이 필요해요.",
   );
+});
+
+test("offers exact, approximate, and unknown customer-count choices", async () => {
+  const root = await openCustomerCountQuestion();
+  const choices = Array.from(
+    root.querySelectorAll<HTMLInputElement>(
+      "[name='monthlyCustomerCountStatus']",
+    ),
+  ).map((input) => [input.value, input.closest("label")?.textContent?.trim()]);
+
+  expect(choices).toEqual([
+    ["exact", "정확히 알아요"],
+    ["approximate", "대략 알아요"],
+    ["unknown", "잘 모르겠어요"],
+  ]);
+});
+
+test.each(["exact", "approximate"])(
+  "shows and requires a customer count when confidence is %s",
+  async (status) => {
+    const root = await openCustomerCountQuestion();
+    choose("monthlyCustomerCountStatus", status);
+    const count = root.querySelector<HTMLInputElement>(
+      "[name='monthlyCustomerCount']",
+    );
+    const countField = count?.closest<HTMLElement>(
+      "[data-monthly-customer-count-field]",
+    );
+
+    expect(count?.disabled).toBe(false);
+    expect(countField).not.toBeNull();
+    expect(countField?.hidden).toBe(false);
+    click("[data-next-question]");
+    expect(count?.getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(count);
+    expect(
+      root.querySelector<HTMLElement>(
+        "[data-question='monthlyCustomerCountStatus']",
+      )?.hidden,
+    ).toBe(false);
+  },
+);
+
+test("clears and disables the customer count when confidence is unknown", async () => {
+  const root = await openCustomerCountQuestion();
+  choose("monthlyCustomerCountStatus", "exact");
+  setValue("monthlyCustomerCount", "980");
+  choose("monthlyCustomerCountStatus", "unknown");
+  const count = root.querySelector<HTMLInputElement>(
+    "[name='monthlyCustomerCount']",
+  );
+  const form = root.querySelector<HTMLFormElement>("[data-diagnosis-form]")!;
+
+  expect(count?.disabled).toBe(true);
+  expect(count?.value).toBe("");
+  expect(readDiagnosisForm(form).revenue).toMatchObject({
+    monthlyCustomerCount: null,
+    monthlyCustomerCountStatus: "unknown",
+  });
 });
 
 test("shows a readable three-step progress indicator", async () => {
@@ -285,7 +370,7 @@ test("links a radio-group error to every invalid choice", async () => {
 });
 
 test.each(["0", "-1"])(
-  "keeps a known monthly customer count of %s on step two with an error",
+  "keeps an exact monthly customer count of %s on step two with an error",
   async (customerCount) => {
     const root = document.querySelector<HTMLElement>("#app");
     if (!root) throw new Error("missing test root");
@@ -296,7 +381,7 @@ test.each(["0", "-1"])(
     setValue("averageOrderValue", "25,000");
     setValue("operatingDays", "20");
     advanceQuestions(4);
-    choose("monthlyCustomerCountStatus", "known");
+    choose("monthlyCustomerCountStatus", "exact");
     setValue("monthlyCustomerCount", customerCount);
     choose("primaryConcern", "unknown");
     advanceQuestions(2);
@@ -316,7 +401,7 @@ test.each(["0", "-1"])(
 );
 
 test.each(["", "0"])(
-  "returns to the customer-count question when a known count of %j is invalid",
+  "returns to the customer-count question when an exact count of %j is invalid",
   async (customerCount) => {
     const root = document.querySelector<HTMLElement>("#app")!;
     await createApp(root, createDemoService()).start();
@@ -326,7 +411,7 @@ test.each(["", "0"])(
     setValue("averageOrderValue", "25,000");
     setValue("operatingDays", "20");
     advanceQuestions(4);
-    choose("monthlyCustomerCountStatus", "known");
+    choose("monthlyCustomerCountStatus", "exact");
     setValue("monthlyCustomerCount", customerCount);
     choose("primaryConcern", "unknown");
     advanceQuestions(2);
@@ -475,8 +560,77 @@ test("does not claim numeric capacity from missing operations data", async () =>
 
   const copy =
     document.querySelector("[data-restaurant-insight]")?.textContent ?? "";
+  expect(document.querySelector("[data-restaurant-insight]")).toBeNull();
   expect(copy).not.toMatch(/최대 .*명.*받을 수/);
 });
+
+test.each([
+  ["waiting", "no", "average-order-value"],
+  ["almost_full", "sometimes", "off-peak-offer"],
+] as const)(
+  "uses %s peak occupancy to conservatively select %s capacity guidance",
+  async (peakOccupancy, effectiveCapacity, actionKey) => {
+    const service = createDemoService();
+    const saveAssessment = vi.spyOn(service, "saveAssessment");
+    await openStepThree("unknown", service);
+    choose("restaurantPeakOccupancy", peakOccupancy);
+    choose("adsRunning", "false");
+    click("[data-submit-diagnosis]");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(saveAssessment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputs: expect.objectContaining({ capacity: "yes" }),
+        diagnosis: expect.objectContaining({
+          effectiveCapacity,
+          actionKey,
+        }),
+      }),
+    );
+    expect(
+      document.querySelector("[data-recommended-action]")?.textContent,
+    ).not.toContain("검색한 고객이 선택할 이유 한 가지를 고치세요");
+  },
+);
+
+test.each([
+  ["exact", "980", 980, "actual", "입력 기준"],
+  ["approximate", "980", 980, "approximate", "대략 입력 기준"],
+  ["unknown", undefined, null, "estimated", "추정 기준"],
+] as const)(
+  "persists %s customer-count confidence and provenance",
+  async (
+    status,
+    enteredCount,
+    monthlyCustomerCount,
+    customerCountSource,
+    badge,
+  ) => {
+    const service = createDemoService();
+    const saveAssessment = vi.spyOn(service, "saveAssessment");
+    await openStepThree("unknown", service, status, enteredCount);
+    choose("adsRunning", "false");
+    click("[data-submit-diagnosis]");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(saveAssessment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputs: expect.objectContaining({
+          revenue: expect.objectContaining({
+            monthlyCustomerCount,
+            monthlyCustomerCountStatus: status,
+          }),
+        }),
+        metrics: expect.objectContaining({
+          customerCountSource,
+        }),
+      }),
+    );
+    expect(document.querySelector(".estimate-badge")?.textContent).toBe(badge);
+  },
+);
 
 test("persists restaurant input and derived insight in assessment JSON", async () => {
   const service = createDemoService();

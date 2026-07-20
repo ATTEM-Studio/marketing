@@ -54,7 +54,15 @@ export function validateRevenueInputs(input: RevenueInputs): FieldError[] {
       message: "월 영업일을 1일 이상 입력해 주세요.",
     });
   }
-  if (input.monthlyCustomerCount !== null && input.monthlyCustomerCount <= 0) {
+  const requiresCustomerCount =
+    input.monthlyCustomerCountStatus === "exact" ||
+    input.monthlyCustomerCountStatus === "approximate";
+  if (
+    (requiresCustomerCount && !isFiniteNumber(input.monthlyCustomerCount)) ||
+    (input.monthlyCustomerCount !== null &&
+      (!isFiniteNumber(input.monthlyCustomerCount) ||
+        input.monthlyCustomerCount < 1))
+  ) {
     errors.push({
       field: "monthlyCustomerCount",
       message: "월 고객 수는 1명 이상 입력하거나 모름을 선택해 주세요.",
@@ -75,7 +83,10 @@ export function calculateRevenueMetrics(input: RevenueInputs): RevenueMetrics {
     0,
   );
   const maxNewCustomers = Math.ceil(shortfallRevenue / input.averageOrderValue);
-  const actualCount = input.monthlyCustomerCount;
+  const actualCount =
+    input.monthlyCustomerCountStatus === "unknown"
+      ? null
+      : input.monthlyCustomerCount;
 
   return {
     shortfallRevenue,
@@ -84,7 +95,12 @@ export function calculateRevenueMetrics(input: RevenueInputs): RevenueMetrics {
     monthlyCustomerCount:
       actualCount ??
       Math.ceil(input.averageMonthlyRevenue / input.averageOrderValue),
-    customerCountSource: actualCount === null ? "estimated" : "actual",
+    customerCountSource:
+      actualCount === null
+        ? "estimated"
+        : input.monthlyCustomerCountStatus === "approximate"
+          ? "approximate"
+          : "actual",
     targetReached: input.averageMonthlyRevenue >= input.targetMonthlyRevenue,
   };
 }

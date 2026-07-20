@@ -2,6 +2,7 @@ import type {
   AdvertisingInputs,
   BottleneckInputs,
   Capacity,
+  CustomerCountStatus,
   GoalAllocationInput,
   AverageStayBand,
   PeakOccupancy,
@@ -171,15 +172,22 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
       ? "unknown"
       : selectedReturningDataStatus;
   const adsRunning = radioValue(form, "adsRunning") === "true";
-  const revenue = {
+  const monthlyCustomerCountStatus = (radioValue(
+    form,
+    "monthlyCustomerCountStatus",
+  ) ?? "unknown") as CustomerCountStatus;
+  const hasCustomerCount =
+    monthlyCustomerCountStatus === "exact" ||
+    monthlyCustomerCountStatus === "approximate";
+  const revenue: RevenueInputs = {
     averageMonthlyRevenue: numberValue(form, "averageMonthlyRevenue"),
     targetMonthlyRevenue: numberValue(form, "targetMonthlyRevenue"),
     averageOrderValue: numberValue(form, "averageOrderValue"),
     operatingDays: numberValue(form, "operatingDays"),
-    monthlyCustomerCount:
-      radioValue(form, "monthlyCustomerCountStatus") === "known"
-        ? nullableNumberValue(form, "monthlyCustomerCount")
-        : null,
+    monthlyCustomerCount: hasCustomerCount
+      ? nullableNumberValue(form, "monthlyCustomerCount")
+      : null,
+    monthlyCustomerCountStatus,
   };
   const allocation = {
     newCustomerRevenue: nullableNumberValue(form, "newCustomerRevenue"),
@@ -439,6 +447,27 @@ function restaurantValidationErrors(form: HTMLFormElement) {
   return errors;
 }
 
+function customerCountValidationErrors(form: HTMLFormElement) {
+  const status = radioValue(form, "monthlyCustomerCountStatus");
+  if (status !== "exact" && status !== "approximate") return [];
+  const input = form.elements.namedItem("monthlyCustomerCount");
+  if (!(input instanceof HTMLInputElement) || input.value.trim() === "") {
+    return [{ name: "monthlyCustomerCount", message: "값을 입력해 주세요." }];
+  }
+  if (hasInvalidNumber(form, "monthlyCustomerCount")) {
+    return [{ name: "monthlyCustomerCount", message: "숫자만 입력해 주세요." }];
+  }
+  if (numberValue(form, "monthlyCustomerCount") < 1) {
+    return [
+      {
+        name: "monthlyCustomerCount",
+        message: "월 고객 수는 1명 이상 입력해 주세요.",
+      },
+    ];
+  }
+  return [];
+}
+
 function setError(form: HTMLFormElement, name: string, message: string): void {
   const error = form.querySelector<HTMLElement>(`#${name}-error`);
   if (error) error.textContent = message;
@@ -544,6 +573,9 @@ function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
     form.querySelector<HTMLInputElement>(`[name='${id}']`)?.focus();
     return false;
   }
+  if (id === "monthlyCustomerCountStatus") {
+    return presentValidationErrors(form, customerCountValidationErrors(form));
+  }
   if (id === "capacity") {
     const errors = restaurantValidationErrors(form);
     return presentValidationErrors(form, errors);
@@ -554,12 +586,53 @@ function validateQuestion(form: HTMLFormElement, id: QuestionId): boolean {
 function updateCoachingFeedback(form: HTMLFormElement): void {
   const feedback = form.querySelector<HTMLElement>("[data-coaching-feedback]");
   if (!feedback) return;
-  const current = numberValue(form, "averageMonthlyRevenue");
-  const target = numberValue(form, "targetMonthlyRevenue");
-  feedback.textContent =
-    current > 0 && target > current
-      ? `목표까지 월 ${new Intl.NumberFormat("ko-KR").format(target - current)}원이 더 필요해요.`
-      : "";
+  const current = nullableNumberValue(form, "averageMonthlyRevenue");
+  const target = nullableNumberValue(form, "targetMonthlyRevenue");
+  if (current === null || current < 0 || target === null || target <= current) {
+    feedback.textContent = "";
+    return;
+  }
+
+  const gap = target - current;
+  const messages = [
+    `목표까지 월 ${new Intl.NumberFormat("ko-KR").format(gap)}원이 더 필요해요.`,
+  ];
+  const averageOrderValue = nullableNumberValue(form, "averageOrderValue");
+  const operatingDays = nullableNumberValue(form, "operatingDays");
+  if (
+    averageOrderValue !== null &&
+    averageOrderValue > 0 &&
+    operatingDays !== null &&
+    operatingDays > 0
+  ) {
+    const dailyCustomers = Math.ceil(gap / averageOrderValue / operatingDays);
+    messages.push(
+      `현재 객단가라면 하루 약 ${new Intl.NumberFormat("ko-KR").format(dailyCustomers)}명의 추가 고객이 필요해요.`,
+    );
+  }
+  feedback.textContent = messages.join(" ");
+}
+
+function syncMonthlyCustomerCountField(
+  form: HTMLFormElement,
+  status = radioValue(form, "monthlyCustomerCountStatus"),
+): void {
+  const field = form.querySelector<HTMLElement>(
+    "[data-monthly-customer-count-field]",
+  );
+  const input = form.elements.namedItem("monthlyCustomerCount");
+  if (!field || !(input instanceof HTMLInputElement)) return;
+  const enabled = status === "exact" || status === "approximate";
+  field.hidden = !enabled;
+  input.disabled = !enabled;
+  if (!enabled) {
+    input.value = "";
+    input.removeAttribute("aria-invalid");
+    const error = form.querySelector<HTMLElement>(
+      "#monthlyCustomerCount-error",
+    );
+    if (error) error.textContent = "";
+  }
 }
 
 function syncAdvertisingFields(
@@ -639,28 +712,7 @@ function validateStep(
         errors.push({ name, message: "하나를 선택해 주세요." });
       }
     });
-    if (radioValue(form, "monthlyCustomerCountStatus") === "known") {
-      const customerCount = form.elements.namedItem("monthlyCustomerCount");
-      if (
-        customerCount instanceof HTMLInputElement &&
-        customerCount.value.trim() === ""
-      ) {
-        errors.push({
-          name: "monthlyCustomerCount",
-          message: "값을 입력해 주세요.",
-        });
-      } else if (hasInvalidNumber(form, "monthlyCustomerCount")) {
-        errors.push({
-          name: "monthlyCustomerCount",
-          message: "숫자만 입력해 주세요.",
-        });
-      } else if (numberValue(form, "monthlyCustomerCount") < 1) {
-        errors.push({
-          name: "monthlyCustomerCount",
-          message: "월 고객 수는 1명 이상 입력해 주세요.",
-        });
-      }
-    }
+    customerCountValidationErrors(form).forEach((error) => errors.push(error));
   }
   if (step === 3) {
     [
@@ -753,11 +805,12 @@ export function renderDiagnosis(
               "monthlyCustomerCountStatus",
               "월 고객 수를 알고 있나요?",
               [
-                ["known", "알고 있어요"],
-                ["unknown", "모르겠어요"],
+                ["exact", "정확히 알아요"],
+                ["approximate", "대략 알아요"],
+                ["unknown", "잘 모르겠어요"],
               ],
             )}
-            ${numberField("monthlyCustomerCount", "월 고객 수", false)}
+            <div data-monthly-customer-count-field>${numberField("monthlyCustomerCount", "월 고객 수")}</div>
           </section>
           <section class="question-card" data-question="primaryConcern" hidden>
             <p class="question-number">질문 2</p>
@@ -860,6 +913,7 @@ export function renderDiagnosis(
   const form = root.querySelector<HTMLFormElement>("[data-diagnosis-form]");
   if (!form) return;
   syncAdvertisingFields(form);
+  syncMonthlyCustomerCountField(form);
   let questionIndex = 0;
   const revealErrorQuestion = (field: string) => {
     const questionId = questionByErrorField[field];
@@ -879,12 +933,25 @@ export function renderDiagnosis(
     if (target instanceof HTMLInputElement && target.name === "adsRunning") {
       syncAdvertisingFields(form, target.value === "true");
     }
+    if (
+      target instanceof HTMLInputElement &&
+      target.name === "monthlyCustomerCountStatus"
+    ) {
+      syncMonthlyCustomerCountField(form, target.value);
+    }
   });
   form
     .querySelectorAll<HTMLInputElement>("[name='adsRunning']")
     .forEach((input) => {
       input.addEventListener("click", () =>
         syncAdvertisingFields(form, input.value === "true"),
+      );
+    });
+  form
+    .querySelectorAll<HTMLInputElement>("[name='monthlyCustomerCountStatus']")
+    .forEach((input) => {
+      input.addEventListener("click", () =>
+        syncMonthlyCustomerCountField(form, input.value),
       );
     });
   form.addEventListener("click", (event) => {

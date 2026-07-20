@@ -1,6 +1,9 @@
 import { selectBottleneck } from "./domain/bottleneck";
 import { selectAction } from "./domain/recommendation";
-import { analyzeRestaurantOperations } from "./domain/restaurant";
+import {
+  analyzeRestaurantOperations,
+  resolveEffectiveCapacity,
+} from "./domain/restaurant";
 import {
   allocationNewCustomerTarget,
   calculateAdvertisingMetrics,
@@ -85,11 +88,20 @@ export function createApp(
               }
             : {};
         const bottleneck = selectBottleneck(input.bottleneck);
-        const action = selectAction({ ...input, metrics, bottleneck });
         const restaurant = analyzeRestaurantOperations(
           input.restaurant,
           metrics.maxNewCustomersPerDay,
         );
+        const effectiveCapacity = resolveEffectiveCapacity(
+          input.capacity,
+          restaurant.status,
+        );
+        const action = selectAction({
+          ...input,
+          capacity: effectiveCapacity,
+          metrics,
+          bottleneck,
+        });
         const hasRestaurantInputs = [
           input.restaurant.seats,
           input.restaurant.hallHours,
@@ -118,7 +130,11 @@ export function createApp(
               advertising,
               restaurant,
             } as unknown as Record<string, unknown>,
-            diagnosis: { bottleneck, actionKey: action.key },
+            diagnosis: {
+              bottleneck,
+              actionKey: action.key,
+              effectiveCapacity,
+            },
           });
           renderResult(
             root,

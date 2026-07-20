@@ -39,6 +39,59 @@ describe("revenue goal calculation", () => {
     ).toBe("actual");
   });
 
+  test.each([
+    ["exact", "actual"],
+    ["approximate", "approximate"],
+  ] as const)(
+    "preserves %s customer-count provenance",
+    (monthlyCustomerCountStatus, customerCountSource) => {
+      expect(
+        calculateRevenueMetrics({
+          ...base,
+          monthlyCustomerCount: 980,
+          monthlyCustomerCountStatus,
+        }),
+      ).toMatchObject({
+        monthlyCustomerCount: 980,
+        customerCountSource,
+      });
+    },
+  );
+
+  test("estimates the customer count when its status is unknown", () => {
+    expect(
+      calculateRevenueMetrics({
+        ...base,
+        monthlyCustomerCountStatus: "unknown",
+      }),
+    ).toMatchObject({
+      monthlyCustomerCount: 1200,
+      customerCountSource: "estimated",
+    });
+  });
+
+  test.each(["exact", "approximate"] as const)(
+    "requires a finite positive customer count when status is %s",
+    (monthlyCustomerCountStatus) => {
+      for (const monthlyCustomerCount of [
+        null,
+        0,
+        Number.NaN,
+        Number.POSITIVE_INFINITY,
+      ]) {
+        expect(
+          validateRevenueInputs({
+            ...base,
+            monthlyCustomerCount,
+            monthlyCustomerCountStatus,
+          }),
+        ).toContainEqual(
+          expect.objectContaining({ field: "monthlyCustomerCount" }),
+        );
+      }
+    },
+  );
+
   test("does not return a negative shortfall after reaching target", () => {
     const result = calculateRevenueMetrics({
       ...base,

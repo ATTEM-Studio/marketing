@@ -153,7 +153,11 @@ export function renderResult(
   const summary = coaching
     ? coachingSummary[model.action.coachingKey]
     : undefined;
-  const estimated = model.metrics.customerCountSource === "estimated";
+  const customerCountBadge = {
+    actual: "입력 기준",
+    approximate: "대략 입력 기준",
+    estimated: "추정 기준",
+  }[model.metrics.customerCountSource];
   root.innerHTML = `
     <header class="work-header">
       <a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>
@@ -168,7 +172,7 @@ export function renderResult(
           <h2 id="customer-target-title"><span>최대</span> <strong class="metric-value">${won.format(model.metrics.maxNewCustomers)}명</strong></h2>
           <p>전부 신규 고객으로 채운다고 가정한 최대 ${won.format(model.metrics.maxNewCustomers)}명입니다.</p>
         </div>
-        <span class="estimate-badge">${estimated ? "추정 기준" : "입력 기준"}</span>
+        <span class="estimate-badge">${customerCountBadge}</span>
       </section>
       <section class="metric-grid" aria-label="목표 매출 계산">
         <article class="metric-card"><span>목표까지 부족한 매출</span><strong>${won.format(model.metrics.shortfallRevenue)}원</strong></article>

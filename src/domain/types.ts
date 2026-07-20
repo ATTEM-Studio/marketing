@@ -1,5 +1,6 @@
 export type ReturningDataStatus = "known" | "sampled" | "unknown";
 export type Capacity = "yes" | "sometimes" | "no";
+export type CustomerCountStatus = "exact" | "approximate" | "unknown";
 
 export interface RevenueInputs {
   averageMonthlyRevenue: number;
@@ -7,6 +8,7 @@ export interface RevenueInputs {
   averageOrderValue: number;
   operatingDays: number;
   monthlyCustomerCount: number | null;
+  monthlyCustomerCountStatus?: CustomerCountStatus;
 }
 
 export interface RevenueMetrics {
@@ -14,7 +16,7 @@ export interface RevenueMetrics {
   maxNewCustomers: number;
   maxNewCustomersPerDay: number;
   monthlyCustomerCount: number;
-  customerCountSource: "actual" | "estimated";
+  customerCountSource: "actual" | "approximate" | "estimated";
   targetReached: boolean;
 }
 

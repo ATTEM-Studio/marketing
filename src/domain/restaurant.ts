@@ -1,4 +1,5 @@
 import type {
+  Capacity,
   FieldError,
   RestaurantCapacityStatus,
   RestaurantOperationsInsight,
@@ -30,6 +31,30 @@ function capacityStatus(
   if (occupancy === "almost_full") return "time_limited";
   if (occupancy === "waiting") return "saturated";
   return "insufficient";
+}
+
+const capacitySeverity: Record<Capacity, number> = {
+  yes: 0,
+  sometimes: 1,
+  no: 2,
+};
+
+const statusCapacity: Record<RestaurantCapacityStatus, Capacity | undefined> = {
+  available: "yes",
+  time_limited: "sometimes",
+  saturated: "no",
+  insufficient: undefined,
+};
+
+export function resolveEffectiveCapacity(
+  declared: Capacity,
+  restaurantStatus: RestaurantCapacityStatus,
+): Capacity {
+  const observed = statusCapacity[restaurantStatus];
+  if (!observed) return declared;
+  return capacitySeverity[observed] > capacitySeverity[declared]
+    ? observed
+    : declared;
 }
 
 export function validateRestaurantOperations(

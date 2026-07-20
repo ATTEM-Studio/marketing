@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   analyzeRestaurantOperations,
+  resolveEffectiveCapacity,
   validateRestaurantOperations,
 } from "../src/domain/restaurant";
 
@@ -18,6 +19,26 @@ const emptyProfile = {
 } as const;
 
 describe("restaurant operations", () => {
+  test.each([
+    ["yes", "available", "yes"],
+    ["sometimes", "available", "sometimes"],
+    ["no", "available", "no"],
+    ["yes", "time_limited", "sometimes"],
+    ["sometimes", "time_limited", "sometimes"],
+    ["no", "time_limited", "no"],
+    ["yes", "saturated", "no"],
+    ["sometimes", "saturated", "no"],
+    ["no", "saturated", "no"],
+    ["yes", "insufficient", "yes"],
+    ["sometimes", "insufficient", "sometimes"],
+    ["no", "insufficient", "no"],
+  ] as const)(
+    "keeps the more conservative capacity for %s and %s",
+    (declared, status, expected) => {
+      expect(resolveEffectiveCapacity(declared, status)).toBe(expected);
+    },
+  );
+
   test("keeps a fully empty profile valid and capacity-insufficient", () => {
     expect(validateRestaurantOperations(emptyProfile)).toEqual([]);
     expect(analyzeRestaurantOperations(emptyProfile, 12)).toEqual({

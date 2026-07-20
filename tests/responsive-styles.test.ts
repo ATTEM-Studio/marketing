@@ -50,6 +50,12 @@ test("defines a focused diagnosis stage and mobile action layout", () => {
   expect(css).toMatch(/\.choice-card[^{]*\{[^}]*min-height:\s*44px/);
 });
 
+test("gives every disclosure summary a touch-safe interactive height", () => {
+  expect(css).toMatch(
+    /details\s*>\s*summary\s*\{[^}]*display:\s*flex[^}]*align-items:\s*center[^}]*min-height:\s*44px/s,
+  );
+});
+
 test("keeps diagnosis content flexible without stretching the action row", () => {
   expect(css).toMatch(
     /\.diagnosis-stage\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\)\s+auto\s+auto\s+auto/s,
