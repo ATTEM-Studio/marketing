@@ -1,0 +1,125 @@
+import type {
+  Capacity,
+  FieldError,
+  RestaurantCapacityStatus,
+  RestaurantOperationsInsight,
+  RestaurantOperationsInput,
+} from "./types";
+
+const positiveNumberMessage = "0보다 큰 숫자를 입력해주세요.";
+const shareMessage = "비중은 0~100 사이로 입력해주세요.";
+
+const stayRanges = {
+  under_30: { min: 20, max: 30 },
+  "30_60": { min: 30, max: 60 },
+  "60_90": { min: 60, max: 90 },
+  over_90: { min: 90, max: 120 },
+} as const;
+
+function isFiniteNumber(value: number | null): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function roundToOneDecimal(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function capacityStatus(
+  occupancy: RestaurantOperationsInput["peakOccupancy"],
+): RestaurantCapacityStatus {
+  if (occupancy === "spacious" || occupancy === "half") return "available";
+  if (occupancy === "almost_full") return "time_limited";
+  if (occupancy === "waiting") return "saturated";
+  return "insufficient";
+}
+
+const capacitySeverity: Record<Capacity, number> = {
+  yes: 0,
+  sometimes: 1,
+  no: 2,
+};
+
+const statusCapacity: Record<RestaurantCapacityStatus, Capacity | undefined> = {
+  available: "yes",
+  time_limited: "sometimes",
+  saturated: "no",
+  insufficient: undefined,
+};
+
+export function resolveEffectiveCapacity(
+  declared: Capacity,
+  restaurantStatus: RestaurantCapacityStatus,
+): Capacity {
+  const observed = statusCapacity[restaurantStatus];
+  if (!observed) return declared;
+  return capacitySeverity[observed] > capacitySeverity[declared]
+    ? observed
+    : declared;
+}
+
+export function validateRestaurantOperations(
+  input: RestaurantOperationsInput,
+): FieldError[] {
+  const errors: FieldError[] = [];
+  const positiveFields = ["seats", "hallHours", "averagePartySize"] as const;
+
+  positiveFields.forEach((field) => {
+    const value = input[field];
+    if (value !== null && (!isFiniteNumber(value) || value <= 0)) {
+      errors.push({ field, message: positiveNumberMessage });
+    }
+  });
+
+  const channelFields = ["dineIn", "takeout", "delivery"] as const;
+  channelFields.forEach((field) => {
+    const value = input.channelShares[field];
+    if (
+      value !== null &&
+      (!isFiniteNumber(value) || value < 0 || value > 100)
+    ) {
+      errors.push({ field, message: shareMessage });
+    }
+  });
+
+  const { dineIn, takeout, delivery } = input.channelShares;
+  if (
+    isFiniteNumber(dineIn) &&
+    isFiniteNumber(takeout) &&
+    isFiniteNumber(delivery) &&
+    dineIn + takeout + delivery !== 100
+  ) {
+    errors.push({
+      field: "channelShares",
+      message: "홀·포장·배달 비중의 합계를 100%로 맞춰주세요.",
+    });
+  }
+
+  return errors;
+}
+
+export function analyzeRestaurantOperations(
+  input: RestaurantOperationsInput,
+  requiredCustomersPerDay: number,
+): RestaurantOperationsInsight {
+  const requiredPartiesPerDay =
+    isFiniteNumber(input.averagePartySize) && input.averagePartySize > 0
+      ? Math.ceil(requiredCustomersPerDay / input.averagePartySize)
+      : null;
+  const stayRange =
+    input.averageStayBand === null || input.averageStayBand === "unknown"
+      ? null
+      : stayRanges[input.averageStayBand];
+  const theoreticalTurns =
+    isFiniteNumber(input.hallHours) && input.hallHours > 0 && stayRange !== null
+      ? {
+          min: roundToOneDecimal((input.hallHours * 60) / stayRange.max),
+          max: roundToOneDecimal((input.hallHours * 60) / stayRange.min),
+        }
+      : null;
+
+  return {
+    status: capacityStatus(input.peakOccupancy),
+    requiredPartiesPerDay,
+    theoreticalTurns,
+  };
+}
