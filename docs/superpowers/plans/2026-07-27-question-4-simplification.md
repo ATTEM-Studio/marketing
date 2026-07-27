@@ -28,10 +28,12 @@
 ### Task 1: Lock the simplified Question 4 behavior with UI tests
 
 **Files:**
+
 - Modify: `tests/diagnosis-ui.test.ts`
 - Test: `tests/diagnosis-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: `createApp(root, createDemoService())`, existing `setValue`, `click`, and `advanceQuestions` test helpers.
 - Produces: regression expectations for Question 4 markup, automatic coaching copy, empty allocation, and successful navigation.
 
@@ -108,10 +110,12 @@ git commit -m "test: define simplified question 4 flow"
 ### Task 2: Remove allocation controls from the new diagnosis flow
 
 **Files:**
+
 - Modify: `src/ui/diagnosis.ts`
 - Test: `tests/diagnosis-ui.test.ts`
 
 **Interfaces:**
+
 - Consumes: `DiagnosisInput`, `GoalAllocationInput`, `calculateRevenueMetrics`, and the existing coaching-feedback element.
 - Produces: `readDiagnosisForm(form): DiagnosisInput` with three nullable allocation values that normalize to `{}`, and Question 4 markup without allocation controls.
 
@@ -184,12 +188,14 @@ git commit -m "feat: simplify question 4 customer estimate"
 ### Task 3: Verify backward compatibility and production readiness
 
 **Files:**
+
 - Verify unchanged: `src/domain/revenue.ts`
 - Verify unchanged: `src/services/supabase-service.ts`
 - Verify unchanged: `src/ui/result.ts`
 - Verify: all source and test files
 
 **Interfaces:**
+
 - Consumes: existing historic-allocation domain tests, Supabase service tests, completion tests, and build scripts.
 - Produces: a verified production bundle with no persistence-contract changes.
 
