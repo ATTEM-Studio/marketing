@@ -16,6 +16,13 @@ import type {
 
 type Row = Record<string, unknown>;
 
+interface SupabaseTokenVerifier {
+  getUser(token: string): Promise<{
+    data: { user: { id: string } | null };
+    error: unknown;
+  }>;
+}
+
 export { isCompletedPersistedAssessment };
 
 export interface OwnedCoachingAssessment extends CoachingContextSource {
@@ -192,6 +199,7 @@ export function createSupabaseAdmin(
         },
       });
     })();
+  const tokenVerifier = client.auth as unknown as SupabaseTokenVerifier;
 
   const finalize = async (
     userId: string,
@@ -220,7 +228,7 @@ export function createSupabaseAdmin(
 
   return {
     async verifyToken(token) {
-      const { data, error } = await client.auth.getUser(token);
+      const { data, error } = await tokenVerifier.getUser(token);
       if (error || !data.user) return null;
       return { userId: data.user.id };
     },
