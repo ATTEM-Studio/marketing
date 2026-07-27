@@ -66,10 +66,16 @@ export function createApp(
     );
   };
 
-  const showCoaching = (assessmentId: string) => {
-    renderCoaching(root, assessmentId, service, () => {
-      void showDashboard();
-    });
+  const showCoaching = (assessmentId: string, initialQuestion?: string) => {
+    renderCoaching(
+      root,
+      assessmentId,
+      service,
+      () => {
+        void showDashboard();
+      },
+      { ...(initialQuestion ? { initialQuestion } : {}) },
+    );
   };
 
   const showDiagnosis = (liveSession = false) => {

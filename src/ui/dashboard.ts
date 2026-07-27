@@ -7,6 +7,11 @@ import type {
 import { isCompletedPersistedAssessment } from "../coaching/completion";
 
 const number = new Intl.NumberFormat("ko-KR");
+const dashboardQuestionExamples = [
+  "광고를 하는데 손님이 늘지 않아요",
+  "재방문 고객을 어떻게 확인하나요?",
+  "객단가를 올리려면 무엇부터 해야 하나요?",
+] as const;
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -118,6 +123,27 @@ function dashboardMarkup(
   const resultEntry = completedAssessment
     ? '<button type="button" class="summary-link" data-view-latest-result>최근 진단 결과 전체 보기</button>'
     : "";
+  const aiQuestionCard = completedAssessment
+    ? `<section class="dashboard-ai-card" aria-labelledby="dashboard-ai-title">
+        <p class="eyebrow">AI 즉문즉답</p>
+        <h2 id="dashboard-ai-title">AI 코치에게 바로 질문하기</h2>
+        <p>최신 진단을 바탕으로 지금 할 행동을 함께 찾아드려요.</p>
+        <form data-dashboard-question-form novalidate>
+          <label for="dashboard-question">매출·광고·재방문·플레이스 고민</label>
+          <textarea id="dashboard-question" name="dashboardQuestion" maxlength="500" rows="3" data-dashboard-question aria-describedby="dashboard-question-error"></textarea>
+          <div class="dashboard-question-examples" aria-label="질문 예시">
+            ${dashboardQuestionExamples
+              .map(
+                (example) =>
+                  `<button type="button" data-question-example="${escapeHtml(example)}">${escapeHtml(example)}</button>`,
+              )
+              .join("")}
+          </div>
+          <p id="dashboard-question-error" class="field-error" data-dashboard-question-error></p>
+          <button type="submit">AI 코치에게 질문하기</button>
+        </form>
+      </section>`
+    : "";
 
   const assessmentSummary = assessment
     ? `<section class="dashboard-summary" aria-label="최근 진단 요약">
@@ -149,6 +175,7 @@ function dashboardMarkup(
     <main id="main" class="dashboard-shell">
       <section class="dashboard-hero"><div><p class="eyebrow">내 가게 대시보드</p><h1>${escapeHtml(profile?.businessName ?? "내 매장")}의 다음 한 걸음</h1><p>${escapeHtml(profile?.name ?? "사장님")}님, 모든 것을 한꺼번에 바꾸지 않아도 됩니다.</p></div>${assessmentSummary}</section>
       ${currentAction}
+      ${aiQuestionCard}
       ${checkInForm(activePlan, checkInValues)}
       ${upcomingPlans}
       ${completedPlans}
@@ -179,7 +206,10 @@ export async function renderDashboard(
   service: AppService,
   onStartDiagnosis: () => void,
   onSignedOut: () => void = onStartDiagnosis,
-  onStartCoaching: (assessmentId: string) => void = () => undefined,
+  onStartCoaching: (
+    assessmentId: string,
+    initialQuestion?: string,
+  ) => void = () => undefined,
   onViewLatestResult: (assessment: AssessmentSnapshot) => void = () =>
     undefined,
 ): Promise<void> {
@@ -248,6 +278,42 @@ export async function renderDashboard(
         ?.addEventListener("click", () =>
           onStartCoaching(coachingAssessmentId),
         );
+      const questionInput = root.querySelector<HTMLTextAreaElement>(
+        "[data-dashboard-question]",
+      );
+      const questionError = root.querySelector<HTMLElement>(
+        "[data-dashboard-question-error]",
+      );
+      root
+        .querySelectorAll<HTMLButtonElement>("[data-question-example]")
+        .forEach((button) => {
+          button.addEventListener("click", () => {
+            if (!questionInput) return;
+            questionInput.value = button.dataset.questionExample ?? "";
+            questionInput.removeAttribute("aria-invalid");
+            if (questionError) questionError.textContent = "";
+            questionInput.focus();
+          });
+        });
+      root
+        .querySelector<HTMLFormElement>("[data-dashboard-question-form]")
+        ?.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!questionInput) return;
+          const question = questionInput.value.trim();
+          if (question.length === 0 || question.length > 500) {
+            questionInput.setAttribute("aria-invalid", "true");
+            if (questionError) {
+              questionError.textContent =
+                question.length > 500
+                  ? "질문은 500자 이내로 적어 주세요."
+                  : "궁금한 내용을 적어 주세요.";
+            }
+            questionInput.focus();
+            return;
+          }
+          onStartCoaching(coachingAssessmentId, question);
+        });
     }
     if (assessment && coachingAssessmentId) {
       root
