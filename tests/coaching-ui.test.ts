@@ -142,6 +142,15 @@ describe("instant coaching UI", () => {
       "true",
     );
     const loadingStatus = root().querySelector("[data-coaching-status]");
+    const spinner = root().querySelector("[data-coaching-spinner]");
+    const dots = root().querySelector("[data-coaching-dots]");
+
+    expect(spinner?.getAttribute("aria-hidden")).toBe("true");
+    expect(dots?.getAttribute("aria-hidden")).toBe("true");
+    expect(dots?.querySelectorAll(".coaching-loading-dot")).toHaveLength(3);
+    expect(loadingStatus?.textContent?.trim()).toBe(
+      "답변을 준비하고 있습니다.",
+    );
     expect(loadingStatus?.textContent).toContain("답변을 준비하고 있습니다");
     expect(loadingStatus?.classList.contains("coaching-loading")).toBe(true);
     expect(document.activeElement).toBe(loadingStatus);
@@ -151,6 +160,8 @@ describe("instant coaching UI", () => {
 
     expect(root().querySelectorAll("[data-follow-up]")).toHaveLength(1);
     expect(root().querySelector("[data-coaching-answer]")).toBeNull();
+    expect(root().querySelector("[data-coaching-spinner]")).toBeNull();
+    expect(root().querySelector("[data-coaching-dots]")).toBeNull();
     expect(document.activeElement).toBe(
       root().querySelector("[data-follow-up-heading]"),
     );
