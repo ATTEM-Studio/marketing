@@ -2,9 +2,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
   handleCoachingRequest,
   type CoachingHandlerDependencies,
-} from "./_lib/coaching-handler";
-import { classifyQuestion, composeCoachingResponse } from "./_lib/openai";
-import { createSupabaseAdmin } from "./_lib/supabase-admin";
+} from "./_lib/coaching-handler.js";
+import { classifyQuestion, composeCoachingResponse } from "./_lib/openai.js";
+import { createSupabaseAdmin } from "./_lib/supabase-admin.js";
 
 function productionDependencies(): CoachingHandlerDependencies {
   return {

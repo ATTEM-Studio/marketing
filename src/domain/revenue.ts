@@ -6,7 +6,7 @@ import type {
   GoalAllocationInput,
   RevenueInputs,
   RevenueMetrics,
-} from "./types";
+} from "./types.js";
 
 const allocationFields = [
   {

@@ -1,4 +1,4 @@
-import type { CoachingActionDefinition } from "./types";
+import type { CoachingActionDefinition } from "./types.js";
 
 const verifiedAt = "2026-07-20";
 const reviewAfter = "2027-07-20";

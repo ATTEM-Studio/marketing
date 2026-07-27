@@ -7,6 +7,11 @@ import type {
 import { isCompletedPersistedAssessment } from "../coaching/completion";
 
 const number = new Intl.NumberFormat("ko-KR");
+const dashboardQuestionExamples = [
+  "광고를 하는데 손님이 늘지 않아요",
+  "재방문 고객을 어떻게 확인하나요?",
+  "객단가를 올리려면 무엇부터 해야 하나요?",
+] as const;
 
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -111,8 +116,33 @@ function dashboardMarkup(
   const upcoming = planned.slice(1);
   const target = assessment ? latestTarget(assessment) : null;
   const ceiling = assessment ? maximumNewCustomers(assessment) : null;
-  const coachingEntry = isCompletedAssessment(assessment)
+  const completedAssessment = isCompletedAssessment(assessment);
+  const coachingEntry = completedAssessment
     ? '<button type="button" class="secondary-action" data-start-coaching>지금 고민 해결하기</button>'
+    : "";
+  const resultEntry = completedAssessment
+    ? '<button type="button" class="summary-link" data-view-latest-result>최근 진단 결과 전체 보기</button>'
+    : "";
+  const aiQuestionCard = completedAssessment
+    ? `<section class="dashboard-ai-card" aria-labelledby="dashboard-ai-title">
+        <p class="eyebrow">AI 즉문즉답</p>
+        <h2 id="dashboard-ai-title">AI 코치에게 바로 질문하기</h2>
+        <p>최신 진단을 바탕으로 지금 할 행동을 함께 찾아드려요.</p>
+        <form data-dashboard-question-form novalidate>
+          <label for="dashboard-question">매출·광고·재방문·플레이스 고민</label>
+          <textarea id="dashboard-question" name="dashboardQuestion" maxlength="500" rows="3" data-dashboard-question aria-describedby="dashboard-question-error"></textarea>
+          <div class="dashboard-question-examples" aria-label="질문 예시">
+            ${dashboardQuestionExamples
+              .map(
+                (example) =>
+                  `<button type="button" data-question-example="${escapeHtml(example)}">${escapeHtml(example)}</button>`,
+              )
+              .join("")}
+          </div>
+          <p id="dashboard-question-error" class="field-error" data-dashboard-question-error></p>
+          <button type="submit">AI 코치에게 질문하기</button>
+        </form>
+      </section>`
     : "";
 
   const assessmentSummary = assessment
@@ -120,6 +150,7 @@ function dashboardMarkup(
         <h2>최근 진단 요약</h2>
         ${target === null ? "<p>목표 매출을 다시 확인해 주세요.</p>" : `<p>목표 월 매출 ${number.format(target)}원</p>`}
         ${ceiling === null ? "" : `<p>전부 신규 고객으로 채운다고 가정한 최대 ${number.format(ceiling)}명입니다.</p>`}
+        ${resultEntry}
       </section>`
     : `<section class="dashboard-summary"><h2>아직 진단한 내용이 없어요.</h2><p>최근 매출과 목표 매출만 먼저 적어 보면 됩니다.</p></section>`;
 
@@ -144,6 +175,7 @@ function dashboardMarkup(
     <main id="main" class="dashboard-shell">
       <section class="dashboard-hero"><div><p class="eyebrow">내 가게 대시보드</p><h1>${escapeHtml(profile?.businessName ?? "내 매장")}의 다음 한 걸음</h1><p>${escapeHtml(profile?.name ?? "사장님")}님, 모든 것을 한꺼번에 바꾸지 않아도 됩니다.</p></div>${assessmentSummary}</section>
       ${currentAction}
+      ${aiQuestionCard}
       ${checkInForm(activePlan, checkInValues)}
       ${upcomingPlans}
       ${completedPlans}
@@ -174,7 +206,12 @@ export async function renderDashboard(
   service: AppService,
   onStartDiagnosis: () => void,
   onSignedOut: () => void = onStartDiagnosis,
-  onStartCoaching: (assessmentId: string) => void = () => undefined,
+  onStartCoaching: (
+    assessmentId: string,
+    initialQuestion?: string,
+  ) => void = () => undefined,
+  onViewLatestResult: (assessment: AssessmentSnapshot) => void = () =>
+    undefined,
 ): Promise<void> {
   const signOut = async (button: HTMLButtonElement) => {
     button.disabled = true;
@@ -241,6 +278,47 @@ export async function renderDashboard(
         ?.addEventListener("click", () =>
           onStartCoaching(coachingAssessmentId),
         );
+      const questionInput = root.querySelector<HTMLTextAreaElement>(
+        "[data-dashboard-question]",
+      );
+      const questionError = root.querySelector<HTMLElement>(
+        "[data-dashboard-question-error]",
+      );
+      root
+        .querySelectorAll<HTMLButtonElement>("[data-question-example]")
+        .forEach((button) => {
+          button.addEventListener("click", () => {
+            if (!questionInput) return;
+            questionInput.value = button.dataset.questionExample ?? "";
+            questionInput.removeAttribute("aria-invalid");
+            if (questionError) questionError.textContent = "";
+            questionInput.focus();
+          });
+        });
+      root
+        .querySelector<HTMLFormElement>("[data-dashboard-question-form]")
+        ?.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!questionInput) return;
+          const question = questionInput.value.trim();
+          if (question.length === 0 || question.length > 500) {
+            questionInput.setAttribute("aria-invalid", "true");
+            if (questionError) {
+              questionError.textContent =
+                question.length > 500
+                  ? "질문은 500자 이내로 적어 주세요."
+                  : "궁금한 내용을 적어 주세요.";
+            }
+            questionInput.focus();
+            return;
+          }
+          onStartCoaching(coachingAssessmentId, question);
+        });
+    }
+    if (assessment && coachingAssessmentId) {
+      root
+        .querySelector<HTMLButtonElement>("[data-view-latest-result]")
+        ?.addEventListener("click", () => onViewLatestResult(assessment));
     }
     root
       .querySelector<HTMLButtonElement>("[data-complete-plan]")

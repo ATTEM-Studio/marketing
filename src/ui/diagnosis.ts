@@ -13,9 +13,7 @@ import type {
 } from "../domain/types";
 import { validateRestaurantOperations } from "../domain/restaurant";
 import {
-  calculateRevenueMetrics,
   validateAdvertisingInputs,
-  validateGoalAllocation,
   validateRevenueInputs,
 } from "../domain/revenue";
 
@@ -76,10 +74,6 @@ const questionByErrorField: Readonly<Record<string, QuestionId>> = {
   targetMonthlyRevenue: "targetMonthlyRevenue",
   averageOrderValue: "averageOrderValue",
   operatingDays: "operatingDays",
-  newCustomerRevenue: "operatingDays",
-  returningCustomerRevenue: "operatingDays",
-  averageOrderValueRevenue: "operatingDays",
-  allocation: "operatingDays",
   monthlyCustomerCountStatus: "monthlyCustomerCountStatus",
   monthlyCustomerCount: "monthlyCustomerCountStatus",
   primaryConcern: "primaryConcern",
@@ -190,15 +184,9 @@ export function readDiagnosisForm(form: HTMLFormElement): DiagnosisInput {
     monthlyCustomerCountStatus,
   };
   const allocation = {
-    newCustomerRevenue: nullableNumberValue(form, "newCustomerRevenue"),
-    returningCustomerRevenue: nullableNumberValue(
-      form,
-      "returningCustomerRevenue",
-    ),
-    averageOrderValueRevenue: nullableNumberValue(
-      form,
-      "averageOrderValueRevenue",
-    ),
+    newCustomerRevenue: null,
+    returningCustomerRevenue: null,
+    averageOrderValueRevenue: null,
   };
   const advertising = adsRunning
     ? {
@@ -287,16 +275,6 @@ function numberField(name: string, label: string, required = true): string {
       <div class="input-with-unit"><input id="${name}" name="${name}" inputmode="numeric" aria-describedby="${name}-error" /><span class="field-unit" aria-hidden="true">${unit}</span></div>
       ${renderError(name)}
     </div>`;
-}
-
-function allocationFields(): string {
-  return `<details class="optional-details"><summary>부족 매출을 직접 나눠 보기 (선택)</summary>
-    <p>입력하지 않으면 전원 신규 고객 상한선만 계산합니다. 비율이나 추천 분배는 제시하지 않습니다.</p>
-    ${numberField("newCustomerRevenue", "신규 고객 증가로 채울 매출", false)}
-    ${numberField("returningCustomerRevenue", "재방문 증가로 채울 매출", false)}
-    ${numberField("averageOrderValueRevenue", "객단가 상승으로 채울 매출", false)}
-    ${renderError("allocation")}
-  </details>`;
 }
 
 function advertisingFields(): string {
@@ -472,15 +450,9 @@ function setError(form: HTMLFormElement, name: string, message: string): void {
   const error = form.querySelector<HTMLElement>(`#${name}-error`);
   if (error) error.textContent = message;
   const controlNames =
-    name === "allocation"
-      ? [
-          "newCustomerRevenue",
-          "returningCustomerRevenue",
-          "averageOrderValueRevenue",
-        ]
-      : name === "channelShares"
-        ? ["dineInShare", "takeoutShare", "deliveryShare"]
-        : [name];
+    name === "channelShares"
+      ? ["dineInShare", "takeoutShare", "deliveryShare"]
+      : [name];
   controlNames.forEach((controlName) => {
     form
       .querySelectorAll<HTMLInputElement>(`[name='${controlName}']`)
@@ -526,11 +498,7 @@ function presentValidationErrors(
   }
   errors.forEach((error) => setError(form, error.name, error.message));
   const focusName =
-    firstError.name === "allocation"
-      ? "newCustomerRevenue"
-      : firstError.name === "channelShares"
-        ? "dineInShare"
-        : firstError.name;
+    firstError.name === "channelShares" ? "dineInShare" : firstError.name;
   form.querySelector<HTMLElement>(`[name='${focusName}']`)?.focus();
   return false;
 }
@@ -608,6 +576,7 @@ function updateCoachingFeedback(form: HTMLFormElement): void {
     const dailyCustomers = Math.ceil(gap / averageOrderValue / operatingDays);
     messages.push(
       `현재 객단가라면 하루 약 ${new Intl.NumberFormat("ko-KR").format(dailyCustomers)}명의 추가 고객이 필요해요.`,
+      "재방문 고객 수를 정확히 알기 어려워, 우선 모두 신규 고객이라고 가정해 계산했어요.",
     );
   }
   feedback.textContent = messages.join(" ");
@@ -679,31 +648,12 @@ function validateStep(
         errors.push({ name, message: "숫자만 입력해 주세요." });
       }
     });
-    [
-      "newCustomerRevenue",
-      "returningCustomerRevenue",
-      "averageOrderValueRevenue",
-    ].forEach((name) => {
-      if (hasInvalidNumber(form, name)) {
-        errors.push({ name, message: "숫자만 입력해 주세요." });
-      }
-    });
     if (errors.length === 0) {
       validateRevenueInputs(readDiagnosisForm(form).revenue).forEach(
         (error) => {
           errors.push({ name: error.field, message: error.message });
         },
       );
-    }
-    if (errors.length === 0) {
-      const input = readDiagnosisForm(form);
-      const metrics = calculateRevenueMetrics(input.revenue);
-      validateGoalAllocation(
-        input.allocation,
-        metrics.shortfallRevenue,
-      ).forEach((error) => {
-        errors.push({ name: error.field, message: error.message });
-      });
     }
   }
   if (step === 2) {
@@ -792,7 +742,6 @@ export function renderDiagnosis(
             <h2 tabindex="-1">한 달에 며칠 영업하나요?</h2>
             <p class="question-help">평균적인 한 달을 기준으로 영업일을 적어주세요.</p>
             ${numberField("operatingDays", "월 영업일")}
-            ${allocationFields()}
           </section>
         </fieldset>
         <fieldset class="step-panel" data-step="2" hidden><legend><span>2단계</span> 현재 고객 상황</legend>

@@ -4,7 +4,7 @@ import type {
   RestaurantCapacityStatus,
   RestaurantOperationsInsight,
   RestaurantOperationsInput,
-} from "./types";
+} from "./types.js";
 
 const positiveNumberMessage = "0보다 큰 숫자를 입력해주세요.";
 const shareMessage = "비중은 0~100 사이로 입력해주세요.";

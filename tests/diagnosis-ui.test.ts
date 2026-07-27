@@ -126,6 +126,24 @@ test("adds the daily customer need when all revenue inputs are valid", async () 
   expect(feedback).toContain(
     "현재 객단가라면 하루 약 20명의 추가 고객이 필요해요.",
   );
+  expect(feedback).toContain(
+    "재방문 고객 수를 정확히 알기 어려워, 우선 모두 신규 고객이라고 가정해 계산했어요.",
+  );
+});
+
+test("keeps question 4 focused on monthly operating days", async () => {
+  const root = document.querySelector<HTMLElement>("#app")!;
+  await createApp(root, createDemoService()).start();
+  click("[data-start-diagnosis]");
+  setValue("averageMonthlyRevenue", "30,000,000");
+  setValue("targetMonthlyRevenue", "40,000,000");
+  setValue("averageOrderValue", "25,000");
+  click("[data-next-question]");
+
+  expect(root.textContent).not.toContain("부족 매출을 직접 나눠 보기");
+  expect(root.querySelector("[name='newCustomerRevenue']")).toBeNull();
+  expect(root.querySelector("[name='returningCustomerRevenue']")).toBeNull();
+  expect(root.querySelector("[name='averageOrderValueRevenue']")).toBeNull();
 });
 
 test("offers exact, approximate, and unknown customer-count choices", async () => {
@@ -254,6 +272,22 @@ test("completes the three-step all-new-customer ceiling flow", async () => {
   );
   expect(text()).not.toContain("재방문이 문제입니다");
   expect(text()).not.toContain("광고 비용은 아직 계산하지 않았어요");
+});
+
+test("saves an empty allocation for the simplified diagnosis", async () => {
+  const service = createDemoService();
+  const saveAssessment = vi.spyOn(service, "saveAssessment");
+  await openStepThree("unknown", service);
+  choose("adsRunning", "false");
+  click("[data-submit-diagnosis]");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(saveAssessment).toHaveBeenCalledWith(
+    expect.objectContaining({
+      inputs: expect.objectContaining({ allocation: {} }),
+    }),
+  );
 });
 
 test("shows a linked error and moves focus when required revenue is missing", async () => {
@@ -428,59 +462,6 @@ test.each(["", "0"])(
     );
   },
 );
-
-test("requires an exact direct revenue allocation before the next step", async () => {
-  const root = document.querySelector<HTMLElement>("#app");
-  if (!root) throw new Error("missing test root");
-  await createApp(root, createDemoService()).start();
-  click("[data-start-diagnosis]");
-  setValue("averageMonthlyRevenue", "30,000,000");
-  setValue("targetMonthlyRevenue", "40,000,000");
-  setValue("averageOrderValue", "25,000");
-  setValue("operatingDays", "20");
-
-  const allocation = document.querySelector<HTMLInputElement>(
-    "[name='newCustomerRevenue']",
-  );
-  expect(allocation).not.toBeNull();
-  if (!allocation) return;
-  allocation.value = "9,999,999";
-  allocation.dispatchEvent(new Event("input", { bubbles: true }));
-  advanceQuestions(4);
-
-  expect(allocation.getAttribute("aria-invalid")).toBe("true");
-  expect(document.querySelector<HTMLElement>("[data-step='1']")?.hidden).toBe(
-    false,
-  );
-});
-
-test.each(
-  [
-    "newCustomerRevenue",
-    "returningCustomerRevenue",
-    "averageOrderValueRevenue",
-  ].flatMap((field) =>
-    ["abc", "Infinity", "1e309"].map((value) => [field, value] as const),
-  ),
-)("rejects malformed direct allocation %s=%s", async (field, value) => {
-  const root = document.querySelector<HTMLElement>("#app");
-  if (!root) throw new Error("missing test root");
-  await createApp(root, createDemoService()).start();
-  click("[data-start-diagnosis]");
-  setValue("averageMonthlyRevenue", "30,000,000");
-  setValue("targetMonthlyRevenue", "40,000,000");
-  setValue("averageOrderValue", "25,000");
-  setValue("operatingDays", "20");
-  setValue(field, value);
-  advanceQuestions(4);
-
-  const input = document.querySelector<HTMLInputElement>(`[name='${field}']`);
-  expect(input?.getAttribute("aria-invalid")).toBe("true");
-  expect(document.activeElement).toBe(input);
-  expect(document.querySelector<HTMLElement>("[data-step='1']")?.hidden).toBe(
-    false,
-  );
-});
 
 test("only enables and reads advertising details while ads are running", async () => {
   const root = await openStepThree();

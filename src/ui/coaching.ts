@@ -62,22 +62,12 @@ function initialContent(
   const remaining = Math.max(0, 500 - question.length);
   const canSubmit = question.trim().length > 0 && question.length <= 500;
   return `
-    <section class="coaching-intro" aria-labelledby="coaching-concerns-title">
-      <h2 id="coaching-concerns-title">어떤 점이 가장 고민인가요?</h2>
-      <p>가장 가까운 고민 하나를 고르면 저장된 진단을 바탕으로 지금 할 행동을 알려드려요.</p>
-      <div class="coaching-concern-grid">
-        ${concerns
-          .map(
-            ({ key, label }) =>
-              `<button type="button" class="coaching-concern" data-concern="${key}"${busy ? " disabled" : ""}><span>${escapeHtml(label)}</span><span aria-hidden="true">→</span></button>`,
-          )
-          .join("")}
-      </div>
-    </section>
     <section class="coaching-question-card" aria-labelledby="coaching-question-title">
-      <h2 id="coaching-question-title">직접 질문하기</h2>
+      <p class="eyebrow">AI 자유 질문</p>
+      <h2 id="coaching-question-title">AI 코치에게 직접 물어보세요</h2>
+      <p>매출·광고·재방문·플레이스 고민을 최신 진단을 바탕으로 답해드려요.</p>
       <form data-question-form novalidate>
-        <label for="coaching-question">직접 질문하기 <span class="optional">(선택)</span></label>
+        <label for="coaching-question">AI 코치에게 직접 질문하기</label>
         <textarea id="coaching-question" data-coaching-question name="question" rows="4" maxlength="500" aria-describedby="coaching-character-count coaching-question-error"${validationMessage ? ' aria-invalid="true"' : ""}${busy ? " disabled" : ""}>${escapeHtml(question)}</textarea>
         <div class="coaching-question-meta">
           <p id="coaching-question-error" class="field-error">${escapeHtml(validationMessage)}</p>
@@ -87,6 +77,18 @@ function initialContent(
           <button type="submit" data-submit-question${!canSubmit || busy ? " disabled" : ""}>질문하고 행동 찾기</button>
         </div>
       </form>
+    </section>
+    <section class="coaching-intro" aria-labelledby="coaching-concerns-title">
+      <h2 id="coaching-concerns-title">또는 고민 유형으로 시작하기</h2>
+      <p>말로 적기 어렵다면 가장 가까운 고민 하나를 골라주세요.</p>
+      <div class="coaching-concern-grid">
+        ${concerns
+          .map(
+            ({ key, label }) =>
+              `<button type="button" class="coaching-concern" data-concern="${key}"${busy ? " disabled" : ""}><span>${escapeHtml(label)}</span><span aria-hidden="true">→</span></button>`,
+          )
+          .join("")}
+      </div>
     </section>`;
 }
 
@@ -160,6 +162,7 @@ export function renderCoaching(
   assessmentId: string,
   service: AppService,
   onBack: () => void,
+  options: { initialQuestion?: string } = {},
 ): void {
   let state: "initial" | "follow_up" | "answer" | "error" = "initial";
   let question = "";
@@ -353,5 +356,12 @@ export function renderCoaching(
     }
   }
 
+  const initialQuestion = options.initialQuestion?.trim() ?? "";
+  if (initialQuestion.length > 0 && initialQuestion.length <= 500) {
+    question = initialQuestion;
+  }
   render();
+  if (question) {
+    void submitRequest({ assessmentId, question });
+  }
 }

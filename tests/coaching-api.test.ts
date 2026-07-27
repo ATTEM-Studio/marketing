@@ -561,6 +561,37 @@ describe("coaching server handler", () => {
       },
     });
   });
+
+  it("logs only a safe error code when a coaching request fails", async () => {
+    const deps = dependencies();
+    deps.admin.verifyToken = vi
+      .fn()
+      .mockRejectedValue(new Error("COACHING_DATA_ERROR"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const result = await handleCoachingRequest(
+        request(
+          turn({
+            concernKey: undefined,
+            question: "customer question text",
+          }),
+        ),
+        deps,
+      );
+
+      expect(result.status).toBe(500);
+      expect(log).toHaveBeenCalledWith(
+        "COACHING_REQUEST_FAILED",
+        "COACHING_DATA_ERROR",
+      );
+      expect(JSON.stringify(log.mock.calls)).not.toContain(
+        "customer question text",
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
 });
 
 describe("Vercel coaching endpoint", () => {

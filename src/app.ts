@@ -1,15 +1,7 @@
-import { selectBottleneck } from "./domain/bottleneck";
-import { selectAction } from "./domain/recommendation";
 import {
-  analyzeRestaurantOperations,
-  resolveEffectiveCapacity,
-} from "./domain/restaurant";
-import {
-  allocationNewCustomerTarget,
-  calculateAdvertisingMetrics,
-  calculateRevenueMetrics,
-  normalizeGoalAllocation,
-} from "./domain/revenue";
+  buildDiagnosisOutcome,
+  restoreResultViewModel,
+} from "./result-view-model";
 import type { AppService } from "./services/contracts";
 import {
   readDiagnosisForm,
@@ -62,64 +54,35 @@ export function createApp(
       },
       showLanding,
       showCoaching,
+      (assessment) => {
+        const model = restoreResultViewModel(assessment);
+        if (!model) return;
+        renderResult(root, model, {
+          onBack: () => {
+            void showDashboard();
+          },
+        });
+      },
     );
   };
 
-  const showCoaching = (assessmentId: string) => {
-    renderCoaching(root, assessmentId, service, () => {
-      void showDashboard();
-    });
+  const showCoaching = (assessmentId: string, initialQuestion?: string) => {
+    renderCoaching(
+      root,
+      assessmentId,
+      service,
+      () => {
+        void showDashboard();
+      },
+      { ...(initialQuestion ? { initialQuestion } : {}) },
+    );
   };
 
   const showDiagnosis = (liveSession = false) => {
     renderDiagnosis(root, {
       async onSubmit(input: DiagnosisInput) {
-        const metrics = calculateRevenueMetrics(input.revenue);
-        const allocation = normalizeGoalAllocation(input.allocation);
-        const newCustomerTarget = allocationNewCustomerTarget(
-          metrics.maxNewCustomers,
-          input.revenue.averageOrderValue,
-          allocation,
-        );
-        const advertising = calculateAdvertisingMetrics(
-          newCustomerTarget,
-          input.advertising,
-        );
-        const hasAdvertisingInputs = Object.values(input.advertising).some(
-          (value) => value !== null,
-        );
-        const advertisingResult =
-          input.adsRunning || hasAdvertisingInputs
-            ? {
-                advertising,
-                advertisingInputs: input.advertising,
-              }
-            : {};
-        const bottleneck = selectBottleneck(input.bottleneck);
-        const restaurant = analyzeRestaurantOperations(
-          input.restaurant,
-          metrics.maxNewCustomersPerDay,
-        );
-        const effectiveCapacity = resolveEffectiveCapacity(
-          input.capacity,
-          restaurant.status,
-        );
-        const action = selectAction({
-          ...input,
-          capacity: effectiveCapacity,
-          metrics,
-          bottleneck,
-        });
-        const hasRestaurantInputs = [
-          input.restaurant.seats,
-          input.restaurant.hallHours,
-          input.restaurant.peakOccupancy,
-          input.restaurant.averagePartySize,
-          input.restaurant.averageStayBand,
-          input.restaurant.channelShares.dineIn,
-          input.restaurant.channelShares.takeout,
-          input.restaurant.channelShares.delivery,
-        ].some((value) => value !== null);
+        const outcome = buildDiagnosisOutcome(input);
+        const { action, allocation } = outcome.model;
         const submit = root.querySelector<HTMLButtonElement>(
           "[data-submit-diagnosis]",
         );
@@ -132,41 +95,20 @@ export function createApp(
               ...input,
               allocation,
             } as unknown as Record<string, unknown>,
-            metrics: {
-              ...metrics,
-              newCustomerTarget,
-              advertising,
-              restaurant,
-            } as unknown as Record<string, unknown>,
-            diagnosis: {
-              bottleneck,
-              actionKey: action.key,
-              effectiveCapacity,
+            metrics: outcome.persistedMetrics,
+            diagnosis: outcome.persistedDiagnosis,
+          });
+          renderResult(root, outcome.model, {
+            async onSaveAction() {
+              await service.saveActionPlan({
+                assessmentId: assessment.id,
+                actionKey: action.key,
+                metric: action.metric,
+                checkInDueAt: checkInDueDate(assessment.createdAt),
+              });
+              await showDashboard();
             },
           });
-          renderResult(
-            root,
-            {
-              effectiveCapacity,
-              metrics,
-              allocation,
-              ...advertisingResult,
-              ...(hasRestaurantInputs ? { restaurant } : {}),
-              bottleneck,
-              action,
-            },
-            {
-              async onSaveAction() {
-                await service.saveActionPlan({
-                  assessmentId: assessment.id,
-                  actionKey: action.key,
-                  metric: action.metric,
-                  checkInDueAt: checkInDueDate(assessment.createdAt),
-                });
-                await showDashboard();
-              },
-            },
-          );
         } catch {
           if (status) {
             status.textContent =

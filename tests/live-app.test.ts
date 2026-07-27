@@ -61,6 +61,28 @@ test("returns from coaching to a freshly loaded dashboard", async () => {
   expect(service.getLatestAssessment).toHaveBeenCalledTimes(2);
 });
 
+test("reopens the latest diagnosis as a read-only result and returns", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const service = liveService();
+  service.getLatestAssessment = vi.fn(async () => createAuthenticAssessment());
+
+  await createApp(root, service, { isLive: true }).start();
+  root.querySelector<HTMLButtonElement>("[data-view-latest-result]")?.click();
+
+  expect(root.querySelector(".result-shell")).not.toBeNull();
+  expect(root.querySelector("[data-save-action]")).toBeNull();
+  expect(root.textContent).toContain("최대 100명");
+  expect(root.textContent).toContain("하루 최대");
+
+  root.querySelector<HTMLButtonElement>("[data-result-back]")?.click();
+  await vi.waitFor(() => {
+    expect(root.querySelector(".dashboard-shell")).not.toBeNull();
+  });
+  expect(service.getLatestAssessment).toHaveBeenCalledTimes(2);
+});
+
 test("starts only one dashboard reload after rapid coaching back attempts", async () => {
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.querySelector<HTMLElement>("#app");

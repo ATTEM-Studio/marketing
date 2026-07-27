@@ -22,7 +22,8 @@ export interface ResultViewModel {
 }
 
 export interface ResultCallbacks {
-  onSaveAction: () => Promise<void> | void;
+  onSaveAction?: () => Promise<void> | void;
+  onBack?: () => void;
 }
 
 const won = new Intl.NumberFormat("ko-KR");
@@ -181,10 +182,13 @@ export function renderResult(
     approximate: "대략 입력 기준",
     estimated: "추정 기준",
   }[model.metrics.customerCountSource];
+  const backButton = callbacks?.onBack
+    ? '<button type="button" class="quiet-button result-back" data-result-back aria-label="대시보드로 돌아가기">← 대시보드</button>'
+    : "";
   root.innerHTML = `
     <header class="work-header">
       <a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>
-      <span class="status-chip">진단 완료</span>
+      <div class="result-header-actions">${backButton}<span class="status-chip">진단 완료</span></div>
     </header>
     <main id="main" class="result-shell">
       <p class="eyebrow">진단 결과</p>
@@ -210,7 +214,7 @@ export function renderResult(
         <div class="action-reason"><h3>왜 이 행동인가요?</h3><p>${model.bottleneck.status === "insufficient" ? "목표 크기, 고객 수용 여력, 지금 실행할 수 있는 조건을 기준으로 골랐습니다." : model.action.reason}</p><p>${bottleneckCopy(model.bottleneck)}</p></div>
         <div class="action-steps"><h3>이 순서로 실행하세요</h3><ol>${model.action.steps.map((step) => `<li>${step}</li>`).join("")}</ol></div>
         <div class="action-meta"><div><span>확인할 숫자</span><strong>${model.action.metric}</strong></div><div class="avoid-note"><span>지금 피할 것</span><strong>${model.action.avoid}</strong></div></div>
-        ${callbacks ? '<button type="button" class="primary-action" data-save-action>7일 행동으로 저장하기</button><p class="form-status" role="status" aria-live="polite" data-action-status></p>' : ""}
+        ${callbacks?.onSaveAction ? '<button type="button" class="primary-action" data-save-action>7일 행동으로 저장하기</button><p class="form-status" role="status" aria-live="polite" data-action-status></p>' : ""}
       </section>
       <section class="coaching-principle"><h2>관련 코칭 원칙</h2><p>${summary ?? "한 번에 한 가지 행동만 바꾸고, 결과를 기록하세요."}</p></section>
     </main>`;
@@ -218,9 +222,12 @@ export function renderResult(
   const saveAction =
     root.querySelector<HTMLButtonElement>("[data-save-action]");
   const status = root.querySelector<HTMLElement>("[data-action-status]");
+  root
+    .querySelector<HTMLButtonElement>("[data-result-back]")
+    ?.addEventListener("click", () => callbacks?.onBack?.());
   let saving = false;
   saveAction?.addEventListener("click", async () => {
-    if (!callbacks || saving) return;
+    if (!callbacks?.onSaveAction || saving) return;
     saving = true;
     saveAction.disabled = true;
     if (status) status.textContent = "실행 계획을 저장하고 있습니다.";

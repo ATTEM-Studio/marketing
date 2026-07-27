@@ -105,6 +105,18 @@ describe("instant coaching UI", () => {
       root().querySelector("[data-character-count]")?.textContent,
     ).toContain("500자 남음");
     expect(submitButton().disabled).toBe(true);
+    const questionCard = root().querySelector(".coaching-question-card");
+    const concernIntro = root().querySelector(".coaching-intro");
+    expect(questionCard).not.toBeNull();
+    expect(concernIntro).not.toBeNull();
+    if (questionCard && concernIntro) {
+      expect(
+        questionCard.compareDocumentPosition(concernIntro) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+    }
+    expect(root().textContent).toContain("AI 코치에게 직접 물어보세요");
+    expect(root().textContent).toContain("또는 고민 유형으로 시작하기");
   });
 
   it("starts from a concern card, prevents duplicate submits, and renders one follow-up at a time", async () => {
@@ -206,6 +218,21 @@ describe("instant coaching UI", () => {
       ?.requestSubmit();
     await flushPromises();
 
+    expect(askCoach).toHaveBeenCalledWith({
+      assessmentId: "a1",
+      question: "광고를 하는데 손님이 늘지 않아요",
+    });
+  });
+
+  it("submits an initial dashboard question exactly once", async () => {
+    const askCoach = vi.fn(async () => answerResponse);
+
+    renderCoaching(root(), "a1", serviceWith(askCoach), vi.fn(), {
+      initialQuestion: "광고를 하는데 손님이 늘지 않아요",
+    });
+    await flushPromises();
+
+    expect(askCoach).toHaveBeenCalledTimes(1);
     expect(askCoach).toHaveBeenCalledWith({
       assessmentId: "a1",
       question: "광고를 하는데 손님이 늘지 않아요",

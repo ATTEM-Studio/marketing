@@ -1,4 +1,4 @@
-import type { RecommendedAction, RecommendationContext } from "./types";
+import type { RecommendedAction, RecommendationContext } from "./types.js";
 
 const ACTIONS = {
   "profit-review": {
