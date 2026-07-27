@@ -142,6 +142,22 @@ describe("instant coaching UI", () => {
       "true",
     );
     const loadingStatus = root().querySelector("[data-coaching-status]");
+    const spinner = root().querySelector("[data-coaching-spinner]");
+    const dots = root().querySelector("[data-coaching-dots]");
+
+    expect(spinner?.getAttribute("aria-hidden")).toBe("true");
+    expect(dots?.getAttribute("aria-hidden")).toBe("true");
+    expect(dots?.querySelectorAll(".coaching-loading-dot")).toHaveLength(3);
+    expect(
+      [...(loadingStatus?.children ?? [])].map((element) => element.className),
+    ).toEqual([
+      "coaching-loading-spinner",
+      "coaching-loading-message",
+      "coaching-loading-dots",
+    ]);
+    expect(loadingStatus?.textContent?.trim()).toBe(
+      "답변을 준비하고 있습니다.",
+    );
     expect(loadingStatus?.textContent).toContain("답변을 준비하고 있습니다");
     expect(loadingStatus?.classList.contains("coaching-loading")).toBe(true);
     expect(document.activeElement).toBe(loadingStatus);
@@ -151,6 +167,8 @@ describe("instant coaching UI", () => {
 
     expect(root().querySelectorAll("[data-follow-up]")).toHaveLength(1);
     expect(root().querySelector("[data-coaching-answer]")).toBeNull();
+    expect(root().querySelector("[data-coaching-spinner]")).toBeNull();
+    expect(root().querySelector("[data-coaching-dots]")).toBeNull();
     expect(document.activeElement).toBe(
       root().querySelector("[data-follow-up-heading]"),
     );
@@ -224,6 +242,40 @@ describe("instant coaching UI", () => {
     });
   });
 
+  it("keeps progress visible for a pending direct question and removes it with the answer", async () => {
+    let resolveTurn: ((value: CoachingTurnResponse) => void) | undefined;
+    const askCoach = vi.fn(
+      () =>
+        new Promise<CoachingTurnResponse>((resolve) => {
+          resolveTurn = resolve;
+        }),
+    );
+
+    renderCoaching(root(), "a1", serviceWith(askCoach), vi.fn());
+    typeQuestion("광고를 하는데 손님이 늘지 않아요");
+    root()
+      .querySelector<HTMLFormElement>("[data-question-form]")
+      ?.requestSubmit();
+
+    const loadingStatus = root().querySelector("[data-coaching-status]");
+    expect(root().querySelector("[data-coaching-spinner]")).not.toBeNull();
+    expect(root().querySelector("[data-coaching-dots]")).not.toBeNull();
+    expect(
+      [...(loadingStatus?.children ?? [])].map((element) => element.className),
+    ).toEqual([
+      "coaching-loading-spinner",
+      "coaching-loading-message",
+      "coaching-loading-dots",
+    ]);
+
+    resolveTurn?.(answerResponse);
+    await flushPromises();
+
+    expect(root().querySelector("[data-coaching-spinner]")).toBeNull();
+    expect(root().querySelector("[data-coaching-dots]")).toBeNull();
+    expect(root().querySelector("[data-coaching-answer]")).not.toBeNull();
+  });
+
   it("submits an initial dashboard question exactly once", async () => {
     const askCoach = vi.fn(async () => answerResponse);
 
@@ -275,10 +327,22 @@ describe("instant coaching UI", () => {
     );
     expect(pendingRetry?.disabled).toBe(true);
     expect(pendingRetry?.getAttribute("aria-disabled")).toBe("true");
+    const loadingStatus = root().querySelector("[data-coaching-status]");
+    expect(root().querySelector("[data-coaching-spinner]")).not.toBeNull();
+    expect(root().querySelector("[data-coaching-dots]")).not.toBeNull();
+    expect(
+      [...(loadingStatus?.children ?? [])].map((element) => element.className),
+    ).toEqual([
+      "coaching-loading-spinner",
+      "coaching-loading-message",
+      "coaching-loading-dots",
+    ]);
 
     resolveRetry?.(followUpResponse);
     await flushPromises();
     expect(root().querySelectorAll("[data-follow-up]")).toHaveLength(1);
+    expect(root().querySelector("[data-coaching-spinner]")).toBeNull();
+    expect(root().querySelector("[data-coaching-dots]")).toBeNull();
   });
 
   it("records one accessible selected feedback state", async () => {

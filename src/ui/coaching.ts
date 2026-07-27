@@ -50,7 +50,19 @@ function shell(content: string, busy: boolean, status: string): string {
         </div>
       </header>
       ${content}
-      <p class="${busy ? "coaching-loading" : "sr-only"}" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" data-coaching-status>${escapeHtml(status)}</p>
+      <p class="${busy ? "coaching-loading" : "sr-only"}" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" data-coaching-status>${
+        busy
+          ? `<span class="coaching-loading-spinner" data-coaching-spinner aria-hidden="true"></span>`
+          : ""
+      }<span class="coaching-loading-message">${escapeHtml(status)}</span>${
+        busy
+          ? `<span class="coaching-loading-dots" data-coaching-dots aria-hidden="true">
+              <span class="coaching-loading-dot"></span>
+              <span class="coaching-loading-dot"></span>
+              <span class="coaching-loading-dot"></span>
+            </span>`
+          : ""
+      }</p>
     </main>`;
 }
 

@@ -1254,6 +1254,12 @@ details > summary {
 }
 
 .coaching-loading {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
   margin: 1rem 0 0;
   padding: 0.75rem 1rem;
   border-radius: var(--radius-sm);
@@ -1261,6 +1267,85 @@ details > summary {
   background: var(--green-soft);
   font-weight: 750;
   text-align: center;
+  overflow: hidden;
+}
+
+.coaching-loading::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.45) 45%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  animation: coaching-loading-sheen 2.2s ease-in-out infinite;
+}
+
+.coaching-loading-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coaching-loading-spinner,
+.coaching-loading-message,
+.coaching-loading-dots {
+  position: relative;
+  z-index: 1;
+}
+
+.coaching-loading-dots {
+  gap: 0.2rem;
+}
+
+.coaching-loading-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgb(22 95 57 / 0.25);
+  border-top-color: var(--green-dark);
+  border-radius: 50%;
+  animation: coaching-spin 0.8s linear infinite;
+}
+
+.coaching-loading-dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.25;
+  animation: coaching-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.coaching-loading-dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.coaching-loading-dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes coaching-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes coaching-dot-pulse {
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes coaching-loading-sheen {
+  45%,
+  100% {
+    transform: translateX(120%);
+  }
 }
 
 .coaching-intro {
@@ -1567,6 +1652,10 @@ details > summary {
     padding-bottom: 5.5rem;
   }
 
+  .coaching-loading {
+    flex-wrap: wrap;
+  }
+
   .coaching-primary-action {
     position: sticky;
     z-index: 5;
@@ -1658,6 +1747,12 @@ details > summary {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .coaching-loading::before,
+  .coaching-loading-spinner,
+  .coaching-loading-dot {
+    animation: none;
+  }
+
   .question-card {
     animation: none;
   }
