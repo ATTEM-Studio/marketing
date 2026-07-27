@@ -1,4 +1,7 @@
-import { buildDiagnosisOutcome } from "./result-view-model";
+import {
+  buildDiagnosisOutcome,
+  restoreResultViewModel,
+} from "./result-view-model";
 import type { AppService } from "./services/contracts";
 import {
   readDiagnosisForm,
@@ -51,6 +54,15 @@ export function createApp(
       },
       showLanding,
       showCoaching,
+      (assessment) => {
+        const model = restoreResultViewModel(assessment);
+        if (!model) return;
+        renderResult(root, model, {
+          onBack: () => {
+            void showDashboard();
+          },
+        });
+      },
     );
   };
 

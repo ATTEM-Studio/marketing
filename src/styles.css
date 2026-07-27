@@ -1100,6 +1100,25 @@ details > summary {
   margin-bottom: 0.35rem;
 }
 
+.summary-link {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.85rem;
+  color: var(--green-dark);
+  border: 1px solid var(--green);
+  background: #ffffff;
+}
+
+.result-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.result-back {
+  min-height: 44px;
+}
+
 .upcoming-actions ul,
 .action-history ul {
   display: grid;

@@ -30,6 +30,34 @@ test("starts coaching with the latest completed assessment", async () => {
   expect(onStartCoaching).toHaveBeenCalledWith(completedAssessment.id);
 });
 
+test("opens the latest completed assessment from its dashboard summary", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const completedAssessment = createAuthenticAssessment();
+  const onViewLatestResult = vi.fn();
+  const service = {
+    getLatestAssessment: vi.fn(async () => completedAssessment),
+    listActionPlans: vi.fn(async () => []),
+    signOut: vi.fn(),
+  } as unknown as AppService;
+
+  await renderDashboard(
+    root,
+    { mode: "demo", profile: null },
+    service,
+    vi.fn(),
+    vi.fn(),
+    vi.fn(),
+    onViewLatestResult,
+  );
+  root
+    .querySelector<HTMLButtonElement>("[data-view-latest-result]")
+    ?.click();
+
+  expect(onViewLatestResult).toHaveBeenCalledWith(completedAssessment);
+});
+
 test("does not show coaching for an incomplete assessment", async () => {
   document.body.innerHTML = '<div id="app"></div>';
   const root = document.querySelector<HTMLElement>("#app");
@@ -52,6 +80,7 @@ test("does not show coaching for an incomplete assessment", async () => {
   );
 
   expect(root.querySelector("[data-start-coaching]")).toBeNull();
+  expect(root.querySelector("[data-view-latest-result]")).toBeNull();
 });
 
 test("does not show coaching for a tampered assessment", async () => {
@@ -74,6 +103,7 @@ test("does not show coaching for a tampered assessment", async () => {
   );
 
   expect(root.querySelector("[data-start-coaching]")).toBeNull();
+  expect(root.querySelector("[data-view-latest-result]")).toBeNull();
 });
 
 test("does not show coaching when the persisted goal differs", async () => {

@@ -111,8 +111,12 @@ function dashboardMarkup(
   const upcoming = planned.slice(1);
   const target = assessment ? latestTarget(assessment) : null;
   const ceiling = assessment ? maximumNewCustomers(assessment) : null;
-  const coachingEntry = isCompletedAssessment(assessment)
+  const completedAssessment = isCompletedAssessment(assessment);
+  const coachingEntry = completedAssessment
     ? '<button type="button" class="secondary-action" data-start-coaching>지금 고민 해결하기</button>'
+    : "";
+  const resultEntry = completedAssessment
+    ? '<button type="button" class="summary-link" data-view-latest-result>최근 진단 결과 전체 보기</button>'
     : "";
 
   const assessmentSummary = assessment
@@ -120,6 +124,7 @@ function dashboardMarkup(
         <h2>최근 진단 요약</h2>
         ${target === null ? "<p>목표 매출을 다시 확인해 주세요.</p>" : `<p>목표 월 매출 ${number.format(target)}원</p>`}
         ${ceiling === null ? "" : `<p>전부 신규 고객으로 채운다고 가정한 최대 ${number.format(ceiling)}명입니다.</p>`}
+        ${resultEntry}
       </section>`
     : `<section class="dashboard-summary"><h2>아직 진단한 내용이 없어요.</h2><p>최근 매출과 목표 매출만 먼저 적어 보면 됩니다.</p></section>`;
 
@@ -175,6 +180,8 @@ export async function renderDashboard(
   onStartDiagnosis: () => void,
   onSignedOut: () => void = onStartDiagnosis,
   onStartCoaching: (assessmentId: string) => void = () => undefined,
+  onViewLatestResult: (assessment: AssessmentSnapshot) => void = () =>
+    undefined,
 ): Promise<void> {
   const signOut = async (button: HTMLButtonElement) => {
     button.disabled = true;
@@ -241,6 +248,11 @@ export async function renderDashboard(
         ?.addEventListener("click", () =>
           onStartCoaching(coachingAssessmentId),
         );
+    }
+    if (assessment && coachingAssessmentId) {
+      root
+        .querySelector<HTMLButtonElement>("[data-view-latest-result]")
+        ?.addEventListener("click", () => onViewLatestResult(assessment));
     }
     root
       .querySelector<HTMLButtonElement>("[data-complete-plan]")
