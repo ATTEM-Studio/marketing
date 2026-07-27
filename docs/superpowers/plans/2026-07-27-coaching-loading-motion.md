@@ -21,10 +21,12 @@
 ### Task 1: 로딩 상태의 의미와 시각 요소
 
 **Files:**
+
 - Modify: `tests/coaching-ui.test.ts`
 - Modify: `src/ui/coaching.ts`
 
 **Interfaces:**
+
 - Consumes: `shell(content: string, busy: boolean, status: string): string`
 - Produces: `[data-coaching-spinner]`, `[data-coaching-dots]`, 세 개의 `.coaching-loading-dot` 요소
 
@@ -39,9 +41,7 @@ const dots = root().querySelector("[data-coaching-dots]");
 expect(spinner?.getAttribute("aria-hidden")).toBe("true");
 expect(dots?.getAttribute("aria-hidden")).toBe("true");
 expect(dots?.querySelectorAll(".coaching-loading-dot")).toHaveLength(3);
-expect(loadingStatus?.textContent?.trim()).toBe(
-  "답변을 준비하고 있습니다.",
-);
+expect(loadingStatus?.textContent?.trim()).toBe("답변을 준비하고 있습니다.");
 
 resolveTurn?.(followUpResponse);
 await flushPromises();
@@ -80,8 +80,14 @@ const loadingVisual = busy
 상태 요소 안에서는 접근성 문구와 장식 요소를 분리한다.
 
 ```html
-<p class="coaching-loading" role="status" aria-live="polite"
-   aria-atomic="true" tabindex="-1" data-coaching-status>
+<p
+  class="coaching-loading"
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+  tabindex="-1"
+  data-coaching-status
+>
   <span class="coaching-loading-copy">답변을 준비하고 있습니다.</span>
   ${loadingVisual}
 </p>
@@ -111,10 +117,12 @@ git commit -m "feat: show active AI coaching progress"
 ### Task 2: 반응형 애니메이션과 모션 감소
 
 **Files:**
+
 - Modify: `tests/responsive-styles.test.ts`
 - Modify: `src/styles.css`
 
 **Interfaces:**
+
 - Consumes: `.coaching-loading`, `.coaching-loading-spinner`, `.coaching-loading-dot`
 - Produces: `coaching-spin`, `coaching-dot-pulse`, `coaching-loading-sheen` 애니메이션
 
@@ -220,16 +228,23 @@ Expected: `coaching-spin` 계약이 없어 FAIL.
 }
 
 @keyframes coaching-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes coaching-dot-pulse {
-  50% { opacity: 1; transform: translateY(-2px); }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }
 
 @keyframes coaching-loading-sheen {
   45%,
-  100% { transform: translateX(120%); }
+  100% {
+    transform: translateX(120%);
+  }
 }
 ```
 
@@ -265,12 +280,14 @@ git commit -m "feat: animate AI coaching loading state"
 ### Task 3: 전체 검증과 운영 배포
 
 **Files:**
+
 - Verify: `src/ui/coaching.ts`
 - Verify: `src/styles.css`
 - Verify: `tests/coaching-ui.test.ts`
 - Verify: `tests/responsive-styles.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1과 Task 2의 로딩 마크업 및 CSS 애니메이션
 - Produces: 검증된 GitHub main 커밋과 Vercel 운영 배포
 

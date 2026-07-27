@@ -106,4 +106,16 @@ test("animates coaching progress while respecting reduced motion", () => {
   expect(css).toMatch(
     /prefers-reduced-motion:\s*reduce[\s\S]*\.coaching-loading-spinner[\s\S]*animation:\s*none/s,
   );
+  expect(css).toMatch(
+    /@keyframes\s+coaching-spin\s*\{[\s\S]*rotate\(360deg\)/s,
+  );
+  expect(css).toMatch(
+    /@keyframes\s+coaching-dot-pulse\s*\{[\s\S]*opacity:\s*1[\s\S]*translateY\(-2px\)/s,
+  );
+  expect(css).toMatch(
+    /@keyframes\s+coaching-loading-sheen\s*\{[\s\S]*translateX\(120%\)/s,
+  );
+  expect(css).toMatch(
+    /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.coaching-loading::before\s*,\s*\.coaching-loading-spinner\s*,\s*\.coaching-loading-dot\s*\{\s*animation:\s*none/s,
+  );
 });

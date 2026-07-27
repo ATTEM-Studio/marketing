@@ -1275,26 +1275,25 @@ details > summary {
   z-index: 0;
   inset: 0;
   content: "";
-  background: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.45) 45%, transparent 70%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.45) 45%,
+    transparent 70%
+  );
   transform: translateX(-120%);
   animation: coaching-loading-sheen 2.2s ease-in-out infinite;
 }
 
-.coaching-loading-visual,
 .coaching-loading-dots {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.coaching-loading-visual {
-  position: relative;
-  z-index: 1;
-  gap: 0.45rem;
-  flex: 0 0 auto;
-}
-
-.coaching-loading-message {
+.coaching-loading-spinner,
+.coaching-loading-message,
+.coaching-loading-dots {
   position: relative;
   z-index: 1;
 }
