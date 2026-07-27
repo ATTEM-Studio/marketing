@@ -1,6 +1,6 @@
-import { buildCoachingContext } from "../../src/coaching/context";
-import { chooseNextTurn, selectAction } from "../../src/coaching/rules";
-import { sanitizeQuestion } from "../../src/coaching/safety";
+import { buildCoachingContext } from "../../src/coaching/context.js";
+import { chooseNextTurn, selectAction } from "../../src/coaching/rules.js";
+import { sanitizeQuestion } from "../../src/coaching/safety.js";
 import type {
   CoachingConcernKey,
   CoachingContext,
@@ -9,25 +9,25 @@ import type {
   CoachingIntent,
   CoachingResponse,
   CoachingTurnResponse,
-} from "../../src/coaching/types";
-import type { CoachingActionDefinition } from "../../src/coaching/types";
+} from "../../src/coaching/types.js";
+import type { CoachingActionDefinition } from "../../src/coaching/types.js";
 import {
   buildProviderQuestionSignals,
   type ComposeCoachingInput,
   type IntentResult,
   type ProviderQuestionSignals,
-} from "./openai";
+} from "./openai.js";
 import type {
   CoachingAdmin,
   CoachingSessionRecord,
   OwnedCoachingAssessment,
-} from "./supabase-admin";
+} from "./supabase-admin.js";
 
 export type {
   CoachingAdmin,
   CoachingSessionRecord,
   OwnedCoachingAssessment,
-} from "./supabase-admin";
+} from "./supabase-admin.js";
 
 export interface CoachingHttpRequest {
   method?: string;
@@ -623,7 +623,13 @@ export async function handleCoachingRequest(
         : error(404, "RECOMMENDATION_NOT_FOUND");
     }
     return await handleTurn(body, authenticated, deps);
-  } catch {
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "";
+    const safeCode = /^[A-Z][A-Z0-9_]{2,80}$/.test(message)
+      ? message
+      : "UNEXPECTED_ERROR";
+
+    console.error("COACHING_REQUEST_FAILED", safeCode);
     return error(500, "COACHING_REQUEST_FAILED");
   }
 }

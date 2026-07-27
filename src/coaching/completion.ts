@@ -1,17 +1,17 @@
-import { selectBottleneck } from "../domain/bottleneck";
-import { selectAction } from "../domain/recommendation";
+import { selectBottleneck } from "../domain/bottleneck.js";
+import { selectAction } from "../domain/recommendation.js";
 import {
   analyzeRestaurantOperations,
   resolveEffectiveCapacity,
   validateRestaurantOperations,
-} from "../domain/restaurant";
+} from "../domain/restaurant.js";
 import {
   allocationNewCustomerTarget,
   calculateAdvertisingMetrics,
   calculateRevenueMetrics,
   validateAdvertisingInputs,
   validateGoalAllocation,
-} from "../domain/revenue";
+} from "../domain/revenue.js";
 import type {
   AdvertisingInputs,
   BottleneckInputs,
@@ -22,7 +22,7 @@ import type {
   RestaurantOperationsInput,
   ReturningDataStatus,
   RevenueInputs,
-} from "../domain/types";
+} from "../domain/types.js";
 
 type Row = Record<string, unknown>;
 

@@ -3,7 +3,7 @@ import type {
   BottleneckKey,
   BottleneckResult,
   ComparableMetric,
-} from "./types";
+} from "./types.js";
 
 const INSUFFICIENT_RESULT: BottleneckResult = {
   key: null,

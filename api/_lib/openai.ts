@@ -4,7 +4,7 @@ import type {
   CoachingContext,
   CoachingIntent,
   CoachingResponse,
-} from "../../src/coaching/types";
+} from "../../src/coaching/types.js";
 
 const RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-5-mini";

@@ -1,18 +1,18 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { isCompletedPersistedAssessment } from "../../src/coaching/completion";
+import { isCompletedPersistedAssessment } from "../../src/coaching/completion.js";
 import type {
   CoachingAssessmentRecord,
   CoachingContextSource,
   CoachingGoalRecord,
   CoachingPlanRecord,
-} from "../../src/coaching/context";
+} from "../../src/coaching/context.js";
 import type {
   CoachingConcernKey,
   CoachingContext,
   CoachingFeedback,
   CoachingIntent,
   CoachingResponse,
-} from "../../src/coaching/types";
+} from "../../src/coaching/types.js";
 
 type Row = Record<string, unknown>;
 

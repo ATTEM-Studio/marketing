@@ -1,12 +1,12 @@
-import { coachingActions } from "./content";
-import { detectProhibitedRequest } from "./safety";
+import { coachingActions } from "./content.js";
+import { detectProhibitedRequest } from "./safety.js";
 import type {
   CoachingActionDefinition,
   CoachingConcernKey,
   CoachingContext,
   CoachingFollowUp,
   CoachingIntent,
-} from "./types";
+} from "./types.js";
 
 export type RuleDecision =
   | { kind: "follow_up"; question: CoachingFollowUp }

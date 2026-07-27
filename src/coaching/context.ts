@@ -1,4 +1,4 @@
-import type { CoachingContext } from "./types";
+import type { CoachingContext } from "./types.js";
 
 type DataRecord = Record<string, unknown>;
 
