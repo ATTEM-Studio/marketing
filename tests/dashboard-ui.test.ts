@@ -84,8 +84,7 @@ test("starts coaching with a trimmed dashboard question", async () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).not.toBe(0);
   expect(
-    aiCard.compareDocumentPosition(history) &
-      Node.DOCUMENT_POSITION_FOLLOWING,
+    aiCard.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).not.toBe(0);
 });
 
@@ -110,9 +109,7 @@ test("opens the latest completed assessment from its dashboard summary", async (
     vi.fn(),
     onViewLatestResult,
   );
-  root
-    .querySelector<HTMLButtonElement>("[data-view-latest-result]")
-    ?.click();
+  root.querySelector<HTMLButtonElement>("[data-view-latest-result]")?.click();
 
   expect(onViewLatestResult).toHaveBeenCalledWith(completedAssessment);
 });

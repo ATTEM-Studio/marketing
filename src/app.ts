@@ -98,21 +98,17 @@ export function createApp(
             metrics: outcome.persistedMetrics,
             diagnosis: outcome.persistedDiagnosis,
           });
-          renderResult(
-            root,
-            outcome.model,
-            {
-              async onSaveAction() {
-                await service.saveActionPlan({
-                  assessmentId: assessment.id,
-                  actionKey: action.key,
-                  metric: action.metric,
-                  checkInDueAt: checkInDueDate(assessment.createdAt),
-                });
-                await showDashboard();
-              },
+          renderResult(root, outcome.model, {
+            async onSaveAction() {
+              await service.saveActionPlan({
+                assessmentId: assessment.id,
+                actionKey: action.key,
+                metric: action.metric,
+                checkInDueAt: checkInDueDate(assessment.createdAt),
+              });
+              await showDashboard();
             },
-          );
+          });
         } catch {
           if (status) {
             status.textContent =

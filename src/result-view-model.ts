@@ -95,8 +95,8 @@ function restoredInput(assessment: AssessmentSnapshot): DiagnosisInput {
   const input = assessment.inputs as unknown as DiagnosisInput;
   const allocation =
     input.allocation &&
-    Object.keys(input.allocation as unknown as Record<string, unknown>)
-      .length > 0
+    Object.keys(input.allocation as unknown as Record<string, unknown>).length >
+      0
       ? input.allocation
       : {
           newCustomerRevenue: null,

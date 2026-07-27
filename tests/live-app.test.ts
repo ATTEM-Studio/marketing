@@ -69,9 +69,7 @@ test("reopens the latest diagnosis as a read-only result and returns", async () 
   service.getLatestAssessment = vi.fn(async () => createAuthenticAssessment());
 
   await createApp(root, service, { isLive: true }).start();
-  root
-    .querySelector<HTMLButtonElement>("[data-view-latest-result]")
-    ?.click();
+  root.querySelector<HTMLButtonElement>("[data-view-latest-result]")?.click();
 
   expect(root.querySelector(".result-shell")).not.toBeNull();
   expect(root.querySelector("[data-save-action]")).toBeNull();
