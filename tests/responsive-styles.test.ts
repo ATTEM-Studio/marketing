@@ -92,3 +92,18 @@ test("keeps diagnosis content flexible without stretching the action row", () =>
 test("removes question transitions when reduced motion is requested", () => {
   expect(css).toMatch(/prefers-reduced-motion:\s*reduce[\s\S]*\.question-card/);
 });
+
+test("animates coaching progress while respecting reduced motion", () => {
+  expect(css).toMatch(
+    /\.coaching-loading-spinner\s*\{[^}]*animation:\s*coaching-spin/s,
+  );
+  expect(css).toMatch(
+    /\.coaching-loading-dot\s*\{[^}]*animation:\s*coaching-dot-pulse/s,
+  );
+  expect(css).toMatch(
+    /\.coaching-loading::before\s*\{[^}]*animation:\s*coaching-loading-sheen/s,
+  );
+  expect(css).toMatch(
+    /prefers-reduced-motion:\s*reduce[\s\S]*\.coaching-loading-spinner[\s\S]*animation:\s*none/s,
+  );
+});
