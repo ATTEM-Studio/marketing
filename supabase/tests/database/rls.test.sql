@@ -1,6 +1,6 @@
 begin;
 
-select plan(148);
+select plan(150);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
@@ -115,6 +115,12 @@ select lives_ok(
   'a successful login can clear failures'
 );
 select ok(public.check_admin_login_attempt(repeat('a', 64)), 'clearing failures restores access');
+select ok(not public.check_admin_login_attempt(null), 'a null hash cannot log in');
+select throws_ok(
+  $$select public.record_admin_login_failure(null)$$,
+  'P0001', 'invalid_ip_hash',
+  'a null hash cannot record a failure'
+);
 reset role;
 select alike((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%access_status = ''active''%', 'assessment RPC rejects inactive users');
 select alike((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%p_allocation%', 'assessment RPC validates the saved allocation');

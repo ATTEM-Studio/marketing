@@ -30,7 +30,7 @@ describe("authenticated database privileges", () => {
       "supabase/tests/database/rls.test.sql",
       "utf8",
     );
-    expect(databaseTest).toContain("select plan(148)");
+    expect(databaseTest).toContain("select plan(150)");
     expect(databaseTest).toContain(
       "authenticated can read their profile through RLS",
     );

@@ -16,7 +16,7 @@ returns boolean language plpgsql security definer set search_path = public
 as $$
 declare v_failures integer;
 begin
-  if char_length(p_ip_hash) <> 64 then return false; end if;
+  if p_ip_hash is null or char_length(p_ip_hash) <> 64 then return false; end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_ip_hash, 0));
   delete from public.admin_login_attempts
     where attempted_at < now() - interval '15 minutes';
@@ -31,7 +31,7 @@ returns boolean language plpgsql security definer set search_path = public
 as $$
 declare v_failures integer;
 begin
-  if char_length(p_ip_hash) <> 64 then
+  if p_ip_hash is null or char_length(p_ip_hash) <> 64 then
     raise exception 'invalid_ip_hash';
   end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_ip_hash, 0));
