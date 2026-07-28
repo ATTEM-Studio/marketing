@@ -25,7 +25,7 @@
 
 ## File Structure
 
-- `supabase/migrations/202607280012_admin_login_rate_limit.sql`: service-role-only hashed login attempt storage and atomic rate-limit functions.
+- `supabase/migrations/202607280012_admin_login_rate_limit.sql`: service-role-only hashed login attempt storage and atomic failure recording.
 - `api/_lib/admin-auth.ts`: constant-time password verification, signed session token, cookie parsing/serialization, IP hashing.
 - `api/_lib/admin-handler.ts`: framework-independent login, session, logout, overview, and member-detail request handlers.
 - `api/_lib/admin-data.ts`: Supabase-backed rate-limit and member reporting repository.
@@ -40,7 +40,6 @@
 - `src/app.ts`: administrator flow orchestration.
 - `src/ui/shell.ts`, `src/ui/onboarding.ts`, `src/ui/dashboard.ts`, `src/ui/diagnosis.ts`, `src/ui/result.ts`: use common brand markup.
 - `src/styles.css`: administrator dialog/dashboard responsive and accessibility styles.
-- `tests/admin-database-contract.test.ts`: migration security and rate-limit contract.
 - `tests/admin-auth.test.ts`: token, cookie, password, and IP hash unit coverage.
 - `tests/admin-api.test.ts`: handler authorization, status, pagination, and no-store coverage.
 - `tests/admin-data.test.ts`: repository mapping and duplicate severity coverage.
@@ -53,46 +52,51 @@
 
 **Files:**
 - Create: `supabase/migrations/202607280012_admin_login_rate_limit.sql`
-- Create: `tests/admin-database-contract.test.ts`
 - Modify: `supabase/tests/database/rls.test.sql`
 
 **Interfaces:**
 - Produces: `public.check_admin_login_attempt(p_ip_hash text) returns boolean`
-- Produces: `public.record_admin_login_failure(p_ip_hash text) returns void`
+- Produces: `public.record_admin_login_failure(p_ip_hash text) returns boolean`
 - Produces: `public.clear_admin_login_failures(p_ip_hash text) returns void`
 - Security: all three functions and `public.admin_login_attempts` are available only to `service_role`
 
-- [ ] **Step 1: Write the failing database contract test**
+- [ ] **Step 1: Write failing pgTAP behavior and privilege tests**
 
-```ts
-import { readFileSync } from "node:fs";
-import { describe, expect, test } from "vitest";
+```sql
+select has_table('public', 'admin_login_attempts', 'admin login attempts table exists');
+select ok(
+  not has_table_privilege('anon', 'public.admin_login_attempts', 'select'),
+  'anon cannot read admin login attempts'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.record_admin_login_failure(text)', 'execute'),
+  'authenticated users cannot record admin login failures'
+);
+select ok(
+  has_function_privilege('service_role', 'public.record_admin_login_failure(text)', 'execute'),
+  'service role can record admin login failures'
+);
 
-const sql = readFileSync(
-  "supabase/migrations/202607280012_admin_login_rate_limit.sql",
-  "utf8",
-).toLowerCase();
-
-describe("admin login database contract", () => {
-  test("stores only a fixed-length hash and keeps access service-role-only", () => {
-    expect(sql).toContain("create table public.admin_login_attempts");
-    expect(sql).toContain("check (char_length(ip_hash) = 64)");
-    expect(sql).toContain("revoke all on table public.admin_login_attempts from public, anon, authenticated");
-    expect(sql).toMatch(/grant execute[\s\S]+check_admin_login_attempt[\s\S]+to service_role/);
-  });
-
-  test("blocks at five failures in fifteen minutes", () => {
-    expect(sql).toContain("interval '15 minutes'");
-    expect(sql).toMatch(/count\(\*\)[\s\S]+>= 5/);
-  });
-});
+set local role service_role;
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'first failure remains below the lock threshold');
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'second failure remains below the lock threshold');
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'third failure remains below the lock threshold');
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'fourth failure remains below the lock threshold');
+select ok(not public.record_admin_login_failure(repeat('a', 64)), 'fifth failure atomically reaches the lock threshold');
+select ok(not public.check_admin_login_attempt(repeat('a', 64)), 'a locked hash cannot log in');
+select lives_ok(
+  $$select public.clear_admin_login_failures(repeat('a', 64))$$,
+  'a successful login can clear failures'
+);
+select ok(public.check_admin_login_attempt(repeat('a', 64)), 'clearing failures restores access');
+reset role;
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails because the migration does not exist**
+- [ ] **Step 2: Run the database test and confirm it fails because the table and functions do not exist**
 
-Run: `pnpm vitest run tests/admin-database-contract.test.ts`
+Run: `pnpm exec supabase db test`
 
-Expected: FAIL with `ENOENT` for `202607280012_admin_login_rate_limit.sql`.
+Expected: FAIL on the missing `admin_login_attempts` table or functions. If the local Supabase runtime is unavailable, record that limitation and run the project pgTAP contract test after adding the failing assertions; the migration must still be behavior-tested against the linked database before deployment.
 
 - [ ] **Step 3: Add the service-role-only table and atomic functions**
 
@@ -130,13 +134,21 @@ Complete the migration with these functions and grants:
 
 ```sql
 create or replace function public.record_admin_login_failure(p_ip_hash text)
-returns void language plpgsql security definer set search_path = public
+returns boolean language plpgsql security definer set search_path = public
 as $$
+declare v_failures integer;
 begin
   if char_length(p_ip_hash) <> 64 then
     raise exception 'invalid_ip_hash';
   end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_ip_hash, 0));
+  delete from public.admin_login_attempts
+    where attempted_at < now() - interval '15 minutes';
+  select count(*) into v_failures from public.admin_login_attempts
+    where ip_hash = p_ip_hash and attempted_at >= now() - interval '15 minutes';
+  if v_failures >= 5 then return false; end if;
   insert into public.admin_login_attempts (ip_hash) values (p_ip_hash);
+  return v_failures + 1 < 5;
 end;
 $$;
 
@@ -154,33 +166,18 @@ grant execute on function public.record_admin_login_failure(text) to service_rol
 grant execute on function public.clear_admin_login_failures(text) to service_role;
 ```
 
-- [ ] **Step 4: Extend pgTAP assertions and run the database contract tests**
+- [ ] **Step 4: Run the database privilege and behavior tests**
 
-Append these pgTAP assertions:
+Run: `pnpm exec supabase db test`
 
-```sql
-select ok(
-  not has_table_privilege('anon', 'public.admin_login_attempts', 'select'),
-  'anon cannot read admin login attempts'
-);
-select ok(
-  not has_function_privilege('authenticated', 'public.check_admin_login_attempt(text)', 'execute'),
-  'authenticated users cannot invoke admin login rate limiting'
-);
-select ok(
-  has_function_privilege('service_role', 'public.check_admin_login_attempt(text)', 'execute'),
-  'service role can check admin login rate limiting'
-);
-```
-
-Run: `pnpm vitest run tests/admin-database-contract.test.ts tests/pgtap-contract.test.ts tests/database-privileges-contract.test.ts`
+Run: `pnpm vitest run tests/pgtap-contract.test.ts tests/database-privileges-contract.test.ts`
 
 Expected: PASS.
 
 - [ ] **Step 5: Commit the database boundary**
 
 ```bash
-git add supabase/migrations/202607280012_admin_login_rate_limit.sql supabase/tests/database/rls.test.sql tests/admin-database-contract.test.ts
+git add supabase/migrations/202607280012_admin_login_rate_limit.sql supabase/tests/database/rls.test.sql
 git commit -m "feat: add admin login rate limiting"
 ```
 
@@ -692,7 +689,7 @@ git add src/ui/admin-dashboard.ts src/app.ts src/styles.css tests/admin-ui.test.
 git commit -m "feat: add responsive admin dashboard"
 ```
 
-### Task 7: Security regression, operating documentation, migration, and production deployment
+### Task 7: Security regression, operating documentation, and release preparation
 
 **Files:**
 - Create: `tests/admin-security.test.ts`
@@ -702,7 +699,7 @@ git commit -m "feat: add responsive admin dashboard"
 
 **Interfaces:**
 - Consumes: all previous tasks
-- Produces: verified Supabase migration and Vercel production deployment
+- Produces: a fully verified feature branch ready for review, merge, migration, and deployment
 
 - [ ] **Step 1: Write security regression tests**
 
@@ -742,13 +739,13 @@ Run: `pnpm verify`
 
 Expected: formatting, TypeScript, all Vitest tests, security scan, and Vite production build all PASS.
 
-- [ ] **Step 5: Apply and verify the Supabase migration**
+- [ ] **Step 5: Verify the migration against the linked Supabase project without applying it**
 
-Run: `pnpm exec supabase db push --linked`
+Run: `pnpm exec supabase db diff --linked`
 
 Run: `pnpm exec supabase migration list --linked`
 
-Expected: remote and local both list `202607280012`.
+Expected: the pending local migration is identified and no unrelated destructive change is present. Do not push the migration before the whole-branch review and `main` merge.
 
 - [ ] **Step 6: Configure Vercel server-only secrets without printing values**
 
@@ -761,13 +758,13 @@ git add tests/admin-security.test.ts tests/security-scan.test.ts tests/build-con
 git commit -m "docs: secure admin dashboard operations"
 ```
 
-- [ ] **Step 8: Push and deploy the exact verified commit**
+- [ ] **Step 8: Record the exact verified feature commit**
 
-Run: `git push origin main`
+Run: `git rev-parse HEAD`
 
-Deploy the linked project to Vercel Production and record the resulting commit SHA and deployment ID. Do not deploy an uncommitted or different source state.
+Expected: one clean feature-branch commit SHA with no working-tree changes. The controller performs the whole-branch review, merges into `main`, pushes `main`, applies migration `202607280012`, and deploys the exact merged SHA.
 
-- [ ] **Step 9: Verify the production story**
+- [ ] **Step 9: Prepare the production verification checklist**
 
 Verify on desktop and a mobile viewport:
 
@@ -780,8 +777,8 @@ Verify on desktop and a mobile viewport:
 7. Network responses are `no-store`; a signed-out request returns `401`.
 8. Logout removes visible PII and reauthentication is required.
 
-Run a final secret scan against tracked files and the built `dist` directory, then record the production URL.
+Run a final secret scan against tracked files and the built `dist` directory. Save no real member data in reports or screenshots.
 
 - [ ] **Step 10: Final handoff**
 
-Report the production URL, commit SHA, migration status, test summary, the secret gesture, two-hour expiry, and the two required Vercel variable names. Do not include either secret value or any real member data.
+Report the verified feature SHA, pending migration, test summary, the secret gesture, two-hour expiry, and the two required Vercel variable names. Do not include either secret value or any real member data. Production URL and deployment ID are added only after whole-branch review, `main` merge, migration, and deployment.
