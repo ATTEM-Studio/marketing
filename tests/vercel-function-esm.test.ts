@@ -4,14 +4,19 @@ import { pathToFileURL } from "node:url";
 import * as ts from "typescript";
 import { expect, test } from "vitest";
 
-test("emits a Node ESM coaching function whose complete module graph loads", async () => {
+test("emits Node ESM Vercel functions whose complete module graphs load", async () => {
   const cacheRoot = resolve("node_modules/.cache");
   await mkdir(cacheRoot, { recursive: true });
   const outDir = await mkdtemp(join(cacheRoot, "vercel-esm-"));
 
   try {
     const program = ts.createProgram({
-      rootNames: [resolve("api/coaching.ts")],
+      rootNames: [
+        resolve("api/coaching.ts"),
+        resolve("api/admin-login.ts"),
+        resolve("api/admin-session.ts"),
+        resolve("api/admin-logout.ts"),
+      ],
       options: {
         target: ts.ScriptTarget.ES2022,
         module: ts.ModuleKind.NodeNext,
@@ -37,11 +42,18 @@ test("emits a Node ESM coaching function whose complete module graph loads", asy
 
     expect(diagnostics).toEqual([]);
     expect(program.emit().emitSkipped).toBe(false);
-    await expect(
-      import(
-        `${pathToFileURL(join(outDir, "api/coaching.js")).href}?test=${Date.now()}`
-      ),
-    ).resolves.toMatchObject({ default: expect.any(Function) });
+    for (const endpoint of [
+      "coaching",
+      "admin-login",
+      "admin-session",
+      "admin-logout",
+    ]) {
+      await expect(
+        import(
+          `${pathToFileURL(join(outDir, `api/${endpoint}.js`)).href}?test=${Date.now()}`
+        ),
+      ).resolves.toMatchObject({ default: expect.any(Function) });
+    }
   } finally {
     await rm(outDir, { recursive: true, force: true });
   }
