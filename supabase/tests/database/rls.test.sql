@@ -1,6 +1,6 @@
 begin;
 
-select plan(136);
+select plan(148);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
@@ -25,6 +25,7 @@ select has_table('public'::name, 'coaching_messages'::name, 'coaching messages t
 select has_table('public'::name, 'coaching_recommendations'::name, 'coaching recommendations table exists');
 select has_table('public'::name, 'coaching_request_events'::name, 'coaching request events table exists');
 select has_function('public', 'consume_coaching_request', array['uuid']);
+select has_table('public', 'admin_login_attempts', 'admin login attempts table exists');
 select policies_are('public', 'assessments', array['assessment_owner_select']);
 select policies_are('public', 'goals', array['goal_owner_select']);
 select policies_are('public', 'action_plans', array['action_owner_select', 'action_owner_insert', 'action_owner_update']);
@@ -42,6 +43,10 @@ select ok(not has_table_privilege('anon', 'public.pending_registrations', 'selec
 select ok(not has_table_privilege('authenticated', 'public.pending_registrations', 'select'), 'authenticated cannot read pending PII');
 select ok(not has_table_privilege('authenticated', 'public.invite_codes', 'select'), 'authenticated cannot read invite hashes');
 select ok(not has_table_privilege('authenticated', 'public.coaching_request_events', 'select'), 'authenticated cannot read coaching rate events');
+select ok(
+  not has_table_privilege('anon', 'public.admin_login_attempts', 'select'),
+  'anon cannot read admin login attempts'
+);
 select ok(has_table_privilege('authenticated', 'public.profiles', 'select'), 'authenticated can read their profile through RLS');
 select ok(has_table_privilege('authenticated', 'public.consent_events', 'select'), 'authenticated can read their consent through RLS');
 select ok(has_table_privilege('authenticated', 'public.stores', 'select'), 'authenticated can read their store through RLS');
@@ -71,6 +76,14 @@ select ok(not has_function_privilege('authenticated', 'public.cleanup_expired_bu
 select ok(not has_function_privilege('authenticated', 'public.activate_anonymous_reader(uuid, text, text, text, text, text, boolean, boolean)', 'execute'), 'only the server activates an anonymous reader');
 select ok(not has_function_privilege('authenticated', 'public.consume_coaching_request(uuid)', 'execute'), 'clients cannot consume coaching requests directly');
 select ok(has_function_privilege('service_role', 'public.consume_coaching_request(uuid)', 'execute'), 'only the server can consume coaching requests');
+select ok(
+  not has_function_privilege('authenticated', 'public.record_admin_login_failure(text)', 'execute'),
+  'authenticated users cannot record admin login failures'
+);
+select ok(
+  has_function_privilege('service_role', 'public.record_admin_login_failure(text)', 'execute'),
+  'service role can record admin login failures'
+);
 select ok(has_function_privilege('authenticated', 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)', 'execute'), 'active authenticated buyers can save an assessment through the RPC');
 select is((select prosecdef from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), true, 'finalizer is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'reservation is security definer');
@@ -90,6 +103,19 @@ select ok(exists (select 1 from pg_indexes where schemaname = 'public' and index
 select alike((select prosrc from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), '%v_invite.code_hash = p_code_hash%', 'an idempotent pending reservation requires the same code hash');
 select alike((select prosrc from pg_proc where oid = 'public.consume_invite_attempt(text)'::regprocedure), '%pg_advisory_xact_lock%', 'rate limiting locks each IP rolling window atomically');
 select alike((select prosrc from pg_proc where oid = 'public.consume_coaching_request(uuid)'::regprocedure), '%pg_advisory_xact_lock%', 'coaching rate limiting locks each user rolling window atomically');
+set local role service_role;
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'first failure remains below the lock threshold');
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'second failure remains below the lock threshold');
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'third failure remains below the lock threshold');
+select ok(public.record_admin_login_failure(repeat('a', 64)), 'fourth failure remains below the lock threshold');
+select ok(not public.record_admin_login_failure(repeat('a', 64)), 'fifth failure atomically reaches the lock threshold');
+select ok(not public.check_admin_login_attempt(repeat('a', 64)), 'a locked hash cannot log in');
+select lives_ok(
+  $$select public.clear_admin_login_failures(repeat('a', 64))$$,
+  'a successful login can clear failures'
+);
+select ok(public.check_admin_login_attempt(repeat('a', 64)), 'clearing failures restores access');
+reset role;
 select alike((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%access_status = ''active''%', 'assessment RPC rejects inactive users');
 select alike((select prosrc from pg_proc where oid = 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)'::regprocedure), '%p_allocation%', 'assessment RPC validates the saved allocation');
 select ok(not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'assessments' and policyname = 'assessment_owner_insert'), 'direct assessment INSERT policy is removed');
