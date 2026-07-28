@@ -4,11 +4,6 @@ import {
   type AdminHandlerDependencies,
   type AdminHttpResponse,
 } from "./_lib/admin-handler.js";
-import { createAdminDataStore } from "./_lib/admin-data.js";
-
-function productionDependencies(): AdminHandlerDependencies {
-  return { data: createAdminDataStore() };
-}
 
 function applyAdminResponse(
   response: VercelResponse,
@@ -28,13 +23,13 @@ export function createAdminSessionEndpoint(
   injectedDependencies?: AdminHandlerDependencies,
 ): (request: VercelRequest, response: VercelResponse) => Promise<void> {
   return async (request, response) => {
-    const result = await createAdminHandler(
-      injectedDependencies ?? productionDependencies(),
-    ).session({
-      headers: request.headers,
-      body: request.body,
-      ...(request.method ? { method: request.method } : {}),
-    });
+    const result = await createAdminHandler(injectedDependencies ?? {}).session(
+      {
+        headers: request.headers,
+        body: request.body,
+        ...(request.method ? { method: request.method } : {}),
+      },
+    );
     applyAdminResponse(response, result);
   };
 }

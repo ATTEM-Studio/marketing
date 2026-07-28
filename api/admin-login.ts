@@ -10,6 +10,30 @@ function productionDependencies(): AdminHandlerDependencies {
   return { data: createAdminDataStore() };
 }
 
+function unavailableDependencies(): AdminHandlerDependencies {
+  const unavailable = async (): Promise<never> => {
+    throw new Error("ADMIN_DEPENDENCY_UNAVAILABLE");
+  };
+  return {
+    data: {
+      isAllowed: unavailable,
+      recordFailure: unavailable,
+      clearFailures: unavailable,
+    },
+  };
+}
+
+function dependenciesFor(
+  injectedDependencies: AdminHandlerDependencies | undefined,
+): AdminHandlerDependencies {
+  if (injectedDependencies) return injectedDependencies;
+  try {
+    return productionDependencies();
+  } catch {
+    return unavailableDependencies();
+  }
+}
+
 function applyAdminResponse(
   response: VercelResponse,
   result: AdminHttpResponse,
@@ -29,7 +53,7 @@ export function createAdminLoginEndpoint(
 ): (request: VercelRequest, response: VercelResponse) => Promise<void> {
   return async (request, response) => {
     const result = await createAdminHandler(
-      injectedDependencies ?? productionDependencies(),
+      dependenciesFor(injectedDependencies),
     ).login({
       headers: request.headers,
       body: request.body,

@@ -8,6 +8,8 @@ const { createAdminSession, hashAdminClientIp } =
 const { createAdminHandler } = await import("../api/_lib/admin-handler");
 const { createAdminDataStore } = await import("../api/_lib/admin-data");
 const { createAdminLoginEndpoint } = await import("../api/admin-login");
+const { createAdminSessionEndpoint } = await import("../api/admin-session");
+const { createAdminLogoutEndpoint } = await import("../api/admin-logout");
 
 const now = new Date("2026-07-28T00:00:00Z");
 
@@ -219,4 +221,104 @@ test("the Vercel login adapter applies a pure handler response", async () => {
   expect(status).toHaveBeenCalledWith(204);
   expect(end).toHaveBeenCalledOnce();
   expect(setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+});
+
+function responseDouble() {
+  const status = vi.fn().mockReturnThis();
+  return { status, json: vi.fn(), end: vi.fn(), setHeader: vi.fn() };
+}
+
+async function withoutSupabaseConfiguration(run: () => Promise<void>) {
+  const originalUrl = process.env.SUPABASE_URL;
+  const serviceRoleKeyName = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
+  const originalKey = process.env[serviceRoleKeyName];
+  delete process.env.SUPABASE_URL;
+  Reflect.deleteProperty(process.env, serviceRoleKeyName);
+  try {
+    await run();
+  } finally {
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) {
+      Reflect.deleteProperty(process.env, serviceRoleKeyName);
+    } else {
+      Reflect.set(process.env, serviceRoleKeyName, originalKey);
+    }
+  }
+}
+
+test("a production login dependency failure becomes a generic no-store response", async () => {
+  await withoutSupabaseConfiguration(async () => {
+    const response = responseDouble();
+
+    await createAdminLoginEndpoint()(
+      {
+        method: "POST",
+        headers: { "x-forwarded-for": "203.0.113.7" },
+        body: { password: "correct horse battery staple" },
+      } as never,
+      response as never,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.json).toHaveBeenCalledWith({ error: "REQUEST_FAILED" });
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
+  });
+});
+
+test("a production login retains 405 and Allow when dependency initialization fails", async () => {
+  await withoutSupabaseConfiguration(async () => {
+    const response = responseDouble();
+
+    await createAdminLoginEndpoint()(
+      { method: "GET", headers: {} } as never,
+      response as never,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(405);
+    expect(response.json).toHaveBeenCalledWith({ error: "METHOD_NOT_ALLOWED" });
+    expect(response.setHeader).toHaveBeenCalledWith("Allow", "POST");
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
+  });
+});
+
+test("production session and logout adapters do not require limiter configuration", async () => {
+  await withoutSupabaseConfiguration(async () => {
+    const sessionResponse = responseDouble();
+    const logoutResponse = responseDouble();
+
+    await createAdminSessionEndpoint()(
+      { method: "GET", headers: {} } as never,
+      sessionResponse as never,
+    );
+    await createAdminLogoutEndpoint()(
+      { method: "POST", headers: {} } as never,
+      logoutResponse as never,
+    );
+
+    expect(sessionResponse.status).toHaveBeenCalledWith(401);
+    expect(sessionResponse.json).toHaveBeenCalledWith({
+      error: "UNAUTHORIZED",
+    });
+    expect(sessionResponse.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
+    expect(logoutResponse.status).toHaveBeenCalledWith(204);
+    expect(logoutResponse.end).toHaveBeenCalledOnce();
+    expect(logoutResponse.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
+    expect(logoutResponse.setHeader).toHaveBeenCalledWith(
+      "Set-Cookie",
+      expect.stringContaining("Max-Age=0"),
+    );
+  });
 });

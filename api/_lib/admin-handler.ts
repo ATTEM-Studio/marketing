@@ -22,7 +22,7 @@ export interface AdminHttpResponse {
 }
 
 export interface AdminHandlerDependencies {
-  data: AdminLoginLimiter;
+  data?: AdminLoginLimiter;
   now?: () => Date;
 }
 
@@ -93,15 +93,17 @@ export function createAdminHandler(
     if (password === null) return error(400, "INVALID_REQUEST");
 
     try {
+      const data = dependencies.data;
+      if (!data) return error(500, "REQUEST_FAILED");
       const ipHash = hashAdminClientIp(header(request, "x-forwarded-for"));
-      if (!(await dependencies.data.isAllowed(ipHash))) {
+      if (!(await data.isAllowed(ipHash))) {
         return error(401, "LOGIN_FAILED");
       }
       if (!verifyAdminPassword(password)) {
-        await dependencies.data.recordFailure(ipHash);
+        await data.recordFailure(ipHash);
         return error(401, "LOGIN_FAILED");
       }
-      await dependencies.data.clearFailures(ipHash);
+      await data.clearFailures(ipHash);
       return response(204, undefined, {
         "Set-Cookie": adminSessionCookie(
           createAdminSession(dependencies.now?.() ?? new Date()),
