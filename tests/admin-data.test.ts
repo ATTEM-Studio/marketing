@@ -127,3 +127,63 @@ test("member reporting requests only coaching count and latest timestamp", async
   ]);
   expect(calls.some((call) => call.table === "coaching_messages")).toBe(false);
 });
+
+test("overview refuses a truncated duplicate scan instead of silently omitting members", async () => {
+  const client = {
+    rpc: async () => ({ data: true, error: null }),
+    from(table: string) {
+      let head = false;
+      let offset = 0;
+      const query = {
+        select(_columns: string, options?: { head?: boolean }) {
+          head = options?.head === true;
+          return query;
+        },
+        eq: () => query,
+        gte: () => query,
+        lt: () => query,
+        in: () => query,
+        order: () => query,
+        range(from: number) {
+          offset = from;
+          return query;
+        },
+        limit: () => query,
+        maybeSingle: async () => ({ data: null, error: null }),
+        then: <TResult1 = unknown, TResult2 = never>(
+          onfulfilled?:
+            ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+          onrejected?:
+            ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+        ) => {
+          const data =
+            table === "profiles" && !head
+              ? Array.from({ length: 200 }, (_, index) => ({
+                  id: `${offset + index}`,
+                  name: "name",
+                  email: `${offset + index}@example.com`,
+                  region: "서울",
+                  business_name: `가게 ${offset + index}`,
+                  created_at: "2026-07-28T00:00:00.000Z",
+                }))
+              : null;
+          return Promise.resolve({
+            data,
+            error: null,
+            count: head ? 0 : null,
+          }).then(onfulfilled, onrejected);
+        },
+      };
+      return query;
+    },
+  };
+
+  await expect(
+    createAdminDataStore(client as never).overview({
+      search: "",
+      duplicate: "all",
+      page: 1,
+      pageSize: 25,
+    }),
+  ).rejects.toThrow("ADMIN_DATA_LIMIT_EXCEEDED");
+});

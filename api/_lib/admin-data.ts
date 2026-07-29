@@ -286,6 +286,16 @@ export function createAdminDataStore(
       profiles.push(...data);
       if (data.length < QUERY_CHUNK_SIZE) break;
     }
+    if (profiles.length === MAX_DUPLICATE_PROFILES) {
+      const { data, error } = await reportingClient
+        .from<Record<string, unknown>>("profiles")
+        .select("id")
+        .eq("access_status", "active")
+        .order("id")
+        .range(MAX_DUPLICATE_PROFILES, MAX_DUPLICATE_PROFILES);
+      if (error || !Array.isArray(data)) throw new Error("ADMIN_DATA_ERROR");
+      if (data.length > 0) throw new Error("ADMIN_DATA_LIMIT_EXCEEDED");
+    }
     return profiles;
   }
 
