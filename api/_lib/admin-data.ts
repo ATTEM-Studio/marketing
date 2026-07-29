@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { isCompletedPersistedAssessment } from "../../src/coaching/completion.js";
 
 interface RpcClient {
   rpc(
@@ -61,17 +62,12 @@ export interface AdminMemberSummary {
 
 export interface AdminOverview {
   totals: {
-    activeMembers: number;
-    joinedToday: number;
-    completedAssessments: number;
-    coachingSessions: number;
+    total: number;
+    today: number;
+    last7Days: number;
+    last30Days: number;
   };
-  daily: {
-    date: string;
-    joinedMembers: number;
-    completedAssessments: number;
-    coachingSessions: number;
-  };
+  daily: Array<{ date: string; count: number }>;
   members: AdminMemberSummary[];
   page: number;
   pageSize: number;
@@ -88,14 +84,37 @@ export interface AdminMemberDetail {
     joinedAt: string;
     consents: { serviceTerms: boolean; marketing: boolean };
   };
-  duplicatePeers: AdminMemberSummary[];
-  latestAssessment: { id: string; createdAt: string } | null;
-  assessmentHistory: Array<{ id: string; createdAt: string }>;
+  duplicatePeers: {
+    members: AdminMemberSummary[];
+    totalCount: number;
+    truncated: boolean;
+  };
+  latestAssessment: {
+    id: string;
+    createdAt: string;
+    inputData: Record<string, unknown>;
+    calculatedMetrics: Record<string, unknown>;
+    diagnosis: Record<string, unknown>;
+    goal: {
+      targetRevenue: number | null;
+      allocation: Record<string, unknown>;
+      periodStart: string | null;
+      periodEnd: string | null;
+      createdAt: string | null;
+    };
+  } | null;
+  assessmentHistory: {
+    entries: Array<{ id: string; createdAt: string }>;
+    totalCount: number;
+  };
   actionPlans: Array<{
     id: string;
     assessmentId: string;
+    actionKey: string;
+    actionSnapshot: Record<string, unknown>;
     status: string;
     scheduledFor: string | null;
+    checkInDueAt: string | null;
     createdAt: string;
     updatedAt: string;
   }>;
@@ -121,6 +140,8 @@ export interface AdminDataStore extends AdminLoginLimiter {
 
 const QUERY_CHUNK_SIZE = 200;
 const MAX_DUPLICATE_PROFILES = 10_000;
+const MAX_MEMBER_HISTORY_ROWS = 5_000;
+const MAX_DUPLICATE_PEERS_RETURNED = 50;
 
 export function normalizeIdentity(value: string): string {
   return value
@@ -183,6 +204,21 @@ function stringValue(row: Record<string, unknown>, key: string): string {
   return typeof row[key] === "string" ? row[key] : "";
 }
 
+function recordValue(
+  row: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> {
+  const value = row[key];
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function finiteNumber(value: unknown): number | null {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function koreaDayBounds(now = new Date()): {
   date: string;
   start: string;
@@ -203,6 +239,20 @@ function koreaDayBounds(now = new Date()): {
     start: start.toISOString(),
     end: new Date(start.getTime() + 86_400_000).toISOString(),
   };
+}
+
+function recentKoreanDays(now = new Date(), length = 30): string[] {
+  const { start } = koreaDayBounds(now);
+  const today = new Date(start);
+  return Array.from({ length }, (_, index) => {
+    const day = new Date(today.getTime() - index * 86_400_000);
+    return koreaDayBounds(day).date;
+  }).reverse();
+}
+
+function koreanDateKey(timestamp: string): string | null {
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? null : koreaDayBounds(date).date;
 }
 
 function mapMember(
@@ -299,15 +349,38 @@ export function createAdminDataStore(
     return profiles;
   }
 
-  async function duplicateProfiles(): Promise<Map<string, DuplicateGroup>> {
-    return classifyDuplicates(
-      (await activeProfiles()).map((row) => ({
-        id: stringValue(row, "id"),
-        email: stringValue(row, "email"),
-        region: stringValue(row, "region"),
-        businessName: stringValue(row, "business_name"),
-      })),
-    );
+  async function memberRows(
+    table: string,
+    columns: string,
+    userId: string,
+  ): Promise<Record<string, unknown>[]> {
+    const rows: Record<string, unknown>[] = [];
+    for (
+      let offset = 0;
+      offset < MAX_MEMBER_HISTORY_ROWS;
+      offset += QUERY_CHUNK_SIZE
+    ) {
+      const { data, error } = await reportingClient
+        .from<Record<string, unknown>>(table)
+        .select(columns)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(offset, offset + QUERY_CHUNK_SIZE - 1);
+      if (error || !Array.isArray(data)) throw new Error("ADMIN_DATA_ERROR");
+      rows.push(...data);
+      if (data.length < QUERY_CHUNK_SIZE) return rows;
+    }
+    const { data, error } = await reportingClient
+      .from<Record<string, unknown>>(table)
+      .select("id")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(MAX_MEMBER_HISTORY_ROWS, MAX_MEMBER_HISTORY_ROWS);
+    if (error || !Array.isArray(data)) throw new Error("ADMIN_DATA_ERROR");
+    if (data.length > 0) throw new Error("ADMIN_DATA_LIMIT_EXCEEDED");
+    return rows;
   }
 
   return {
@@ -321,15 +394,10 @@ export function createAdminDataStore(
       await call("clear_admin_login_failures", ipHash);
     },
     async overview(query) {
-      const [profiles, totalRows, allAssessments, allCoaching] =
-        await Promise.all([
-          activeProfiles(),
-          countRows("profiles", (source) =>
-            source.eq("access_status", "active"),
-          ),
-          countRows("assessments"),
-          countRows("coaching_sessions"),
-        ]);
+      const [profiles, total] = await Promise.all([
+        activeProfiles(),
+        countRows("profiles", (source) => source.eq("access_status", "active")),
+      ]);
       const duplicates = classifyDuplicates(
         profiles.map((row) => ({
           id: stringValue(row, "id"),
@@ -360,34 +428,25 @@ export function createAdminDataStore(
             b.joinedAt.localeCompare(a.joinedAt) || a.id.localeCompare(b.id),
         );
       const start = (query.page - 1) * query.pageSize;
-      const bounds = koreaDayBounds();
-      const [joinedToday, assessmentsToday, coachingToday] = await Promise.all([
-        countRows("profiles", (source) =>
-          source
-            .eq("access_status", "active")
-            .gte("created_at", bounds.start)
-            .lt("created_at", bounds.end),
-        ),
-        countRows("assessments", (source) =>
-          source.gte("created_at", bounds.start).lt("created_at", bounds.end),
-        ),
-        countRows("coaching_sessions", (source) =>
-          source.gte("created_at", bounds.start).lt("created_at", bounds.end),
-        ),
-      ]);
+      const days = recentKoreanDays();
+      const counts = new Map(days.map((date) => [date, 0]));
+      for (const profile of profiles) {
+        const date = koreanDateKey(stringValue(profile, "created_at"));
+        if (date && counts.has(date))
+          counts.set(date, (counts.get(date) ?? 0) + 1);
+      }
+      const daily = days.map((date) => ({
+        date,
+        count: counts.get(date) ?? 0,
+      }));
       return {
         totals: {
-          activeMembers: totalRows,
-          joinedToday,
-          completedAssessments: allAssessments,
-          coachingSessions: allCoaching,
+          total,
+          today: daily.at(-1)?.count ?? 0,
+          last7Days: daily.slice(-7).reduce((sum, day) => sum + day.count, 0),
+          last30Days: daily.reduce((sum, day) => sum + day.count, 0),
         },
-        daily: {
-          date: bounds.date,
-          joinedMembers: joinedToday,
-          completedAssessments: assessmentsToday,
-          coachingSessions: coachingToday,
-        },
+        daily,
         members: matching.slice(start, start + query.pageSize),
         page: query.page,
         pageSize: query.pageSize,
@@ -407,26 +466,32 @@ export function createAdminDataStore(
       const [
         consentsResult,
         assessmentsResult,
+        goalsResult,
         actionPlansResult,
         coachingCountResult,
         coachingLatestResult,
-        duplicates,
+        profiles,
       ] = await Promise.all([
         reportingClient
           .from<Record<string, unknown>>("consent_events")
           .select("consent_type,granted,recorded_at")
           .eq("user_id", id)
           .order("recorded_at", { ascending: false }),
-        reportingClient
-          .from<Record<string, unknown>>("assessments")
-          .select("id,created_at")
-          .eq("user_id", id)
-          .order("created_at", { ascending: false }),
-        reportingClient
-          .from<Record<string, unknown>>("action_plans")
-          .select("id,assessment_id,status,scheduled_for,created_at,updated_at")
-          .eq("user_id", id)
-          .order("created_at", { ascending: false }),
+        memberRows(
+          "assessments",
+          "id,input_data,calculated_metrics,diagnosis,created_at",
+          id,
+        ),
+        memberRows(
+          "goals",
+          "id,assessment_id,target_revenue,allocation,period_start,period_end,created_at",
+          id,
+        ),
+        memberRows(
+          "action_plans",
+          "id,assessment_id,action_key,action_snapshot,status,scheduled_for,check_in_due_at,created_at,updated_at",
+          id,
+        ),
         reportingClient
           .from<Record<string, unknown>>("coaching_sessions")
           .select("id", { count: "exact", head: true })
@@ -437,23 +502,18 @@ export function createAdminDataStore(
           .eq("user_id", id)
           .order("created_at", { ascending: false })
           .limit(1),
-        duplicateProfiles(),
+        activeProfiles(),
       ]);
       if (
         consentsResult.error ||
-        assessmentsResult.error ||
-        actionPlansResult.error ||
         coachingCountResult.error ||
         coachingLatestResult.error
       ) {
         throw new Error("ADMIN_DATA_ERROR");
       }
-      const assessments = Array.isArray(assessmentsResult.data)
-        ? assessmentsResult.data
-        : [];
-      const actionPlans = Array.isArray(actionPlansResult.data)
-        ? actionPlansResult.data
-        : [];
+      const assessments = assessmentsResult;
+      const goals = goalsResult;
+      const actionPlans = actionPlansResult;
       const latestCoaching = Array.isArray(coachingLatestResult.data)
         ? coachingLatestResult.data[0]
         : null;
@@ -464,11 +524,32 @@ export function createAdminDataStore(
         consentEvents.find(
           (event) => stringValue(event, "consent_type") === type,
         );
-      const peers = (duplicates.get(id)?.peerIds ?? []).slice(0, 50);
-      const allProfiles = await activeProfiles();
-      const profileById = new Map(
-        allProfiles.map((row) => [stringValue(row, "id"), row]),
+      const duplicates = classifyDuplicates(
+        profiles.map((row) => ({
+          id: stringValue(row, "id"),
+          email: stringValue(row, "email"),
+          region: stringValue(row, "region"),
+          businessName: stringValue(row, "business_name"),
+        })),
       );
+      const peerIds = duplicates.get(id)?.peerIds ?? [];
+      const peers = peerIds.slice(0, MAX_DUPLICATE_PEERS_RETURNED);
+      const profileById = new Map(
+        profiles.map((row) => [stringValue(row, "id"), row]),
+      );
+      const goalByAssessment = new Map(
+        goals.map((goal) => [stringValue(goal, "assessment_id"), goal]),
+      );
+      const completedAssessments = assessments.filter((assessment) =>
+        isCompletedPersistedAssessment(
+          assessment,
+          goalByAssessment.get(stringValue(assessment, "id")) ?? null,
+        ),
+      );
+      const latest = completedAssessments[0];
+      const latestGoal = latest
+        ? goalByAssessment.get(stringValue(latest, "id"))
+        : undefined;
       return {
         profile: {
           id,
@@ -482,25 +563,59 @@ export function createAdminDataStore(
             marketing: mostRecentConsent("marketing")?.granted === true,
           },
         },
-        duplicatePeers: peers.map((peerId) =>
-          mapMember(profileById.get(peerId) ?? {}, duplicates),
-        ),
-        latestAssessment: assessments[0]
+        duplicatePeers: {
+          members: peers.map((peerId) =>
+            mapMember(profileById.get(peerId) ?? {}, duplicates),
+          ),
+          totalCount: peerIds.length,
+          truncated: peerIds.length > peers.length,
+        },
+        latestAssessment: latest
           ? {
-              id: stringValue(assessments[0], "id"),
-              createdAt: stringValue(assessments[0], "created_at"),
+              id: stringValue(latest, "id"),
+              createdAt: stringValue(latest, "created_at"),
+              inputData: recordValue(latest, "input_data"),
+              calculatedMetrics: recordValue(latest, "calculated_metrics"),
+              diagnosis: recordValue(latest, "diagnosis"),
+              goal: {
+                targetRevenue: finiteNumber(latestGoal?.target_revenue),
+                allocation: latestGoal
+                  ? recordValue(latestGoal, "allocation")
+                  : {},
+                periodStart:
+                  typeof latestGoal?.period_start === "string"
+                    ? latestGoal.period_start
+                    : null,
+                periodEnd:
+                  typeof latestGoal?.period_end === "string"
+                    ? latestGoal.period_end
+                    : null,
+                createdAt:
+                  typeof latestGoal?.created_at === "string"
+                    ? latestGoal.created_at
+                    : null,
+              },
             }
           : null,
-        assessmentHistory: assessments.map((assessment) => ({
-          id: stringValue(assessment, "id"),
-          createdAt: stringValue(assessment, "created_at"),
-        })),
+        assessmentHistory: {
+          entries: completedAssessments.map((assessment) => ({
+            id: stringValue(assessment, "id"),
+            createdAt: stringValue(assessment, "created_at"),
+          })),
+          totalCount: completedAssessments.length,
+        },
         actionPlans: actionPlans.map((plan) => ({
           id: stringValue(plan, "id"),
           assessmentId: stringValue(plan, "assessment_id"),
+          actionKey: stringValue(plan, "action_key"),
+          actionSnapshot: recordValue(plan, "action_snapshot"),
           status: stringValue(plan, "status"),
           scheduledFor:
             typeof plan.scheduled_for === "string" ? plan.scheduled_for : null,
+          checkInDueAt:
+            typeof plan.check_in_due_at === "string"
+              ? plan.check_in_due_at
+              : null,
           createdAt: stringValue(plan, "created_at"),
           updatedAt: stringValue(plan, "updated_at"),
         })),
