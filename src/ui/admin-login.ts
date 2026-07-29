@@ -15,7 +15,11 @@ export function renderAdminLogin(
   adminApi: AdminLoginApi,
   callbacks: AdminLoginCallbacks,
 ): void {
-  root.querySelector("[data-admin-login-overlay]")?.remove();
+  const existing = root.querySelector<HTMLElement>(
+    "[data-admin-login-overlay]",
+  );
+  existing?.dispatchEvent(new Event("admin-login-dispose"));
+  existing?.remove();
   const returnFocus = callbacks.returnFocus ?? document.activeElement;
   root.insertAdjacentHTML(
     "beforeend",
@@ -38,6 +42,9 @@ export function renderAdminLogin(
   if (!overlay || !dialog || !form || !password || !submit || !status) return;
 
   let open = true;
+  overlay.addEventListener("admin-login-dispose", () => {
+    open = false;
+  });
   const close = () => {
     if (!open) return;
     open = false;

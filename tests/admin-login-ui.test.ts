@@ -179,6 +179,35 @@ test("replaces an existing administrator dialog instead of duplicating it", () =
   expect(root.querySelectorAll("[role='dialog']")).toHaveLength(1);
 });
 
+test("does not authenticate from a pending dialog replaced by a new dialog", async () => {
+  let resolveFirstLogin: (() => void) | undefined;
+  const firstApi = {
+    login: vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFirstLogin = resolve;
+        }),
+    ),
+  };
+  const { root, onAuthenticated } = open(firstApi);
+  const password = root.querySelector<HTMLInputElement>("[name='password']");
+  if (!password) throw new Error("missing password field");
+  password.value = "correct";
+  root
+    .querySelector<HTMLFormElement>("[data-admin-login-form]")
+    ?.requestSubmit();
+
+  renderAdminLogin(
+    root,
+    { login: vi.fn(async () => undefined) },
+    { onAuthenticated: vi.fn(), onClose: vi.fn() },
+  );
+  resolveFirstLogin?.();
+  await flush();
+
+  expect(onAuthenticated).not.toHaveBeenCalled();
+});
+
 test("notifies the app after a successful 204 login", async () => {
   const api = { login: vi.fn(async () => undefined) };
   const { root, onAuthenticated } = open(api);
