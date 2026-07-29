@@ -5,6 +5,7 @@ import type {
   AssessmentSnapshot,
 } from "../services/contracts";
 import { isCompletedPersistedAssessment } from "../coaching/completion";
+import { brandMarkup } from "./brand";
 
 const number = new Intl.NumberFormat("ko-KR");
 const dashboardQuestionExamples = [
@@ -171,7 +172,7 @@ function dashboardMarkup(
     : `<section class="action-history"><h2>지난 결과 기록</h2><p>아직 기록이 없습니다. 작은 변화도 적어 두면 다음 판단에 도움이 됩니다.</p></section>`;
 
   return `
-    <header class="work-header"><a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : '<span class="status-chip">샘플 모드</span>'}</header>
+    <header class="work-header">${brandMarkup("/")}${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : '<span class="status-chip">샘플 모드</span>'}</header>
     <main id="main" class="dashboard-shell">
       <section class="dashboard-hero"><div><p class="eyebrow">내 가게 대시보드</p><h1>${escapeHtml(profile?.businessName ?? "내 매장")}의 다음 한 걸음</h1><p>${escapeHtml(profile?.name ?? "사장님")}님, 모든 것을 한꺼번에 바꾸지 않아도 됩니다.</p></div>${assessmentSummary}</section>
       ${currentAction}
@@ -236,7 +237,7 @@ export async function renderDashboard(
       service.listActionPlans(),
     ]);
   } catch {
-    root.innerHTML = `<header class="work-header"><a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : ""}</header><main id="main" class="dashboard-shell error-state"><p class="eyebrow">연결 상태 확인</p><h1>정보를 불러오지 못했습니다.</h1><p>입력한 내용은 그대로 있습니다. 잠시 후 새로 진단하거나 다시 접속해 주세요.</p><button type="button" data-start-diagnosis>오늘 할 행동 찾기</button><p class="form-status" role="status" aria-live="polite" data-dashboard-status></p></main>`;
+    root.innerHTML = `<header class="work-header">${brandMarkup("/")}${session.mode === "live" ? '<button type="button" class="quiet-button" data-sign-out>로그아웃</button>' : ""}</header><main id="main" class="dashboard-shell error-state"><p class="eyebrow">연결 상태 확인</p><h1>정보를 불러오지 못했습니다.</h1><p>입력한 내용은 그대로 있습니다. 잠시 후 새로 진단하거나 다시 접속해 주세요.</p><button type="button" data-start-diagnosis>오늘 할 행동 찾기</button><p class="form-status" role="status" aria-live="polite" data-dashboard-status></p></main>`;
     root
       .querySelector<HTMLButtonElement>("[data-start-diagnosis]")
       ?.addEventListener("click", onStartDiagnosis);

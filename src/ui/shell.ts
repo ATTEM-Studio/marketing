@@ -1,3 +1,5 @@
+import { brandMarkup } from "./brand";
+
 export interface LandingCallbacks {
   onRegister(): void;
   onLogin(): void;
@@ -20,10 +22,7 @@ export function renderLandingShell(
     <div class="brand-page">
       <header class="site-header">
         <a class="skip-link" href="#main">본문 바로가기</a>
-        <a class="brand-mark" href="#main" aria-label="장사네비게이션 홈">
-          <span class="brand-symbol" aria-hidden="true">N</span>
-          <strong>장사네비게이션</strong>
-        </a>
+        ${brandMarkup("#main")}
         ${live ? '<span class="demo-badge">전자책 구매자 전용</span>' : '<span class="demo-badge">샘플 모드</span>'}
       </header>
       <main id="main" class="landing-shell">

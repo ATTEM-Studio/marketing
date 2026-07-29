@@ -1,4 +1,5 @@
 import { COACHING } from "../content/coaching";
+import { brandMarkup } from "./brand";
 import type {
   AdvertisingInputs,
   AdvertisingMetrics,
@@ -187,7 +188,7 @@ export function renderResult(
     : "";
   root.innerHTML = `
     <header class="work-header">
-      <a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>
+      ${brandMarkup("/")}
       <div class="result-header-actions">${backButton}<span class="status-chip">진단 완료</span></div>
     </header>
     <main id="main" class="result-shell">

@@ -3,6 +3,7 @@ import type {
   AppSession,
   BuyerRegistration,
 } from "../services/contracts";
+import { brandMarkup } from "./brand";
 
 export interface OnboardingCallbacks {
   onAuthenticated(session: AppSession): void;
@@ -82,7 +83,7 @@ function firstRegistrationError(
 }
 
 function workHeader(status: string): string {
-  return `<header class="work-header"><a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a><span class="status-chip">${status}</span></header>`;
+  return `<header class="work-header">${brandMarkup("/")}<span class="status-chip">${status}</span></header>`;
 }
 
 function registrationScreenMarkup(): string {

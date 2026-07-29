@@ -37,4 +37,26 @@ describe("app shell", () => {
     expect(onLogin).not.toHaveBeenCalled();
     expect(root.querySelector("[data-start-login]")).toBeNull();
   });
+
+  test("keeps the home link separate from the hidden administrator logo trigger", () => {
+    const root = document.querySelector<HTMLElement>("#app");
+    if (!root) throw new Error("missing test root");
+    renderLandingShell(
+      root,
+      { onRegister: vi.fn(), onLogin: vi.fn(), onDemo: vi.fn() },
+      { mode: "demo" },
+    );
+
+    const trigger = root.querySelector<HTMLButtonElement>(
+      "[data-admin-trigger]",
+    );
+    expect(trigger?.type).toBe("button");
+    expect(trigger?.getAttribute("aria-label")).toBe("장사네비게이션 로고");
+    expect(trigger?.closest("a")).toBeNull();
+    expect(
+      root
+        .querySelector<HTMLAnchorElement>(".brand-name")
+        ?.getAttribute("href"),
+    ).toBe("#main");
+  });
 });

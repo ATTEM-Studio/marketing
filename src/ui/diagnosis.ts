@@ -16,6 +16,7 @@ import {
   validateAdvertisingInputs,
   validateRevenueInputs,
 } from "../domain/revenue";
+import { brandMarkup } from "./brand";
 
 export interface DiagnosisInput {
   revenue: RevenueInputs;
@@ -706,7 +707,7 @@ export function renderDiagnosis(
 ): void {
   root.innerHTML = `
     <header class="work-header">
-      <a class="work-brand" href="/" aria-label="장사네비게이션 홈"><span class="brand-symbol" aria-hidden="true">N</span><strong>장사네비게이션</strong></a>
+      ${brandMarkup("/")}
       <div class="progress-area">
         <div class="progress-copy"><span data-chapter-title>매출 목표</span><strong data-step-label>1 / 3</strong><span data-question-label>질문 1 / 4</span></div>
         <div class="progress-track" aria-hidden="true"><span data-progress style="width: 33%"></span></div>
