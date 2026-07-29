@@ -102,6 +102,7 @@ export function renderAdminLogin(
       overlay.remove();
       callbacks.onAuthenticated();
     } catch {
+      if (!open) return;
       password.value = "";
       status.textContent = LOGIN_FAILED;
       submit.disabled = false;

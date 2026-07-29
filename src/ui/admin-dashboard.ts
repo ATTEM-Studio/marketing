@@ -1,4 +1,5 @@
 import { AdminApiError } from "../admin/api";
+import { formatKoreanDate, formatKoreanDateTime } from "../admin/date-format";
 import { diagnosisSections } from "../admin/labels";
 import type {
   AdminMemberDetail,
@@ -93,7 +94,7 @@ export async function renderAdminDashboard(
       <header class="admin-dashboard-header">
         <div>
           <p class="eyebrow">운영 현황</p>
-          <h1>관리자 대시보드</h1>
+          <h1 data-admin-dashboard-heading tabindex="-1">관리자 대시보드</h1>
         </div>
         <button type="button" class="quiet-button" data-admin-logout>관리자 로그아웃</button>
       </header>
@@ -136,6 +137,9 @@ export async function renderAdminDashboard(
   `;
 
   const dashboard = root.querySelector<HTMLElement>("[data-admin-dashboard]");
+  const dashboardHeading = root.querySelector<HTMLElement>(
+    "[data-admin-dashboard-heading]",
+  );
   const summary = root.querySelector<HTMLElement>("[data-admin-summary]");
   const trend = root.querySelector<HTMLElement>("[data-admin-trend]");
   const results = root.querySelector<HTMLElement>(
@@ -154,6 +158,7 @@ export async function renderAdminDashboard(
   );
   if (
     !dashboard ||
+    !dashboardHeading ||
     !summary ||
     !trend ||
     !results ||
@@ -201,7 +206,7 @@ export async function renderAdminDashboard(
           : Array.from(
               dashboard.querySelectorAll<HTMLElement>("[data-member-id]"),
             ).find((member) => member.dataset.memberId === closingId);
-      currentTrigger?.focus();
+      (currentTrigger ?? dashboardHeading).focus();
     }
     selectedTrigger = null;
   };
@@ -269,7 +274,7 @@ export async function renderAdminDashboard(
       bar.setAttribute("aria-hidden", "true");
       item.append(
         bar,
-        textElement("span", day.date, "admin-trend-date"),
+        textElement("span", formatKoreanDate(day.date), "admin-trend-date"),
         textElement(
           "strong",
           `${number.format(safeCount)}명`,
@@ -296,7 +301,7 @@ export async function renderAdminDashboard(
     for (const day of overview.daily) {
       const row = document.createElement("tr");
       row.append(
-        textElement("td", day.date),
+        textElement("td", formatKoreanDate(day.date)),
         textElement("td", `${number.format(day.count)}명`),
       );
       body.append(row);
@@ -312,7 +317,7 @@ export async function renderAdminDashboard(
       member.region,
       member.businessName,
       member.email,
-      member.joinedAt,
+      formatKoreanDateTime(member.joinedAt),
     ];
     const labels = ["이름", "지역", "상호명", "이메일", "가입일"];
     values.forEach((value, index) => {
@@ -505,7 +510,7 @@ export async function renderAdminDashboard(
         item.append(
           textElement("strong", member.name),
           textElement("span", member.email, "long-token"),
-          textElement("span", member.joinedAt),
+          textElement("span", formatKoreanDateTime(member.joinedAt)),
         );
         list.append(item);
       }

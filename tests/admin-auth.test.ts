@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { expect, test } from "vitest";
 
 const adminPasswordName = ["ADMIN", "DASHBOARD", "PASSWORD"].join("_");
@@ -23,6 +23,7 @@ const {
   expiredAdminSessionCookie,
   hashAdminClientIp,
   readAdminCookie,
+  safeEqual,
   verifyAdminPassword,
   verifyAdminSession,
 } = await import("../api/_lib/admin-auth");
@@ -80,6 +81,21 @@ test("reads only the administrator cookie from a mixed cookie header", () => {
 test("verifies the configured password without accepting an unequal value", () => {
   expect(verifyAdminPassword(adminPassword)).toBe(true);
   expect(verifyAdminPassword(`${adminPassword}!`)).toBe(false);
+});
+
+test("compares fixed-length digests for equal and unequal-length candidates", () => {
+  const comparedLengths: Array<[number, number]> = [];
+  const compare = (left: Uint8Array, right: Uint8Array) => {
+    comparedLengths.push([left.byteLength, right.byteLength]);
+    return timingSafeEqual(left, right);
+  };
+
+  expect(safeEqual(adminPassword, adminPassword, compare)).toBe(true);
+  expect(safeEqual("short", `${adminPassword}!`, compare)).toBe(false);
+  expect(comparedLengths).toEqual([
+    [32, 32],
+    [32, 32],
+  ]);
 });
 
 test("hashes a forwarded client IP before the data boundary", () => {

@@ -30,7 +30,7 @@ describe("authenticated database privileges", () => {
       "supabase/tests/database/rls.test.sql",
       "utf8",
     );
-    expect(databaseTest).toContain("select plan(150)");
+    expect(databaseTest).toContain("select plan(175)");
     expect(databaseTest).toContain(
       "authenticated can read their profile through RLS",
     );
@@ -38,6 +38,15 @@ describe("authenticated database privileges", () => {
       "authenticated can create a scheduled action plan through RLS",
     );
     expect(databaseTest).toContain("anon cannot read profiles");
+    expect(databaseTest).toContain(
+      "client role %s cannot %s administrator login attempts",
+    );
+    expect(databaseTest).toContain("client role %s cannot execute %s");
+    expect(databaseTest).toContain(
+      "service role can %s administrator login attempts",
+    );
+    expect(databaseTest).toContain("service role can execute %s");
+    expect(databaseTest.match(/privilege\.grantee = 0/gu)).toHaveLength(2);
   });
 
   test("uses referentially valid fixtures and a separate goal read statement", () => {

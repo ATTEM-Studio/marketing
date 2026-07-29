@@ -1,6 +1,6 @@
 begin;
 
-select plan(150);
+select plan(175);
 
 select has_table('public'::name, 'profiles'::name, 'profiles table exists');
 select has_table('public'::name, 'invite_codes'::name, 'invite codes table exists');
@@ -26,6 +26,17 @@ select has_table('public'::name, 'coaching_recommendations'::name, 'coaching rec
 select has_table('public'::name, 'coaching_request_events'::name, 'coaching request events table exists');
 select has_function('public', 'consume_coaching_request', array['uuid']);
 select has_table('public', 'admin_login_attempts', 'admin login attempts table exists');
+select ok(
+  exists (
+    select 1
+    from pg_indexes
+    where schemaname = 'public'
+      and tablename = 'admin_login_attempts'
+      and indexname = 'admin_login_attempts_attempted_at_idx'
+      and indexdef like '%(attempted_at)%'
+  ),
+  'administrator login cleanup has an attempted-at-leading index'
+);
 select policies_are('public', 'assessments', array['assessment_owner_select']);
 select policies_are('public', 'goals', array['goal_owner_select']);
 select policies_are('public', 'action_plans', array['action_owner_select', 'action_owner_insert', 'action_owner_update']);
@@ -44,9 +55,30 @@ select ok(not has_table_privilege('authenticated', 'public.pending_registrations
 select ok(not has_table_privilege('authenticated', 'public.invite_codes', 'select'), 'authenticated cannot read invite hashes');
 select ok(not has_table_privilege('authenticated', 'public.coaching_request_events', 'select'), 'authenticated cannot read coaching rate events');
 select ok(
-  not has_table_privilege('anon', 'public.admin_login_attempts', 'select'),
-  'anon cannot read admin login attempts'
-);
+  not exists (
+    select 1
+    from pg_class as table_class
+    cross join lateral aclexplode(
+      coalesce(table_class.relacl, acldefault('r', table_class.relowner))
+    ) as privilege
+    where table_class.oid = 'public.admin_login_attempts'::regclass
+      and privilege.grantee = 0
+      and privilege.privilege_type = upper(privilege_name)
+  ),
+  format('client role public cannot %s administrator login attempts', privilege_name)
+)
+from (values ('select'), ('insert'), ('update'), ('delete')) as privileges(privilege_name);
+select ok(
+  not has_table_privilege(role_name, 'public.admin_login_attempts', privilege_name),
+  format('client role %s cannot %s administrator login attempts', role_name, privilege_name)
+)
+from (values ('anon'), ('authenticated')) as roles(role_name)
+cross join (values ('select'), ('insert'), ('update'), ('delete')) as privileges(privilege_name);
+select ok(
+  has_table_privilege('service_role', 'public.admin_login_attempts', privilege_name),
+  format('service role can %s administrator login attempts', privilege_name)
+)
+from (values ('select'), ('insert'), ('delete')) as privileges(privilege_name);
 select ok(has_table_privilege('authenticated', 'public.profiles', 'select'), 'authenticated can read their profile through RLS');
 select ok(has_table_privilege('authenticated', 'public.consent_events', 'select'), 'authenticated can read their consent through RLS');
 select ok(has_table_privilege('authenticated', 'public.stores', 'select'), 'authenticated can read their store through RLS');
@@ -77,13 +109,45 @@ select ok(not has_function_privilege('authenticated', 'public.activate_anonymous
 select ok(not has_function_privilege('authenticated', 'public.consume_coaching_request(uuid)', 'execute'), 'clients cannot consume coaching requests directly');
 select ok(has_function_privilege('service_role', 'public.consume_coaching_request(uuid)', 'execute'), 'only the server can consume coaching requests');
 select ok(
-  not has_function_privilege('authenticated', 'public.record_admin_login_failure(text)', 'execute'),
-  'authenticated users cannot record admin login failures'
-);
+  not exists (
+    select 1
+    from pg_proc as function_proc
+    cross join lateral aclexplode(
+      coalesce(function_proc.proacl, acldefault('f', function_proc.proowner))
+    ) as privilege
+    where function_proc.oid = ('public.' || function_signature)::regprocedure
+      and privilege.grantee = 0
+      and privilege.privilege_type = 'EXECUTE'
+  ),
+  format('client role public cannot execute %s', function_signature)
+)
+from (
+  values
+    ('check_admin_login_attempt(text)'),
+    ('record_admin_login_failure(text)'),
+    ('clear_admin_login_failures(text)')
+) as functions(function_signature);
 select ok(
-  has_function_privilege('service_role', 'public.record_admin_login_failure(text)', 'execute'),
-  'service role can record admin login failures'
-);
+  not has_function_privilege(role_name, 'public.' || function_signature, 'execute'),
+  format('client role %s cannot execute %s', role_name, function_signature)
+)
+from (values ('anon'), ('authenticated')) as roles(role_name)
+cross join (
+  values
+    ('check_admin_login_attempt(text)'),
+    ('record_admin_login_failure(text)'),
+    ('clear_admin_login_failures(text)')
+) as functions(function_signature);
+select ok(
+  has_function_privilege('service_role', 'public.' || function_signature, 'execute'),
+  format('service role can execute %s', function_signature)
+)
+from (
+  values
+    ('check_admin_login_attempt(text)'),
+    ('record_admin_login_failure(text)'),
+    ('clear_admin_login_failures(text)')
+) as functions(function_signature);
 select ok(has_function_privilege('authenticated', 'public.save_assessment_with_goal(uuid, jsonb, jsonb, jsonb, numeric, jsonb, date, date)', 'execute'), 'active authenticated buyers can save an assessment through the RPC');
 select is((select prosecdef from pg_proc where oid = 'public.finalize_buyer_registration(uuid, text)'::regprocedure), true, 'finalizer is security definer');
 select is((select prosecdef from pg_proc where oid = 'public.reserve_buyer_registration(text, text, text, text, text, boolean, boolean)'::regprocedure), true, 'reservation is security definer');

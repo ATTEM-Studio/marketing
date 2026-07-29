@@ -168,6 +168,43 @@ test("does not authenticate after the user closes a pending login", async () => 
   expect(onAuthenticated).not.toHaveBeenCalled();
 });
 
+test("does not mutate disposed dialog controls after a pending login rejects", async () => {
+  let rejectLogin: ((error: unknown) => void) | undefined;
+  const api = {
+    login: vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectLogin = reject;
+        }),
+    ),
+  };
+  const { root, trigger } = open(api);
+  const password = root.querySelector<HTMLInputElement>("[name='password']");
+  const submit = root.querySelector<HTMLButtonElement>(
+    "[data-admin-login-submit]",
+  );
+  const status = root.querySelector<HTMLElement>("[data-admin-login-status]");
+  if (!password || !submit || !status) {
+    throw new Error("missing login controls");
+  }
+  password.value = "correct";
+  root
+    .querySelector<HTMLFormElement>("[data-admin-login-form]")
+    ?.requestSubmit();
+  root.querySelector<HTMLButtonElement>("[data-admin-login-close]")?.click();
+  password.value = "disposed password marker";
+  submit.textContent = "disposed submit marker";
+  status.textContent = "disposed status marker";
+
+  rejectLogin?.(new AdminApiError("invalid"));
+  await flush();
+
+  expect(password.value).toBe("disposed password marker");
+  expect(submit.textContent).toBe("disposed submit marker");
+  expect(status.textContent).toBe("disposed status marker");
+  expect(document.activeElement).toBe(trigger);
+});
+
 test("replaces an existing administrator dialog instead of duplicating it", () => {
   const { root } = open();
   renderAdminLogin(

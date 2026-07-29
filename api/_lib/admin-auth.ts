@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const MAX_AGE_SECONDS = 2 * 60 * 60;
 const COOKIE_NAME = "__Host-jangsa-admin";
@@ -21,10 +21,16 @@ function requiredSessionSecret(): string {
   return requiredEnvironment("ADMIN_SESSION_SECRET");
 }
 
-export function safeEqual(left: string, right: string): boolean {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  return a.length === b.length && timingSafeEqual(a, b);
+type SafeComparison = (left: Uint8Array, right: Uint8Array) => boolean;
+
+export function safeEqual(
+  left: string,
+  right: string,
+  compare: SafeComparison = timingSafeEqual,
+): boolean {
+  const leftDigest = createHash("sha256").update(left, "utf8").digest();
+  const rightDigest = createHash("sha256").update(right, "utf8").digest();
+  return compare(leftDigest, rightDigest);
 }
 
 function signature(payload: string): string {

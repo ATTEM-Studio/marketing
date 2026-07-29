@@ -3,6 +3,7 @@ import type {
   AdminDetailSection,
   AdminMemberDetail,
 } from "./types";
+import { formatKoreanDate, formatKoreanDateTime } from "./date-format";
 
 const missing = "입력하지 않음";
 const formatter = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
@@ -142,7 +143,7 @@ export function diagnosisSections(
         item("이름", text(detail.profile.name)),
         item("이메일", text(detail.profile.email)),
         item("지역", text(detail.profile.region)),
-        item("가입일", text(detail.profile.joinedAt)),
+        item("가입일", formatKoreanDateTime(detail.profile.joinedAt)),
         item("서비스 약관 동의", yesNo(detail.profile.consents.serviceTerms)),
         item("마케팅 동의", yesNo(detail.profile.consents.marketing)),
         item("중복 의심 회원 수", count(detail.duplicatePeers.totalCount)),
@@ -156,16 +157,19 @@ export function diagnosisSections(
         ),
         item("실행 계획 수", count(detail.actionPlans.length, "개")),
         item("코칭 이용 횟수", count(detail.coachingUsage.count, "회")),
-        item("최근 코칭 일시", text(detail.coachingUsage.latestAt)),
+        item(
+          "최근 코칭 일시",
+          formatKoreanDateTime(detail.coachingUsage.latestAt),
+        ),
       ],
     },
     {
       title: "최근 진단 요약",
       items: [
-        item("최근 진단 일시", text(assessment?.createdAt)),
+        item("최근 진단 일시", formatKoreanDateTime(assessment?.createdAt)),
         item("목표 월매출", won(goal?.targetRevenue)),
-        item("목표 기간 시작", text(goal?.periodStart)),
-        item("목표 기간 종료", text(goal?.periodEnd)),
+        item("목표 기간 시작", formatKoreanDate(goal?.periodStart)),
+        item("목표 기간 종료", formatKoreanDate(goal?.periodEnd)),
         item("병목 구간", mapped(bottleneck.key, bottleneckLabels)),
         item("병목 상태", mapped(bottleneck.status, bottleneckStatusLabels)),
         item("병목 변화율", percent(bottleneck.changeRate, 100)),
@@ -183,7 +187,10 @@ export function diagnosisSections(
           "최근 실행 계획 상태",
           mapped(latestActionPlan?.status, actionStatusLabels),
         ),
-        item("최근 실행 계획 예정일", text(latestActionPlan?.scheduledFor)),
+        item(
+          "최근 실행 계획 예정일",
+          formatKoreanDate(latestActionPlan?.scheduledFor),
+        ),
       ],
     },
     {

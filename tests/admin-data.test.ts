@@ -24,16 +24,31 @@ function reportingClient(rows: Record<string, Array<Record<string, unknown>>>) {
       let head = false;
       let from = 0;
       let to = Number.MAX_SAFE_INTEGER;
+      const consentFilters = new Map<string, unknown>();
+      let consentOrder: { column: string; ascending: boolean } | null = null;
       const query = {
         select(_columns: string, options?: { head?: boolean }) {
           head = options?.head === true;
           return query;
         },
-        eq: () => query,
+        eq(column: string, value: unknown) {
+          if (table === "consent_events") {
+            consentFilters.set(column, value);
+          }
+          return query;
+        },
         gte: () => query,
         lt: () => query,
         in: () => query,
-        order: () => query,
+        order(column: string, options?: { ascending?: boolean }) {
+          if (table === "consent_events") {
+            consentOrder = {
+              column,
+              ascending: options?.ascending === true,
+            };
+          }
+          return query;
+        },
         range(start: number, end: number) {
           from = start;
           to = end;
@@ -52,12 +67,31 @@ function reportingClient(rows: Record<string, Array<Record<string, unknown>>>) {
             ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
           onrejected?:
             ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-        ) =>
-          Promise.resolve({
-            data: head ? null : (rows[table] ?? []).slice(from, to + 1),
+        ) => {
+          let selected = rows[table] ?? [];
+          if (table === "consent_events") {
+            selected = selected.filter((row) =>
+              Array.from(consentFilters).every(
+                ([column, value]) => row[column] === value,
+              ),
+            );
+            if (consentOrder) {
+              const { column, ascending } = consentOrder;
+              selected = [...selected].sort((left, right) => {
+                const comparison = String(left[column] ?? "").localeCompare(
+                  String(right[column] ?? ""),
+                );
+                return ascending ? comparison : -comparison;
+              });
+            }
+            to = Math.min(to, 999);
+          }
+          return Promise.resolve({
+            data: head ? null : selected.slice(from, to + 1),
             error: null,
             count: head ? (rows[table]?.length ?? 0) : null,
-          }).then(onfulfilled, onrejected),
+          }).then(onfulfilled, onrejected);
+        },
       };
       return query;
     },
@@ -174,6 +208,49 @@ test("member reporting requests only coaching count and latest timestamp", async
     { table: "coaching_sessions", columns: "created_at", head: false },
   ]);
   expect(calls.some((call) => call.table === "coaching_messages")).toBe(false);
+});
+
+test("member reporting resolves the latest event for every consent type beyond the default response cap", async () => {
+  const marketingHistory = Array.from({ length: 1000 }, (_, index) => ({
+    user_id: "member",
+    consent_type: "marketing",
+    granted: index === 0,
+    recorded_at: new Date(
+      Date.UTC(2026, 6, 28, 0, 0, 0) - index * 1000,
+    ).toISOString(),
+  }));
+  const detail = await createAdminDataStore(
+    reportingClient({
+      profiles: [
+        {
+          id: "member",
+          name: "owner",
+          email: "owner@example.com",
+          region: "서울",
+          business_name: "가게",
+          created_at: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+      consent_events: [
+        ...marketingHistory,
+        {
+          user_id: "member",
+          consent_type: "service_terms",
+          granted: true,
+          recorded_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      assessments: [],
+      goals: [],
+      action_plans: [],
+      coaching_sessions: [],
+    }) as never,
+  ).member("member");
+
+  expect(detail?.profile.consents).toEqual({
+    serviceTerms: true,
+    marketing: true,
+  });
 });
 
 test("overview refuses a truncated duplicate scan instead of silently omitting members", async () => {

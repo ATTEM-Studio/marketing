@@ -13,6 +13,10 @@ const anonymousActivationMigration = readFileSync(
   "supabase/migrations/202607190009_anonymous_reader_activation.sql",
   "utf8",
 );
+const adminLoginMigration = readFileSync(
+  "supabase/migrations/202607280012_admin_login_rate_limit.sql",
+  "utf8",
+);
 
 describe("pgTAP database contract", () => {
   test("uses unambiguous schema table assertions", () => {
@@ -70,6 +74,15 @@ describe("pgTAP database contract", () => {
     );
     expect(databaseTest).toContain(
       "duplicate lead emails remain isolated by auth user id",
+    );
+  });
+
+  test("indexes the global administrator-attempt cleanup by timestamp", () => {
+    expect(adminLoginMigration).toMatch(
+      /create index admin_login_attempts_attempted_at_idx\s+on public\.admin_login_attempts \(attempted_at\)/u,
+    );
+    expect(databaseTest).toContain(
+      "administrator login cleanup has an attempted-at-leading index",
     );
   });
 });

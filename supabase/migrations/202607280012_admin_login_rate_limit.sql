@@ -7,6 +7,9 @@ create table public.admin_login_attempts (
 create index admin_login_attempts_ip_hash_attempted_at_idx
   on public.admin_login_attempts (ip_hash, attempted_at desc);
 
+create index admin_login_attempts_attempted_at_idx
+  on public.admin_login_attempts (attempted_at);
+
 alter table public.admin_login_attempts enable row level security;
 revoke all on table public.admin_login_attempts from public, anon, authenticated;
 grant select, insert, delete on table public.admin_login_attempts to service_role;

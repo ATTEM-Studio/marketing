@@ -464,7 +464,8 @@ export function createAdminDataStore(
       if (!profileResult.data || Array.isArray(profileResult.data)) return null;
       const profile = profileResult.data;
       const [
-        consentsResult,
+        serviceConsentResult,
+        marketingConsentResult,
         assessmentsResult,
         goalsResult,
         actionPlansResult,
@@ -476,7 +477,16 @@ export function createAdminDataStore(
           .from<Record<string, unknown>>("consent_events")
           .select("consent_type,granted,recorded_at")
           .eq("user_id", id)
-          .order("recorded_at", { ascending: false }),
+          .eq("consent_type", "service_terms")
+          .order("recorded_at", { ascending: false })
+          .limit(1),
+        reportingClient
+          .from<Record<string, unknown>>("consent_events")
+          .select("consent_type,granted,recorded_at")
+          .eq("user_id", id)
+          .eq("consent_type", "marketing")
+          .order("recorded_at", { ascending: false })
+          .limit(1),
         memberRows(
           "assessments",
           "id,input_data,calculated_metrics,diagnosis,created_at",
@@ -505,7 +515,8 @@ export function createAdminDataStore(
         activeProfiles(),
       ]);
       if (
-        consentsResult.error ||
+        serviceConsentResult.error ||
+        marketingConsentResult.error ||
         coachingCountResult.error ||
         coachingLatestResult.error
       ) {
@@ -517,13 +528,8 @@ export function createAdminDataStore(
       const latestCoaching = Array.isArray(coachingLatestResult.data)
         ? coachingLatestResult.data[0]
         : null;
-      const consentEvents = Array.isArray(consentsResult.data)
-        ? consentsResult.data
-        : [];
-      const mostRecentConsent = (type: string) =>
-        consentEvents.find(
-          (event) => stringValue(event, "consent_type") === type,
-        );
+      const consentGranted = (result: QueryResult<Record<string, unknown>>) =>
+        Array.isArray(result.data) && result.data[0]?.granted === true;
       const duplicates = classifyDuplicates(
         profiles.map((row) => ({
           id: stringValue(row, "id"),
@@ -559,8 +565,8 @@ export function createAdminDataStore(
           businessName: stringValue(profile, "business_name"),
           joinedAt: stringValue(profile, "created_at"),
           consents: {
-            serviceTerms: mostRecentConsent("service_terms")?.granted === true,
-            marketing: mostRecentConsent("marketing")?.granted === true,
+            serviceTerms: consentGranted(serviceConsentResult),
+            marketing: consentGranted(marketingConsentResult),
           },
         },
         duplicatePeers: {

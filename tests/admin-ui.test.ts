@@ -29,7 +29,7 @@ const overviewFixture: AdminOverview = {
       email: "kim@example.com",
       region: "서울 마포구",
       businessName: "김대표 식당",
-      joinedAt: "2026-07-29T01:00:00.000Z",
+      joinedAt: "2026-07-28T15:30:00.000Z",
       duplicate: { severity: "high", peerCount: 2 },
     },
   ],
@@ -45,7 +45,7 @@ const detailFixture: AdminMemberDetail = {
     email: "kim@example.com",
     region: "서울 마포구",
     businessName: "김대표 식당",
-    joinedAt: "2026-07-29T01:00:00.000Z",
+    joinedAt: "2026-07-28T15:30:00.000Z",
     consents: { serviceTerms: true, marketing: false },
   },
   duplicatePeers: {
@@ -56,7 +56,7 @@ const detailFixture: AdminMemberDetail = {
         email: "kim@example.com",
         region: "서울 마포구",
         businessName: "김대표 식당",
-        joinedAt: "2026-07-28T01:00:00.000Z",
+        joinedAt: "2026-07-27T15:30:00.000Z",
         duplicate: { severity: "high", peerCount: 1 },
       },
     ],
@@ -183,10 +183,12 @@ test("shows four totals, an accessible 30-day trend, newest members, and duplica
     root.querySelector("[data-admin-trend]")?.getAttribute("aria-label"),
   ).toContain("최근 30일");
   expect(root.querySelector("[data-admin-trend]")?.textContent).toContain(
-    "2026-07-29",
+    "2026년 7월 29일",
   );
   expect(root.textContent).toContain("김대표");
   expect(root.textContent).toContain("중복 가능성 높음");
+  expect(root.textContent).toContain("2026년 7월 29일 00:30");
+  expect(root.textContent).not.toContain("2026-07-28T15:30:00.000Z");
 });
 
 test("exposes every trend date and count outside the visual role", async () => {
@@ -203,9 +205,9 @@ test("exposes every trend date and count outside the visual role", async () => {
   expect(table).not.toBeNull();
   expect(visual?.contains(table)).toBe(false);
   expect(table?.rows).toHaveLength(3);
-  expect(table?.textContent).toContain("2026-07-28");
+  expect(table?.textContent).toContain("2026년 7월 28일");
   expect(table?.textContent).toContain("2명");
-  expect(table?.textContent).toContain("2026-07-29");
+  expect(table?.textContent).toContain("2026년 7월 29일");
   expect(table?.textContent).toContain("3명");
 });
 
@@ -355,6 +357,22 @@ test("opens a labelled lazy member detail drawer with exactly six safe label sec
   expect(api.member).toHaveBeenCalledWith(MEMBER_ID);
 });
 
+test("formats duplicate-member dates in Korean time after crossing midnight", async () => {
+  const root = getRoot();
+  await renderAdminDashboard(root, createApi(), callbacks(root));
+
+  root
+    .querySelector<HTMLButtonElement>(`[data-member-id='${MEMBER_ID}']`)
+    ?.click();
+  await flush();
+
+  const duplicatePeers = root.querySelector<HTMLElement>(
+    ".admin-duplicate-peers",
+  );
+  expect(duplicatePeers?.textContent).toContain("2026년 7월 28일 00:30");
+  expect(duplicatePeers?.textContent).not.toContain("2026-07-27T15:30:00.000Z");
+});
+
 test("keeps the member list visible when detail loading fails and retries only detail", async () => {
   const root = getRoot();
   let attempts = 0;
@@ -499,6 +517,39 @@ test("restores focus by member ID after an overview refresh replaces the row", a
   root.querySelector<HTMLButtonElement>("[data-admin-detail-close]")?.click();
 
   expect(document.activeElement).toBe(replacement);
+});
+
+test("moves focus to the dashboard heading when refresh removes the selected member", async () => {
+  const root = getRoot();
+  let overviewCalls = 0;
+  const api = createApi({
+    overview: async () => {
+      overviewCalls += 1;
+      if (overviewCalls === 1) return structuredClone(overviewFixture);
+      return {
+        ...structuredClone(overviewFixture),
+        members: [],
+        totalRows: 0,
+      };
+    },
+  });
+  await renderAdminDashboard(root, api, callbacks(root));
+  root
+    .querySelector<HTMLButtonElement>(`[data-member-id='${MEMBER_ID}']`)
+    ?.click();
+  await flush();
+  root
+    .querySelector<HTMLButtonElement>("[data-duplicate-filter='review']")
+    ?.click();
+  await flush();
+  expect(root.querySelector(`[data-member-id='${MEMBER_ID}']`)).toBeNull();
+
+  root.querySelector<HTMLButtonElement>("[data-admin-detail-close]")?.click();
+
+  expect(root.querySelector("[role='dialog']")).toBeNull();
+  expect(document.activeElement).toBe(
+    root.querySelector("[data-admin-dashboard-heading]"),
+  );
 });
 
 test("logs out through the API before notifying the app", async () => {

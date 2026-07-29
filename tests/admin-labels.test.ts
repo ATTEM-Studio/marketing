@@ -127,3 +127,46 @@ test("renders only approved named assessment fields and never conversation conte
   expect(rendered).not.toContain("절대 표시하면 안 되는 계산값");
   expect(rendered).not.toContain("AI 대화 내용은 표시하면 안 됩니다.");
 });
+
+test("formats detail timestamps in Korean time and calendar fields as dates", () => {
+  const detail = detailWithRestaurant({ seats: 24 });
+  detail.profile.joinedAt = "2026-07-01T15:30:00.000Z";
+  detail.latestAssessment!.createdAt = "2026-07-20T15:45:00.000Z";
+  detail.coachingUsage.latestAt = "2026-07-21T15:05:00.000Z";
+  const sections = diagnosisSections(detail);
+
+  expect(sectionValue(sections, "가입일")).toBe("2026년 7월 2일 00:30");
+  expect(sectionValue(sections, "최근 진단 일시")).toBe(
+    "2026년 7월 21일 00:45",
+  );
+  expect(sectionValue(sections, "최근 코칭 일시")).toBe(
+    "2026년 7월 22일 00:05",
+  );
+  expect(sectionValue(sections, "목표 기간 시작")).toBe("2026년 7월 1일");
+  expect(sectionValue(sections, "목표 기간 종료")).toBe("2026년 7월 31일");
+  expect(sectionValue(sections, "최근 실행 계획 예정일")).toBe(
+    "2026년 7월 21일",
+  );
+});
+
+test("uses missing-value copy for invalid or absent detail dates", () => {
+  const detail = detailWithRestaurant({ seats: 24 });
+  detail.profile.joinedAt = "invalid";
+  detail.latestAssessment!.createdAt = "invalid";
+  detail.latestAssessment!.goal.periodStart = "2026-02-30";
+  detail.latestAssessment!.goal.periodEnd = null;
+  detail.actionPlans[0]!.scheduledFor = null;
+  detail.coachingUsage.latestAt = null;
+  const sections = diagnosisSections(detail);
+
+  for (const label of [
+    "가입일",
+    "최근 진단 일시",
+    "목표 기간 시작",
+    "목표 기간 종료",
+    "최근 실행 계획 예정일",
+    "최근 코칭 일시",
+  ]) {
+    expect(sectionValue(sections, label)).toBe("입력하지 않음");
+  }
+});
