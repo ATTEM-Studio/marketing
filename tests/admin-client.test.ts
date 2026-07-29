@@ -63,3 +63,28 @@ test("normalizes fetch failures as network errors", async () => {
   await expect(adminApi.logout()).rejects.toBeInstanceOf(AdminApiError);
   await expect(adminApi.logout()).rejects.toMatchObject({ code: "network" });
 });
+
+test("aborts an obsolete overview fetch when a newer query starts", async () => {
+  const pending = new Promise<Response>(() => undefined);
+  fetchMock.mockReturnValueOnce(pending).mockResolvedValueOnce(
+    new Response(
+      JSON.stringify({
+        totals: { total: 0, today: 0, last7Days: 0, last30Days: 0 },
+        daily: [],
+        members: [],
+        page: 1,
+        pageSize: 25,
+        totalRows: 0,
+      }),
+      { status: 200 },
+    ),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  void adminApi.overview(defaultQuery);
+  await adminApi.overview({ ...defaultQuery, search: "서울" });
+
+  const firstSignal = (fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)
+    ?.signal;
+  expect(firstSignal?.aborted).toBe(true);
+});

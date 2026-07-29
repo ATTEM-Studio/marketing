@@ -189,7 +189,7 @@ export function diagnosisSections(
     {
       title: "고객과 운영",
       items: [
-        item("평균 월매출", won(revenue.averageMonthlyRevenue)),
+        item("최근 월평균 매출", won(revenue.averageMonthlyRevenue)),
         item("목표 월매출", won(revenue.targetMonthlyRevenue)),
         item("평균 객단가", won(revenue.averageOrderValue)),
         item("영업일 수", count(revenue.operatingDays, "일")),

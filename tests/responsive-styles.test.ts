@@ -119,3 +119,46 @@ test("animates coaching progress while respecting reduced motion", () => {
     /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.coaching-loading::before\s*,\s*\.coaching-loading-spinner\s*,\s*\.coaching-loading-dot\s*\{\s*animation:\s*none/s,
   );
 });
+
+test("defines the administrator desktop layout and 760px card/sheet breakpoint", () => {
+  expect(css).toMatch(
+    /\.admin-summary-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/s,
+  );
+  expect(css).toMatch(
+    /\.admin-detail-drawer\s*\{[^}]*position:\s*fixed[^}]*right:\s*0/s,
+  );
+  expect(css).toMatch(
+    /@media\s*\(max-width:\s*760px\)[\s\S]*\.admin-summary-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s,
+  );
+  expect(css).toMatch(
+    /@media\s*\(max-width:\s*760px\)[\s\S]*\.admin-member-table\s+thead\s*\{[^}]*display:\s*none/s,
+  );
+  expect(css).toMatch(
+    /@media\s*\(max-width:\s*760px\)[\s\S]*\.admin-member-table\s+tr\s*\{[^}]*display:\s*grid/s,
+  );
+  expect(css).toMatch(
+    /@media\s*\(max-width:\s*760px\)[\s\S]*\.admin-detail-drawer\s*\{[^}]*inset:[^}]*min-height:\s*calc\(100dvh/s,
+  );
+});
+
+test("keeps administrator content focusable, motion-safe, and inside mobile width", () => {
+  expect(css).toMatch(
+    /\.admin-dashboard\s*\{[^}]*word-break:\s*keep-all[^}]*overflow-x:\s*hidden/s,
+  );
+  expect(css).toMatch(
+    /\.admin-summary-value,[^{]*\.admin-trend-count,[^{]*\.admin-pagination\s*>\s*span\s*\{[^}]*white-space:\s*nowrap/s,
+  );
+  expect(css).toMatch(
+    /\.admin-member-link:focus-visible,[^{]*\.admin-filter-group button:focus-visible\s*\{[^}]*outline:/s,
+  );
+  expect(css).toMatch(
+    /prefers-reduced-motion:\s*reduce[\s\S]*\.admin-skeleton[\s\S]*animation:\s*none/s,
+  );
+});
+
+test("uses defined radius tokens and sizes both shared brand labels on mobile", () => {
+  expect(css).not.toContain("var(--radius)");
+  expect(css).toMatch(
+    /@media\s*\(max-width:\s*720px\)[\s\S]*\.brand-mark strong,\s*\.work-brand strong\s*\{[^}]*font-size:\s*0\.92rem/s,
+  );
+});

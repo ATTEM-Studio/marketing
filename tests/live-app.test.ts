@@ -1,5 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { createApp } from "../src/app";
+import { AdminApiError } from "../src/admin/api";
+import type { AdminOverview } from "../src/admin/types";
 import type { AppService } from "../src/services/contracts";
 import { createAuthenticAssessment } from "./fixtures/authentic-assessment";
 
@@ -300,4 +302,187 @@ test("consumes the callback after explicit new-buyer finalization", async () => 
   expect(fake.finalizeRegistration).toHaveBeenCalledTimes(1);
   expect(window.location.search).toBe("?keep=1");
   expect(window.location.hash).toBe("#magic-link");
+});
+
+const adminOverview: AdminOverview = {
+  totals: { total: 128, today: 3, last7Days: 18, last30Days: 61 },
+  daily: [{ date: "2026-07-29", count: 3 }],
+  members: [
+    {
+      id: "11111111-1111-1111-1111-111111111111",
+      name: "관리 대상 회원",
+      email: "private-member@example.com",
+      region: "서울",
+      businessName: "관리 대상 식당",
+      joinedAt: "2026-07-29T01:00:00.000Z",
+      duplicate: null,
+    },
+  ],
+  page: 1,
+  pageSize: 25,
+  totalRows: 1,
+};
+
+function adminClient(
+  options: {
+    session?: () => Promise<{ authenticated: true }>;
+    overview?: () => Promise<AdminOverview>;
+  } = {},
+) {
+  return {
+    login: vi.fn(async () => undefined),
+    session: vi.fn(
+      options.session ??
+        (async () => {
+          throw new AdminApiError("unauthorized");
+        }),
+    ),
+    logout: vi.fn(async () => undefined),
+    overview: vi.fn(
+      options.overview ?? (async () => structuredClone(adminOverview)),
+    ),
+    member: vi.fn(async () => {
+      throw new Error("unused");
+    }),
+  };
+}
+
+function pressAdminLogo(root: HTMLElement, times = 10): void {
+  for (let index = 0; index < times; index += 1) {
+    root.querySelector<HTMLButtonElement>("[data-admin-trigger]")?.click();
+  }
+}
+
+test("installs one delegated secret entry and opens the dashboard after login", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const admin = adminClient();
+  await createApp(root, liveService(), {
+    isLive: true,
+    adminApi: admin,
+  }).start();
+
+  pressAdminLogo(root, 9);
+  expect(root.querySelector("[data-admin-login-overlay]")).toBeNull();
+  pressAdminLogo(root, 1);
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-login-overlay]")).not.toBeNull();
+  });
+  expect(admin.session).toHaveBeenCalledTimes(1);
+
+  const password = root.querySelector<HTMLInputElement>("[name='password']");
+  if (!password) throw new Error("missing admin password");
+  password.value = "correct";
+  root
+    .querySelector<HTMLFormElement>("[data-admin-login-form]")
+    ?.requestSubmit();
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-dashboard]")).not.toBeNull();
+  });
+
+  expect(admin.login).toHaveBeenCalledWith("correct");
+  expect(root.textContent).toContain("관리 대상 회원");
+});
+
+test("opens the dashboard directly when the administrator session is valid", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const admin = adminClient({
+    session: async () => ({ authenticated: true }),
+  });
+  await createApp(root, liveService(), {
+    isLive: true,
+    adminApi: admin,
+  }).start();
+
+  pressAdminLogo(root);
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-dashboard]")).not.toBeNull();
+  });
+
+  expect(admin.login).not.toHaveBeenCalled();
+  expect(admin.overview).toHaveBeenCalledTimes(1);
+});
+
+test("clears administrator PII and returns to login when the session expires", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  let requests = 0;
+  const admin = adminClient({
+    session: async () => ({ authenticated: true }),
+    overview: async () => {
+      requests += 1;
+      if (requests === 1) return structuredClone(adminOverview);
+      throw new AdminApiError("unauthorized");
+    },
+  });
+  await createApp(root, liveService(), {
+    isLive: true,
+    adminApi: admin,
+  }).start();
+  pressAdminLogo(root);
+  await vi.waitFor(() => {
+    expect(root.textContent).toContain("private-member@example.com");
+  });
+
+  root
+    .querySelector<HTMLButtonElement>("[data-duplicate-filter='review']")
+    ?.click();
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-login-overlay]")).not.toBeNull();
+  });
+
+  expect(root.textContent).not.toContain("private-member@example.com");
+  expect(root.textContent).not.toContain("관리 대상 식당");
+});
+
+test("administrator logout clears PII and restores the prior usable normal view", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  const admin = adminClient({
+    session: async () => ({ authenticated: true }),
+  });
+  await createApp(root, liveService(), {
+    isLive: true,
+    adminApi: admin,
+  }).start();
+  const priorDashboard = root.querySelector<HTMLElement>(".dashboard-shell");
+  pressAdminLogo(root);
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-dashboard]")).not.toBeNull();
+  });
+
+  root.querySelector<HTMLButtonElement>("[data-admin-logout]")?.click();
+  await vi.waitFor(() => {
+    expect(root.querySelector(".dashboard-shell")).not.toBeNull();
+  });
+
+  expect(admin.logout).toHaveBeenCalledTimes(1);
+  expect(root.querySelector(".dashboard-shell")).toBe(priorDashboard);
+  expect(root.textContent).not.toContain("private-member@example.com");
+  root.querySelector<HTMLButtonElement>("[data-start-diagnosis]")?.click();
+  expect(root.querySelector("[data-diagnosis-form]")).not.toBeNull();
+});
+
+test("restores focus to the delegated logo trigger when administrator login closes", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  await createApp(root, liveService(), {
+    isLive: true,
+    adminApi: adminClient(),
+  }).start();
+  const trigger = root.querySelector<HTMLButtonElement>("[data-admin-trigger]");
+
+  pressAdminLogo(root);
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-login-overlay]")).not.toBeNull();
+  });
+  root.querySelector<HTMLButtonElement>("[data-admin-login-close]")?.click();
+
+  expect(document.activeElement).toBe(trigger);
 });

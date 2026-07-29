@@ -2,7 +2,15 @@ import {
   buildDiagnosisOutcome,
   restoreResultViewModel,
 } from "./result-view-model";
+import { adminApi as defaultAdminApi } from "./admin/api";
+import { createSecretEntry } from "./admin/secret-entry";
+import type { AdminSession } from "./admin/types";
 import type { AppService } from "./services/contracts";
+import {
+  renderAdminDashboard,
+  type AdminDashboardApi,
+} from "./ui/admin-dashboard";
+import { renderAdminLogin, type AdminLoginApi } from "./ui/admin-login";
 import {
   readDiagnosisForm,
   renderDiagnosis,
@@ -14,6 +22,16 @@ import { renderDashboard } from "./ui/dashboard";
 import { renderOnboarding } from "./ui/onboarding";
 import type { OnboardingView } from "./ui/onboarding";
 import { renderLandingShell } from "./ui/shell";
+
+interface AdminAppApi extends AdminDashboardApi, AdminLoginApi {
+  session(): Promise<AdminSession>;
+}
+
+interface CreateAppOptions {
+  authCallback?: boolean;
+  isLive?: boolean;
+  adminApi?: AdminAppApi;
+}
 
 function consumeAuthCallback(): void {
   const url = new URL(window.location.href);
@@ -29,8 +47,14 @@ function consumeAuthCallback(): void {
 export function createApp(
   root: HTMLElement,
   service: AppService,
-  options: { authCallback?: boolean; isLive?: boolean } = {},
+  options: CreateAppOptions = {},
 ): { start(): Promise<void> } {
+  const administratorApi = options.adminApi ?? defaultAdminApi;
+  let adminEntryInstalled = false;
+  let adminEntryPending = false;
+  let normalViewNodes: Node[] = [];
+  let adminReturnFocus: HTMLElement | null = null;
+
   const showLanding = () => {
     renderLandingShell(
       root,
@@ -41,6 +65,69 @@ export function createApp(
       },
       { mode: options.isLive ? "live" : "demo" },
     );
+  };
+
+  const restoreNormalView = () => {
+    if (normalViewNodes.length === 0) {
+      showLanding();
+      return;
+    }
+    root.replaceChildren(...normalViewNodes);
+  };
+
+  const showAdminLogin = () => {
+    renderAdminLogin(root, administratorApi, {
+      onAuthenticated() {
+        void showAdministratorDashboard();
+      },
+      onClose() {
+        adminEntryPending = false;
+      },
+      returnFocus: adminReturnFocus,
+    });
+  };
+
+  const showAdministratorDashboard = async () => {
+    adminEntryPending = false;
+    await renderAdminDashboard(root, administratorApi, {
+      onUnauthorized() {
+        restoreNormalView();
+        showAdminLogin();
+      },
+      onLogout() {
+        restoreNormalView();
+      },
+    });
+  };
+
+  const secretEntry = createSecretEntry({
+    presses: 10,
+    windowMs: 5_000,
+    onUnlock() {
+      if (adminEntryPending) return;
+      adminEntryPending = true;
+      normalViewNodes = Array.from(root.childNodes);
+      void administratorApi
+        .session()
+        .then(() => showAdministratorDashboard())
+        .catch(() => {
+          adminEntryPending = false;
+          showAdminLogin();
+        });
+    },
+  });
+
+  const installAdminEntry = () => {
+    if (adminEntryInstalled) return;
+    adminEntryInstalled = true;
+    root.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest<HTMLElement>("[data-admin-trigger]");
+      if (!trigger) return;
+      adminReturnFocus = trigger;
+      secretEntry.press();
+    });
   };
 
   const showDashboard = async () => {
@@ -174,6 +261,7 @@ export function createApp(
 
   return {
     async start() {
+      installAdminEntry();
       if (!options.isLive) showLanding();
       let session;
       try {

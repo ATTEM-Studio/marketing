@@ -53,6 +53,9 @@ function overviewPath(query: AdminOverviewQuery): string {
   return `/api/admin-overview?${search}`;
 }
 
+let overviewAbort: AbortController | null = null;
+let memberAbort: AbortController | null = null;
+
 export const adminApi = {
   login(password: string): Promise<void> {
     return request("/api/admin-login", {
@@ -67,11 +70,19 @@ export const adminApi = {
     return request("/api/admin-logout", { method: "POST" });
   },
   overview(query: AdminOverviewQuery): Promise<AdminOverview> {
-    return request(overviewPath(query), { method: "GET" });
+    overviewAbort?.abort();
+    overviewAbort = new AbortController();
+    return request(overviewPath(query), {
+      method: "GET",
+      signal: overviewAbort.signal,
+    });
   },
   member(id: string): Promise<AdminMemberDetail> {
+    memberAbort?.abort();
+    memberAbort = new AbortController();
     return request(`/api/admin-member?id=${encodeURIComponent(id)}`, {
       method: "GET",
+      signal: memberAbort.signal,
     });
   },
 };

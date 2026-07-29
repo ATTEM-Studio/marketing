@@ -109,7 +109,7 @@ test("labels restaurant and diagnosis fields with Korean units and missing value
   ]);
   expect(sectionValue(sections, "좌석 수")).toBe("24석");
   expect(sectionValue(sections, "평균 체류 시간")).toBe("입력하지 않음");
-  expect(sectionValue(sections, "평균 월매출")).toBe("8,500,000원");
+  expect(sectionValue(sections, "최근 월평균 매출")).toBe("8,500,000원");
   expect(sectionValue(sections, "방문 전환율")).toBe("12%");
   expect(sectionValue(sections, "병목 변화율")).toBe("-15%");
   expect(sectionValue(sections, "코칭 이용 횟수")).toBe("2회");
