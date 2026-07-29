@@ -7,12 +7,17 @@ import {
   verifyAdminPassword,
   verifyAdminSession,
 } from "./admin-auth.js";
-import type { AdminLoginLimiter } from "./admin-data.js";
+import type {
+  AdminDataStore,
+  AdminLoginLimiter,
+  AdminOverviewQuery,
+} from "./admin-data.js";
 
 export interface AdminHttpRequest {
   method?: string;
   headers: Record<string, string | readonly string[] | undefined>;
   body?: unknown;
+  query?: Record<string, string | readonly string[] | undefined>;
 }
 
 export interface AdminHttpResponse {
@@ -22,7 +27,8 @@ export interface AdminHttpResponse {
 }
 
 export interface AdminHandlerDependencies {
-  data?: AdminLoginLimiter;
+  data?: AdminLoginLimiter &
+    Partial<Pick<AdminDataStore, "overview" | "member">>;
   now?: () => Date;
 }
 
@@ -31,6 +37,8 @@ export interface AdminHandler {
   login(request: AdminHttpRequest): Promise<AdminHttpResponse>;
   session(request: AdminHttpRequest): Promise<AdminHttpResponse>;
   logout(request: AdminHttpRequest): Promise<AdminHttpResponse>;
+  overview(request: AdminHttpRequest): Promise<AdminHttpResponse>;
+  member(request: AdminHttpRequest): Promise<AdminHttpResponse>;
 }
 
 function response(
@@ -79,6 +87,62 @@ function passwordFrom(body: unknown): string | null {
   const password = (value as Record<string, unknown>).password;
   return typeof password === "string" && password.length <= 256
     ? password
+    : null;
+}
+
+function queryValue(
+  request: AdminHttpRequest,
+  key: string,
+): string | null | undefined {
+  const value = request.query?.[key];
+  if (value === undefined) return undefined;
+  return typeof value === "string" ? value : null;
+}
+
+function overviewQuery(request: AdminHttpRequest): AdminOverviewQuery | null {
+  const search = queryValue(request, "search");
+  const duplicate = queryValue(request, "duplicate");
+  const page = queryValue(request, "page");
+  const pageSize = queryValue(request, "pageSize");
+  if (
+    search === null ||
+    (search !== undefined && search.length > 100) ||
+    duplicate === null ||
+    (duplicate !== undefined &&
+      duplicate !== "all" &&
+      duplicate !== "high" &&
+      duplicate !== "review")
+  )
+    return null;
+  if (page === null || pageSize === null) return null;
+  const positiveInteger = (
+    value: string | undefined,
+    fallback: number,
+    maximum: number,
+  ): number | null => {
+    if (value === undefined || value === "") return fallback;
+    if (!/^[1-9]\d*$/.test(value)) return null;
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number <= maximum ? number : null;
+  };
+  const parsedPage = positiveInteger(page, 1, 1_000_000);
+  const parsedPageSize = positiveInteger(pageSize, 25, 50);
+  if (parsedPage === null || parsedPageSize === null) return null;
+  return {
+    search: search ?? "",
+    duplicate: duplicate ?? "all",
+    page: parsedPage,
+    pageSize: parsedPageSize,
+  };
+}
+
+function memberId(request: AdminHttpRequest): string | null {
+  const id = queryValue(request, "id");
+  if (id === null || id === undefined) return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id,
+  )
+    ? id
     : null;
 }
 
@@ -141,5 +205,43 @@ export function createAdminHandler(
     });
   };
 
-  return Object.assign(login, { login, session, logout });
+  const isAuthenticated = (request: AdminHttpRequest): boolean => {
+    const cookie = readAdminCookie(header(request, "cookie"));
+    return Boolean(
+      cookie && verifyAdminSession(cookie, dependencies.now?.() ?? new Date()),
+    );
+  };
+
+  const overview = async (
+    request: AdminHttpRequest,
+  ): Promise<AdminHttpResponse> => {
+    if (request.method !== "GET") return methodNotAllowed("GET");
+    const query = overviewQuery(request);
+    if (!query) return error(400, "INVALID_REQUEST");
+    try {
+      if (!isAuthenticated(request)) return error(401, "UNAUTHORIZED");
+      if (!dependencies.data?.overview) return error(500, "REQUEST_FAILED");
+      return response(200, { ...(await dependencies.data.overview(query)) });
+    } catch {
+      return error(500, "REQUEST_FAILED");
+    }
+  };
+
+  const member = async (
+    request: AdminHttpRequest,
+  ): Promise<AdminHttpResponse> => {
+    if (request.method !== "GET") return methodNotAllowed("GET");
+    const id = memberId(request);
+    if (!id) return error(400, "INVALID_REQUEST");
+    try {
+      if (!isAuthenticated(request)) return error(401, "UNAUTHORIZED");
+      if (!dependencies.data?.member) return error(500, "REQUEST_FAILED");
+      const detail = await dependencies.data.member(id);
+      return detail ? response(200, { ...detail }) : error(404, "NOT_FOUND");
+    } catch {
+      return error(500, "REQUEST_FAILED");
+    }
+  };
+
+  return Object.assign(login, { login, session, logout, overview, member });
 }

@@ -10,8 +10,11 @@ const { createAdminDataStore } = await import("../api/_lib/admin-data");
 const { createAdminLoginEndpoint } = await import("../api/admin-login");
 const { createAdminSessionEndpoint } = await import("../api/admin-session");
 const { createAdminLogoutEndpoint } = await import("../api/admin-logout");
+const { createAdminOverviewEndpoint } = await import("../api/admin-overview");
+const { createAdminMemberEndpoint } = await import("../api/admin-member");
 
 const now = new Date("2026-07-28T00:00:00Z");
+const missingUuid = "11111111-1111-4111-8111-111111111111";
 
 function limiter(overrides: Partial<Record<string, boolean>> = {}) {
   return {
@@ -321,4 +324,119 @@ test("production session and logout adapters do not require limiter configuratio
       expect.stringContaining("Max-Age=0"),
     );
   });
+});
+
+test("overview validates bounded query parameters before reading reporting data", async () => {
+  const data = {
+    ...limiter(),
+    overview: vi.fn(),
+    member: vi.fn(),
+  };
+  const routes = createAdminHandler({ data, now: () => now });
+
+  await expect(
+    routes.overview({ method: "GET", headers: {}, query: { page: "0" } }),
+  ).resolves.toMatchObject({ status: 400 });
+  await expect(
+    routes.overview({ method: "GET", headers: {}, query: { pageSize: "51" } }),
+  ).resolves.toMatchObject({ status: 400 });
+  await expect(
+    routes.overview({
+      method: "GET",
+      headers: {},
+      query: { search: "x".repeat(101) },
+    }),
+  ).resolves.toMatchObject({ status: 400 });
+  await expect(
+    routes.overview({
+      method: "GET",
+      headers: {},
+      query: { page: ["1", "2"] },
+    }),
+  ).resolves.toMatchObject({ status: 400 });
+  expect(data.overview).not.toHaveBeenCalled();
+});
+
+test("overview requires a signed cookie and returns no-store reporting data", async () => {
+  const data = {
+    ...limiter(),
+    overview: vi.fn().mockResolvedValue({ members: [] }),
+    member: vi.fn(),
+  };
+  const routes = createAdminHandler({ data, now: () => now });
+  const validCookie = `__Host-jangsa-admin=${createAdminSession(now)}`;
+
+  await expect(
+    routes.overview({ method: "GET", headers: {}, query: {} }),
+  ).resolves.toMatchObject({ status: 401 });
+  const ok = await routes.overview({
+    method: "GET",
+    headers: { cookie: validCookie },
+    query: {},
+  });
+  expect(ok.status).toBe(200);
+  expect(ok.headers?.["Cache-Control"]).toBe("no-store");
+  expect(data.overview).toHaveBeenCalledWith({
+    search: "",
+    duplicate: "all",
+    page: 1,
+    pageSize: 25,
+  });
+});
+
+test("member validates UUIDs and returns 404 only after authentication", async () => {
+  const data = {
+    ...limiter(),
+    overview: vi.fn(),
+    member: vi.fn().mockResolvedValue(null),
+  };
+  const routes = createAdminHandler({ data, now: () => now });
+  const validCookie = `__Host-jangsa-admin=${createAdminSession(now)}`;
+
+  await expect(
+    routes.member({ method: "GET", headers: {}, query: { id: "not-a-uuid" } }),
+  ).resolves.toMatchObject({ status: 400 });
+  await expect(
+    routes.member({
+      method: "GET",
+      headers: { cookie: validCookie },
+      query: { id: missingUuid },
+    }),
+  ).resolves.toMatchObject({ status: 404 });
+  expect(data.member).toHaveBeenCalledWith(missingUuid);
+});
+
+test("reporting Vercel endpoints apply guarded no-store handler responses", async () => {
+  const data = {
+    ...limiter(),
+    overview: vi.fn().mockResolvedValue({ members: [] }),
+    member: vi.fn().mockResolvedValue(null),
+  };
+  const overviewResponse = responseDouble();
+  const memberResponse = responseDouble();
+  const validCookie = `__Host-jangsa-admin=${createAdminSession(now)}`;
+
+  await createAdminOverviewEndpoint({ data, now: () => now })(
+    { method: "GET", headers: { cookie: validCookie }, query: {} } as never,
+    overviewResponse as never,
+  );
+  await createAdminMemberEndpoint({ data, now: () => now })(
+    {
+      method: "GET",
+      headers: { cookie: validCookie },
+      query: { id: missingUuid },
+    } as never,
+    memberResponse as never,
+  );
+
+  expect(overviewResponse.status).toHaveBeenCalledWith(200);
+  expect(overviewResponse.setHeader).toHaveBeenCalledWith(
+    "Cache-Control",
+    "no-store",
+  );
+  expect(memberResponse.status).toHaveBeenCalledWith(404);
+  expect(memberResponse.setHeader).toHaveBeenCalledWith(
+    "Cache-Control",
+    "no-store",
+  );
 });
