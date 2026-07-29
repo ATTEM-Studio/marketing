@@ -12,6 +12,8 @@ const serverSecretNames = [
   "SUPABASE_ACCESS_TOKEN",
   "SUPABASE_DB_PASSWORD",
   "SUPABASE_JWT_SECRET",
+  "ADMIN_DASHBOARD_PASSWORD",
+  "ADMIN_SESSION_SECRET",
 ];
 const serverSecretIndicators = [
   "OPENAI_API_KEY",
@@ -20,18 +22,22 @@ const serverSecretIndicators = [
   "SUPABASE_ACCESS_TOKEN",
   "SUPABASE_DB_PASSWORD",
   "SUPABASE_JWT_SECRET",
+  "ADMIN_DASHBOARD_PASSWORD",
+  "ADMIN_SESSION_SECRET",
 ];
 const disallowedViteSecret = new RegExp(
   `\\bVITE_[A-Z0-9_]*(?:${serverSecretIndicators.join("|")})[A-Z0-9_]*\\b`,
 );
 const serverSecretAssignment = new RegExp(
-  `(?:"|')?\\b(?:${serverSecretNames.join("|")})\\b(?:"|')?[\\t ]*(?:=|:)[\\t ]*(?:"([^"]*)"|'([^']*)'|([^\\s,;#]+))`,
+  `(?:"|')?\\b(?:${serverSecretNames.join("|")})\\b(?:"|')?[\\t ]*(?:=|:)[\\t ]*(?:"([^"]*)"|'([^']*)'|(<[^>]+>)|([^\\s,;#]+))`,
   "g",
 );
 const jwtLikeToken = /eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
 const allowedPlaceholders = new Set([
   "<set-in-supabase-dashboard>",
   "<generate-and-store-securely>",
+  "<a unique long password kept outside the repository>",
+  "<at least 32 random bytes, independently generated>",
 ]);
 
 function isPlaceholderOrReference(value) {
@@ -79,7 +85,7 @@ export function findSecretExposures(files) {
 
     serverSecretAssignment.lastIndex = 0;
     for (const match of source.matchAll(serverSecretAssignment)) {
-      const value = match[1] ?? match[2] ?? match[3] ?? "";
+      const value = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
       if (!isPlaceholderOrReference(value)) {
         findings.push(`${file}: server secret assignment`);
       }

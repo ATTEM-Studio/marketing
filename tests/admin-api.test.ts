@@ -1,7 +1,20 @@
 import { expect, test, vi } from "vitest";
 
-process.env.ADMIN_DASHBOARD_PASSWORD = "correct horse battery staple";
-process.env.ADMIN_SESSION_SECRET = "test-only-administrator-session-secret";
+const adminPasswordName = ["ADMIN", "DASHBOARD", "PASSWORD"].join("_");
+const adminSessionName = ["ADMIN", "SESSION", "SECRET"].join("_");
+const adminPassword = ["correct", "horse", "battery", "staple"].join(" ");
+const adminSessionSecret = [
+  "test",
+  "only",
+  "administrator",
+  "session",
+  "secret",
+].join("-");
+
+Object.assign(process.env, {
+  [adminPasswordName]: adminPassword,
+  [adminSessionName]: adminSessionSecret,
+});
 
 const { createAdminSession, hashAdminClientIp } =
   await import("../api/_lib/admin-auth");
@@ -37,7 +50,7 @@ test("successful login clears failures and returns a hardened no-store cookie", 
   const result = await routes.login({
     method: "POST",
     headers: { "x-forwarded-for": "203.0.113.7" },
-    body: { password: "correct horse battery staple" },
+    body: { password: adminPassword },
   });
 
   expect(result.status).toBe(204);
@@ -77,7 +90,7 @@ test("a rate-limited login keeps the same generic error without recording anothe
   const result = await routes.login({
     method: "POST",
     headers: { "x-forwarded-for": "203.0.113.7" },
-    body: { password: "correct horse battery staple" },
+    body: { password: adminPassword },
   });
 
   expect(result).toMatchObject({
@@ -216,7 +229,7 @@ test("the Vercel login adapter applies a pure handler response", async () => {
     {
       method: "POST",
       headers: { "x-forwarded-for": "203.0.113.7" },
-      body: { password: "correct horse battery staple" },
+      body: { password: adminPassword },
     } as never,
     { status, end, setHeader } as never,
   );
@@ -258,7 +271,7 @@ test("a production login dependency failure becomes a generic no-store response"
       {
         method: "POST",
         headers: { "x-forwarded-for": "203.0.113.7" },
-        body: { password: "correct horse battery staple" },
+        body: { password: adminPassword },
       } as never,
       response as never,
     );

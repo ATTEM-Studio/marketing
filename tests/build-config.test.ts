@@ -15,4 +15,13 @@ describe("deployment configuration", () => {
       /^VITE_[A-Z0-9_]*(?:SERVICE_ROLE|INVITE_HASH_PEPPER)/mu,
     );
   });
+
+  test("never exposes administrator credential configuration to browser builds", () => {
+    const config = readFileSync("src/config.ts", "utf8");
+    const viteConfig = readFileSync("vite.config.ts", "utf8");
+    const adminEnvironment = /ADMIN_(?:DASHBOARD_PASSWORD|SESSION_SECRET)/;
+
+    expect(config).not.toMatch(adminEnvironment);
+    expect(viteConfig).not.toMatch(adminEnvironment);
+  });
 });

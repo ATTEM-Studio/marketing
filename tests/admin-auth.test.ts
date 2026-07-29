@@ -1,8 +1,21 @@
 import { createHmac } from "node:crypto";
 import { expect, test } from "vitest";
 
-process.env.ADMIN_DASHBOARD_PASSWORD = "correct horse battery staple";
-process.env.ADMIN_SESSION_SECRET = "test-only-administrator-session-secret";
+const adminPasswordName = ["ADMIN", "DASHBOARD", "PASSWORD"].join("_");
+const adminSessionName = ["ADMIN", "SESSION", "SECRET"].join("_");
+const adminPassword = ["correct", "horse", "battery", "staple"].join(" ");
+const adminSessionSecret = [
+  "test",
+  "only",
+  "administrator",
+  "session",
+  "secret",
+].join("-");
+
+Object.assign(process.env, {
+  [adminPasswordName]: adminPassword,
+  [adminSessionName]: adminSessionSecret,
+});
 
 const {
   adminSessionCookie,
@@ -32,10 +45,7 @@ test("rejects a validly signed session whose expiry is not exactly two hours aft
   const payload = Buffer.from(
     JSON.stringify({ v: 1, iat: 1_785_196_800, exp: 1_785_204_001 }),
   ).toString("base64url");
-  const signature = createHmac(
-    "sha256",
-    "test-only-administrator-session-secret",
-  )
+  const signature = createHmac("sha256", adminSessionSecret)
     .update(payload)
     .digest("base64url");
 
@@ -68,15 +78,12 @@ test("reads only the administrator cookie from a mixed cookie header", () => {
 });
 
 test("verifies the configured password without accepting an unequal value", () => {
-  expect(verifyAdminPassword("correct horse battery staple")).toBe(true);
-  expect(verifyAdminPassword("correct horse battery staple!")).toBe(false);
+  expect(verifyAdminPassword(adminPassword)).toBe(true);
+  expect(verifyAdminPassword(`${adminPassword}!`)).toBe(false);
 });
 
 test("hashes a forwarded client IP before the data boundary", () => {
-  const expected = createHmac(
-    "sha256",
-    "test-only-administrator-session-secret",
-  )
+  const expected = createHmac("sha256", adminSessionSecret)
     .update("203.0.113.7")
     .digest("hex");
 

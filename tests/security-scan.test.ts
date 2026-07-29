@@ -4,6 +4,8 @@ import * as securityScan from "../scripts/security-scan.mjs";
 const serviceRoleName = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
 const pepperName = ["INVITE", "HASH", "PEPPER"].join("_");
 const accessTokenName = ["SUPABASE", "ACCESS", "TOKEN"].join("_");
+const adminPasswordName = ["ADMIN", "DASHBOARD", "PASSWORD"].join("_");
+const adminSessionName = ["ADMIN", "SESSION", "SECRET"].join("_");
 const liveValue = ["real", "server", "secret", "value"].join("-");
 
 describe("security scan", () => {
@@ -22,6 +24,36 @@ describe("security scan", () => {
     expect(
       findings.every((finding) => finding.includes("server secret assignment")),
     ).toBe(true);
+  });
+
+  test("rejects administrator secret assignments and Vite environment names", () => {
+    const viteAdminPasswordName = ["VITE", adminPasswordName].join("_");
+    const findings = securityScan.findSecretExposures([
+      { file: "admin.env", source: `${adminPasswordName}=${liveValue}` },
+      { file: "session.env", source: `${adminSessionName}=${liveValue}` },
+      { file: "client.env", source: `${viteAdminPasswordName}=placeholder` },
+    ]);
+
+    expect(
+      findings.filter((finding) =>
+        finding.includes("server secret assignment"),
+      ),
+    ).toHaveLength(2);
+    expect(findings).toContain("client.env: Vite secret variable name");
+  });
+
+  test("allows administrator secret names with only the documented placeholders", () => {
+    const findings = securityScan.findSecretExposures([
+      {
+        file: "README.md",
+        source: [
+          `${adminPasswordName}=<a unique long password kept outside the repository>`,
+          `${adminSessionName}=<at least 32 random bytes, independently generated>`,
+        ].join("\n"),
+      },
+    ]);
+
+    expect(findings).toEqual([]);
   });
 
   test("rejects quoted JSON and object-key server-secret assignments", () => {

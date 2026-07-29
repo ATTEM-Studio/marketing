@@ -110,6 +110,25 @@ values ('<paste-local-sha256-hash>', 'available', now() + interval '30 days');
 
 서버 전용 네 변수도 Vercel의 **Preview**와 **Production** 범위에 각각 존재해야 합니다. Preview에는 가능하면 별도 테스트 데이터 경계를 사용합니다. 브라우저에 공개할 수 있는 설정은 위의 `VITE_APP_MODE`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`뿐이며, 서비스 역할 키나 OpenAI 키 이름에 `VITE_` 접두사를 붙이지 않습니다. 변수를 추가하거나 바꾸면 기존 배포에는 반영되지 않으므로 새 Preview를 만든 뒤 검증하고, 같은 검증된 아티팩트를 Production으로 승격합니다.
 
+### 관리자 대시보드 운영
+
+관리자 대시보드는 조회 전용입니다. 회원 정보, 진단 요약, 중복 후보, 집계는 확인할 수 있지만 회원 수정·삭제·병합·내보내기와 코칭 대화 내용 조회는 제공하지 않습니다.
+
+Vercel의 **Preview**와 **Production**에 아래 두 서버 전용 변수를 각각 설정합니다. 값은 저장소, 브라우저 변수, 빌드 출력, 로그에 넣지 않습니다.
+
+```text
+ADMIN_DASHBOARD_PASSWORD=<a unique long password kept outside the repository>
+ADMIN_SESSION_SECRET=<at least 32 random bytes, independently generated>
+```
+
+일반 로고/이름 클릭의 기존 이동 동작은 그대로입니다. 같은 로고를 5초 안에 10번 누르면 비밀번호 대화상자가 열립니다. 인증 세션은 정확히 2시간 후 만료됩니다. 로그아웃하면 관리자 화면의 개인정보를 즉시 지우고 다시 인증해야 합니다.
+
+`ADMIN_DASHBOARD_PASSWORD`를 교체하면 이후 로그인에는 새 비밀번호가 필요합니다. 이미 발급된 세션을 즉시 무효화해야 하면 독립적으로 `ADMIN_SESSION_SECRET`도 교체하고 새 Preview에서 확인한 뒤 Production에 반영합니다. 이 경우 기존 세션은 다시 인증해야 합니다.
+
+중복 배지는 정규화한 이메일이 같은 경우 **높음**, 정규화한 지역과 상호가 같은 경우 **검토**를 뜻합니다. 배지는 중복 후보를 보여 주는 표시이며 회원 데이터를 변경하지 않습니다.
+
+안전한 운영 반영 순서는 전체 브랜치 검토 → 두 서버 전용 변수의 Preview 설정 및 확인 → 같은 변수의 Production 설정 → `main` 병합 → `202607280012_admin_login_rate_limit.sql` 적용 → 검증된 빌드 배포 → 데스크톱·모바일 인증/로그아웃 및 읽기 전용 확인입니다. 실제 운영 비밀번호나 세션 비밀값은 이 문서와 배포 기록에 남기지 않습니다.
+
 ### 사용 제한과 안전한 응답
 
 - 인증된 활성 사용자 한 명당 최근 1시간에 코칭 요청을 최대 20회 허용하며, 초과 요청은 HTTP 429를 반환합니다.
