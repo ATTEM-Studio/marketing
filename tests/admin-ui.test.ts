@@ -189,6 +189,26 @@ test("shows four totals, an accessible 30-day trend, newest members, and duplica
   expect(root.textContent).toContain("중복 가능성 높음");
 });
 
+test("exposes every trend date and count outside the visual role", async () => {
+  const root = getRoot();
+  await renderAdminDashboard(root, createApi(), callbacks(root));
+
+  const visual = root.querySelector<HTMLElement>(
+    "[role='img'][aria-label*='최근 30일']",
+  );
+  const table = root.querySelector<HTMLTableElement>(
+    "[data-admin-trend-values]",
+  );
+  expect(visual).not.toBeNull();
+  expect(table).not.toBeNull();
+  expect(visual?.contains(table)).toBe(false);
+  expect(table?.rows).toHaveLength(3);
+  expect(table?.textContent).toContain("2026-07-28");
+  expect(table?.textContent).toContain("2명");
+  expect(table?.textContent).toContain("2026-07-29");
+  expect(table?.textContent).toContain("3명");
+});
+
 test("debounces search for 300ms and protects the newest result from stale requests", async () => {
   vi.useFakeTimers();
   const root = getRoot();
@@ -381,6 +401,64 @@ test("clears all member PII and returns to login after a 401", async () => {
   ).toBe("관리자 로그인");
 });
 
+test("lets a closed stale detail 401 expire the active dashboard", async () => {
+  const root = getRoot();
+  let rejectDetail: ((error: unknown) => void) | undefined;
+  const api = createApi({
+    member: () =>
+      new Promise<AdminMemberDetail>((_resolve, reject) => {
+        rejectDetail = reject;
+      }),
+  });
+  await renderAdminDashboard(root, api, callbacks(root));
+  root
+    .querySelector<HTMLButtonElement>(`[data-member-id='${MEMBER_ID}']`)
+    ?.click();
+  root.querySelector<HTMLButtonElement>("[data-admin-detail-close]")?.click();
+
+  rejectDetail?.(new AdminApiError("unauthorized"));
+  await flush();
+
+  expect(root.textContent).not.toContain("kim@example.com");
+  expect(
+    root.querySelector("[role='dialog']")?.getAttribute("aria-label"),
+  ).toBe("관리자 로그인");
+});
+
+test("lets a superseded overview 401 expire the active dashboard", async () => {
+  vi.useFakeTimers();
+  const root = getRoot();
+  let rejectStale: ((error: unknown) => void) | undefined;
+  const api = createApi({
+    overview: async (query) => {
+      if (!query.search) return structuredClone(overviewFixture);
+      if (query.search === "첫 검색") {
+        return new Promise<AdminOverview>((_resolve, reject) => {
+          rejectStale = reject;
+        });
+      }
+      return structuredClone(overviewFixture);
+    },
+  });
+  await renderAdminDashboard(root, api, callbacks(root));
+  const search = root.querySelector<HTMLInputElement>("[data-admin-search]");
+  if (!search) throw new Error("missing search");
+  search.value = "첫 검색";
+  search.dispatchEvent(new Event("input", { bubbles: true }));
+  vi.advanceTimersByTime(300);
+  await flush();
+  search.value = "둘째 검색";
+  search.dispatchEvent(new Event("input", { bubbles: true }));
+  vi.advanceTimersByTime(300);
+  await flush();
+
+  rejectStale?.(new AdminApiError("unauthorized"));
+  await flush();
+
+  expect(root.textContent).not.toContain("kim@example.com");
+  expect(root.querySelector("[data-admin-login-overlay]")).not.toBeNull();
+});
+
 test("closes detail on Escape and restores focus to the selected member", async () => {
   const root = getRoot();
   await renderAdminDashboard(root, createApi(), callbacks(root));
@@ -401,6 +479,28 @@ test("closes detail on Escape and restores focus to the selected member", async 
   expect(document.activeElement).toBe(member);
 });
 
+test("restores focus by member ID after an overview refresh replaces the row", async () => {
+  const root = getRoot();
+  await renderAdminDashboard(root, createApi(), callbacks(root));
+  const original = root.querySelector<HTMLButtonElement>(
+    `[data-member-id='${MEMBER_ID}']`,
+  );
+  original?.click();
+  await flush();
+  root
+    .querySelector<HTMLButtonElement>("[data-duplicate-filter='review']")
+    ?.click();
+  await flush();
+  const replacement = root.querySelector<HTMLButtonElement>(
+    `[data-member-id='${MEMBER_ID}']`,
+  );
+  expect(replacement).not.toBe(original);
+
+  root.querySelector<HTMLButtonElement>("[data-admin-detail-close]")?.click();
+
+  expect(document.activeElement).toBe(replacement);
+});
+
 test("logs out through the API before notifying the app", async () => {
   const root = getRoot();
   const api = createApi();
@@ -412,4 +512,21 @@ test("logs out through the API before notifying the app", async () => {
 
   expect(api.logout).toHaveBeenCalledOnce();
   expect(handlers.onLogout).toHaveBeenCalledOnce();
+});
+
+test("cancels a queued debounced search as soon as logout begins", async () => {
+  vi.useFakeTimers();
+  const root = getRoot();
+  const api = createApi();
+  await renderAdminDashboard(root, api, callbacks(root));
+  const search = root.querySelector<HTMLInputElement>("[data-admin-search]");
+  if (!search) throw new Error("missing search");
+  search.value = "로그아웃 뒤 실행되면 안 됨";
+  search.dispatchEvent(new Event("input", { bubbles: true }));
+
+  root.querySelector<HTMLButtonElement>("[data-admin-logout]")?.click();
+  vi.advanceTimersByTime(300);
+  await flush();
+
+  expect(api.overview).toHaveBeenCalledTimes(1);
 });

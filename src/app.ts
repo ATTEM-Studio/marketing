@@ -50,6 +50,10 @@ export function createApp(
   options: CreateAppOptions = {},
 ): { start(): Promise<void> } {
   const administratorApi = options.adminApi ?? defaultAdminApi;
+  const normalRoot = document.createElement("div");
+  normalRoot.dataset.normalAppRoot = "";
+  normalRoot.replaceChildren(...Array.from(root.childNodes));
+  root.replaceChildren(normalRoot);
   let adminEntryInstalled = false;
   let adminEntryPending = false;
   let normalViewNodes: Node[] = [];
@@ -57,7 +61,7 @@ export function createApp(
 
   const showLanding = () => {
     renderLandingShell(
-      root,
+      normalRoot,
       {
         onRegister: () => showOnboarding(false, "register"),
         onLogin: () => showOnboarding(false, "register"),
@@ -89,6 +93,7 @@ export function createApp(
 
   const showAdministratorDashboard = async () => {
     adminEntryPending = false;
+    normalViewNodes = Array.from(root.childNodes);
     await renderAdminDashboard(root, administratorApi, {
       onUnauthorized() {
         restoreNormalView();
@@ -106,7 +111,6 @@ export function createApp(
     onUnlock() {
       if (adminEntryPending) return;
       adminEntryPending = true;
-      normalViewNodes = Array.from(root.childNodes);
       void administratorApi
         .session()
         .then(() => showAdministratorDashboard())
@@ -133,7 +137,7 @@ export function createApp(
   const showDashboard = async () => {
     const session = await service.getSession();
     await renderDashboard(
-      root,
+      normalRoot,
       session,
       service,
       () => {
@@ -144,7 +148,7 @@ export function createApp(
       (assessment) => {
         const model = restoreResultViewModel(assessment);
         if (!model) return;
-        renderResult(root, model, {
+        renderResult(normalRoot, model, {
           onBack: () => {
             void showDashboard();
           },
@@ -155,7 +159,7 @@ export function createApp(
 
   const showCoaching = (assessmentId: string, initialQuestion?: string) => {
     renderCoaching(
-      root,
+      normalRoot,
       assessmentId,
       service,
       () => {
@@ -166,14 +170,15 @@ export function createApp(
   };
 
   const showDiagnosis = (liveSession = false) => {
-    renderDiagnosis(root, {
+    renderDiagnosis(normalRoot, {
       async onSubmit(input: DiagnosisInput) {
         const outcome = buildDiagnosisOutcome(input);
         const { action, allocation } = outcome.model;
-        const submit = root.querySelector<HTMLButtonElement>(
+        const submit = normalRoot.querySelector<HTMLButtonElement>(
           "[data-submit-diagnosis]",
         );
-        const status = root.querySelector<HTMLElement>("[data-save-status]");
+        const status =
+          normalRoot.querySelector<HTMLElement>("[data-save-status]");
         if (submit) submit.disabled = true;
         if (status) status.textContent = "결과를 저장하고 있습니다.";
         try {
@@ -185,7 +190,7 @@ export function createApp(
             metrics: outcome.persistedMetrics,
             diagnosis: outcome.persistedDiagnosis,
           });
-          renderResult(root, outcome.model, {
+          renderResult(normalRoot, outcome.model, {
             async onSaveAction() {
               await service.saveActionPlan({
                 assessmentId: assessment.id,
@@ -209,7 +214,7 @@ export function createApp(
       },
     });
     if (!liveSession) return;
-    const shell = root.querySelector<HTMLElement>(".diagnosis-shell");
+    const shell = normalRoot.querySelector<HTMLElement>(".diagnosis-shell");
     if (!shell) return;
     shell.insertAdjacentHTML(
       "afterbegin",
@@ -242,7 +247,7 @@ export function createApp(
     initialView: OnboardingView = "register",
   ) => {
     renderOnboarding(
-      root,
+      normalRoot,
       service,
       {
         authCallback,

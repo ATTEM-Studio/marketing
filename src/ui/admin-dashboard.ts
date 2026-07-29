@@ -12,6 +12,8 @@ export interface AdminDashboardApi {
   overview(query: AdminOverviewQuery): Promise<AdminOverview>;
   member(id: string): Promise<AdminMemberDetail>;
   logout(): Promise<void>;
+  dashboardScope?(): AdminDashboardApi;
+  dispose?(): void;
 }
 
 export interface AdminDashboardCallbacks {
@@ -71,6 +73,7 @@ export async function renderAdminDashboard(
   adminApi: AdminDashboardApi,
   callbacks: AdminDashboardCallbacks,
 ): Promise<void> {
+  const requestApi = adminApi.dashboardScope?.() ?? adminApi;
   const state: AdminDashboardState = {
     query: { search: "", duplicate: "all", page: 1, pageSize: 25 },
     overview: null,
@@ -103,7 +106,7 @@ export async function renderAdminDashboard(
             <h2>최근 30일</h2>
           </div>
         </div>
-        <div class="admin-trend" role="img" aria-label="최근 30일 일별 가입 회원 수" data-admin-trend></div>
+        <div class="admin-trend" aria-label="최근 30일 일별 가입 회원 수" data-admin-trend></div>
       </section>
       <section class="admin-member-panel" aria-labelledby="admin-members-title">
         <div class="admin-section-heading">
@@ -163,29 +166,42 @@ export async function renderAdminDashboard(
     return;
   }
 
-  const expireSession = () => {
-    if (!active) return;
-    active = false;
+  const cancelPendingWork = () => {
     overviewRequest += 1;
     detailRequest += 1;
-    if (searchTimer) clearTimeout(searchTimer);
-    root.replaceChildren();
-    callbacks.onUnauthorized();
+    if (searchTimer) {
+      clearTimeout(searchTimer);
+      searchTimer = undefined;
+    }
+    requestApi.dispose?.();
   };
 
+  const leaveDashboard = (callback: () => void) => {
+    if (!active) return;
+    active = false;
+    cancelPendingWork();
+    root.replaceChildren();
+    callback();
+  };
+
+  const expireSession = () => leaveDashboard(callbacks.onUnauthorized);
+
   const closeDetail = (restoreFocus = true) => {
+    const closingId = selectedId;
     detailRequest += 1;
     state.selectedMember = null;
     if (state.loading === "detail") state.loading = null;
     if (state.error === "detail") state.error = null;
     detailRoot.replaceChildren();
     selectedId = null;
-    if (
-      restoreFocus &&
-      selectedTrigger instanceof HTMLElement &&
-      selectedTrigger.isConnected
-    ) {
-      selectedTrigger.focus();
+    if (restoreFocus) {
+      const currentTrigger =
+        selectedTrigger instanceof HTMLElement && selectedTrigger.isConnected
+          ? selectedTrigger
+          : Array.from(
+              dashboard.querySelectorAll<HTMLElement>("[data-member-id]"),
+            ).find((member) => member.dataset.memberId === closingId);
+      currentTrigger?.focus();
     }
     selectedTrigger = null;
   };
@@ -234,6 +250,10 @@ export async function renderAdminDashboard(
 
   const renderTrend = (overview: AdminOverview) => {
     trend.replaceChildren();
+    const visual = document.createElement("div");
+    visual.className = "admin-trend-visual";
+    visual.setAttribute("role", "img");
+    visual.setAttribute("aria-label", "최근 30일 일별 가입 회원 수 막대그래프");
     const list = document.createElement("ol");
     list.className = "admin-trend-bars";
     const maximum = Math.max(1, ...overview.daily.map((day) => day.count));
@@ -259,10 +279,30 @@ export async function renderAdminDashboard(
       list.append(item);
     }
     if (overview.daily.length === 0) {
-      trend.append(textElement("p", "최근 가입 추이 데이터가 없습니다."));
+      visual.append(textElement("p", "최근 가입 추이 데이터가 없습니다."));
+      trend.append(visual);
       return;
     }
-    trend.append(list);
+    visual.append(list);
+    const values = document.createElement("table");
+    values.className = "sr-only";
+    values.dataset.adminTrendValues = "";
+    values.append(textElement("caption", "최근 30일 일별 가입 회원 수"));
+    const head = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    headRow.append(textElement("th", "날짜"), textElement("th", "가입 회원"));
+    head.append(headRow);
+    const body = document.createElement("tbody");
+    for (const day of overview.daily) {
+      const row = document.createElement("tr");
+      row.append(
+        textElement("td", day.date),
+        textElement("td", `${number.format(day.count)}명`),
+      );
+      body.append(row);
+    }
+    values.append(head, body);
+    trend.append(visual, values);
   };
 
   const createMemberRow = (member: AdminMemberSummary) => {
@@ -389,7 +429,7 @@ export async function renderAdminDashboard(
     state.error = null;
     renderOverviewLoading();
     try {
-      const overview = await adminApi.overview({ ...state.query });
+      const overview = await requestApi.overview({ ...state.query });
       if (!active || request !== overviewRequest) return;
       state.overview = overview;
       state.loading = null;
@@ -398,11 +438,11 @@ export async function renderAdminDashboard(
       renderMembers(overview);
       announcement.textContent = `${number.format(overview.totalRows)}명의 회원 목록을 불러왔습니다.`;
     } catch (error) {
-      if (!active || request !== overviewRequest) return;
-      if (isUnauthorized(error)) {
+      if (active && isUnauthorized(error)) {
         expireSession();
         return;
       }
+      if (!active || request !== overviewRequest) return;
       state.loading = null;
       state.error = "overview";
       renderOverviewError();
@@ -486,7 +526,7 @@ export async function renderAdminDashboard(
         '<div class="admin-skeleton admin-skeleton-detail" aria-hidden="true"></div><p role="status" aria-live="polite">회원 상세 정보를 불러오고 있습니다.</p>';
     }
     try {
-      const detail = await adminApi.member(id);
+      const detail = await requestApi.member(id);
       if (
         !active ||
         request !== detailRequest ||
@@ -499,11 +539,11 @@ export async function renderAdminDashboard(
       state.loading = null;
       renderDetail(panel, detail);
     } catch (error) {
-      if (!active || request !== detailRequest || !panel.isConnected) return;
-      if (isUnauthorized(error)) {
+      if (active && isUnauthorized(error)) {
         expireSession();
         return;
       }
+      if (!active || request !== detailRequest || !panel.isConnected) return;
       state.loading = null;
       state.error = "detail";
       renderDetailError(panel);
@@ -626,13 +666,12 @@ export async function renderAdminDashboard(
   logout?.addEventListener("click", async () => {
     if (logout.disabled) return;
     logout.disabled = true;
+    cancelPendingWork();
     announcement.textContent = "관리자 세션에서 로그아웃하고 있습니다.";
     try {
-      await adminApi.logout();
+      await requestApi.logout();
       if (!active) return;
-      active = false;
-      root.replaceChildren();
-      callbacks.onLogout();
+      leaveDashboard(callbacks.onLogout);
     } catch (error) {
       if (!active) return;
       if (isUnauthorized(error)) {

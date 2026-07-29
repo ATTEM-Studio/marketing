@@ -486,3 +486,72 @@ test("restores focus to the delegated logo trigger when administrator login clos
 
   expect(document.activeElement).toBe(trigger);
 });
+
+test("captures the latest normal view when the administrator transition actually begins", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  let resolveAdminSession: (() => void) | undefined;
+  const adminSession = new Promise<{ authenticated: true }>((resolve) => {
+    resolveAdminSession = () => resolve({ authenticated: true });
+  });
+  const admin = adminClient({ session: () => adminSession });
+  await createApp(root, liveService(), {
+    isLive: true,
+    adminApi: admin,
+  }).start();
+
+  pressAdminLogo(root);
+  root.querySelector<HTMLButtonElement>("[data-start-diagnosis]")?.click();
+  expect(root.querySelector("[data-diagnosis-form]")).not.toBeNull();
+  resolveAdminSession?.();
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-dashboard]")).not.toBeNull();
+  });
+
+  root.querySelector<HTMLButtonElement>("[data-admin-logout]")?.click();
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-diagnosis-form]")).not.toBeNull();
+  });
+  root.querySelector<HTMLButtonElement>("[data-next-step]")?.click();
+  expect(root.querySelector("[data-diagnosis-form]")).not.toBeNull();
+});
+
+test("keeps stale normal async completion isolated while admin is open and restores it usefully", async () => {
+  document.body.innerHTML = '<div id="app"></div>';
+  const root = document.querySelector<HTMLElement>("#app");
+  if (!root) throw new Error("missing root");
+  let resolveAdminSession: (() => void) | undefined;
+  const adminSession = new Promise<{ authenticated: true }>((resolve) => {
+    resolveAdminSession = () => resolve({ authenticated: true });
+  });
+  let resolveSignOut: (() => void) | undefined;
+  const signOut = vi.fn(
+    () =>
+      new Promise<undefined>((resolve) => {
+        resolveSignOut = () => resolve(undefined);
+      }),
+  );
+  const admin = adminClient({ session: () => adminSession });
+  await createApp(root, liveService(signOut), {
+    isLive: true,
+    adminApi: admin,
+  }).start();
+
+  pressAdminLogo(root);
+  root.querySelector<HTMLButtonElement>("[data-sign-out]")?.click();
+  resolveAdminSession?.();
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-admin-dashboard]")).not.toBeNull();
+  });
+  resolveSignOut?.();
+  await Promise.resolve();
+
+  expect(root.querySelector("[data-admin-dashboard]")).not.toBeNull();
+  root.querySelector<HTMLButtonElement>("[data-admin-logout]")?.click();
+  await vi.waitFor(() => {
+    expect(root.querySelector("[data-start-registration]")).not.toBeNull();
+  });
+  root.querySelector<HTMLButtonElement>("[data-start-registration]")?.click();
+  expect(root.querySelector("[data-registration-form]")).not.toBeNull();
+});

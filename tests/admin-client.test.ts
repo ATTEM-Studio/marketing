@@ -64,7 +64,7 @@ test("normalizes fetch failures as network errors", async () => {
   await expect(adminApi.logout()).rejects.toMatchObject({ code: "network" });
 });
 
-test("aborts an obsolete overview fetch when a newer query starts", async () => {
+test("keeps dashboard abort ownership isolated across reopen", async () => {
   const pending = new Promise<Response>(() => undefined);
   fetchMock.mockReturnValueOnce(pending).mockResolvedValueOnce(
     new Response(
@@ -80,11 +80,17 @@ test("aborts an obsolete overview fetch when a newer query starts", async () => 
     ),
   );
   vi.stubGlobal("fetch", fetchMock);
+  const firstDashboard = adminApi.dashboardScope();
 
-  void adminApi.overview(defaultQuery);
-  await adminApi.overview({ ...defaultQuery, search: "서울" });
+  void firstDashboard.overview(defaultQuery);
+  firstDashboard.dispose();
+  const secondDashboard = adminApi.dashboardScope();
+  await secondDashboard.overview({ ...defaultQuery, search: "서울" });
 
   const firstSignal = (fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)
     ?.signal;
+  const secondSignal = (fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)
+    ?.signal;
   expect(firstSignal?.aborted).toBe(true);
+  expect(secondSignal?.aborted).toBe(false);
 });
